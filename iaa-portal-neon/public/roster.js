@@ -44,13 +44,51 @@
     return (res.data || [])[0] || null;
   }
 
+  // The roster for Home: a few quick retries (the first request after the
+  // portal opens can fail while sign-in refreshes or the database wakes),
+  // then the last roster this device saw, so the panel never just vanishes.
+  const CACHE_KEY = "iaa-portal-roster";
+  function saveCache(r) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), roster: r })); } catch (e) { /* storage full or off */ }
+  }
+  function readCache() {
+    try {
+      const c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+      return c && c.roster ? c : null;
+    } catch (e) { return null; }
+  }
+  async function latestForHome(ctx) {
+    const waits = [0, 600, 1800];
+    let lastErr = null;
+    for (const w of waits) {
+      if (w) await new Promise((res) => setTimeout(res, w));
+      try {
+        const r = await latest(ctx, false);
+        if (r) saveCache(r);
+        return { roster: r, fromCache: null };
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    console.warn("Roster couldn’t load:", lastErr);
+    const cached = readCache();
+    if (cached) return { roster: cached.roster, fromCache: cached.at };
+    return { roster: null, error: lastErr };
+  }
+
   // ------------------------------------------------------------------
   // Home panel
   // ------------------------------------------------------------------
   async function homePanel(ctx, rerender) {
     const { h } = ctx;
-    let r;
-    try { r = await latest(ctx, false); } catch (e) { return null; }
+    const got = await latestForHome(ctx);
+    if (got.error) {
+      return h("section", { class: "panel roster-home", "aria-labelledby": "roster-h" },
+        h("p", { class: "briefing-kicker" }, "Roster"),
+        h("h2", { id: "roster-h" }, "The roster couldn’t load just now"),
+        h("div", { class: "row" }, h("button", { class: "btn btn-quiet", type: "button", onclick: function () { rerender(); } }, "Try again")));
+    }
+    const r = got.roster;
     if (!r) return null;
     const date = iso(addDays(homeOffset));
     const mine = nameMatcher(ctx.state.profile);
@@ -86,6 +124,9 @@
           h("button", { class: "btn btn-quiet btn-small", type: "button", "aria-label": "Previous day", onclick: function () { homeOffset -= 1; rerender(); } }, "‹"),
           homeOffset !== 0 ? h("button", { class: "btn btn-quiet btn-small", type: "button", onclick: function () { homeOffset = 0; rerender(); } }, "Today") : null,
           h("button", { class: "btn btn-quiet btn-small", type: "button", "aria-label": "Next day", onclick: function () { homeOffset += 1; rerender(); } }, "›"))),
+      got.fromCache ? h("p", { class: "fineprint" }, "Couldn’t reach the portal just now, so this is the roster as of " +
+        new Date(got.fromCache).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) + ". ",
+        h("button", { class: "linkish", type: "button", onclick: function () { rerender(); } }, "Try again")) : null,
       myShifts.length ? h("p", { class: "notice roster-mine" }, "You’re on: " + myShifts.join(", ")) : null,
       h("div", { class: "roster-day-grid" }, sheetsOut),
       h("div", { class: "row" }, h("a", { class: "btn btn-quiet", href: "#/roster" }, "Full roster"))

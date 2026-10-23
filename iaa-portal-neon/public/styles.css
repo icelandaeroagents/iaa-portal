@@ -1014,3 +1014,7 @@ td .chip + .chip { margin-left: 0.3rem; }
 .service-manage input[type="text"] { flex: 1; min-width: 8rem; }
 
 .roster-grid td.is-struck { color: var(--muted); }
+
+.linkish { background: none; border: 0; padding: 0; color: var(--brand-strong); text-decoration: underline; cursor: pointer; font: inherit; }
+
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
