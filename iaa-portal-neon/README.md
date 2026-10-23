@@ -13,12 +13,19 @@ iaa-portal/
 │   ├── training.js         ← Training section: lessons, quizzes, certificates, records
 │   ├── training-content.js ← the six modules and 60 quiz questions (edit to change content)
 │   ├── reports.js          ← Reports section: report form, photos, follow-up
+│   ├── briefings.js        ← Briefings section: latest issue, archive, Mark as read, upload
+│   ├── briefing-convert.js ← reads issue number/date/topics from a briefing and makes the web version
+│   ├── roster.js, roster-parse.js ← Roster: today on Home, full grid, Excel upload
+│   ├── passes.js           ← Passes & certificates with expiry reminders
+│   ├── requests.js         ← Requests: leave & availability; stock, equipment & defects
 │   ├── config.js           ← your two Neon addresses go here
 │   ├── logo.svg            ← IAA logo (transparent background, for the navy header)
 │   ├── favicon.svg         ← browser tab icon
 │   └── vendor/
 │       ├── neon-js-0.7.0-beta.js   ← Neon's client library, bundled for the browser
-│       └── jspdf-2.5.1.umd.min.js  ← creates the certificate PDFs
+│       ├── jspdf-2.5.1.umd.min.js  ← creates the certificate PDFs
+│       ├── mammoth-1.9.1.browser.min.js ← turns uploaded Word briefings into web pages
+│       └── xlsx-0.18.5.mini.min.js      ← reads the roster Excel file
 ├── database/
 │   ├── schema.sql          ← run first in Neon's SQL Editor
 │   ├── 02-invitations.sql  ← run second: invitations and personal emails
@@ -26,9 +33,14 @@ iaa-portal/
 │   ├── 04-training.sql     ← training attempts, sign-offs, certificates
 │   ├── 05-import-old-training-records.sql ← records from the old training page
 │   ├── 06-multiple-stations.sql ← people can belong to several stations
-│   └── 07-reports.sql      ← internal reports, photos, follow-up notes, email recipients
+│   ├── 07-reports.sql      ← internal reports, photos, follow-up notes, email recipients
+│   ├── 08-access-requests.sql ← people can request access; management approves
+│   ├── 09-briefings.sql    ← weekly briefings and read confirmations
+│   └── 10-staff-tools.sql  ← roster, passes & certificates, leave, service requests
 ├── api/
-│   └── report-notify.js    ← server function that emails each report to management
+│   ├── report-notify.js    ← server function that emails each report to management
+│   ├── access-notify.js    ← emails management about access requests, and people when approved
+│   └── staff-notify.js     ← leave, urgent requests/vehicle defects, and pass expiry reminders
 ├── package.json            ← libraries for the server function (Vercel installs them)
 ├── tools/
 │   └── build-neon-vendor.sh  ← only needed to upgrade the Neon library
@@ -117,3 +129,26 @@ Run `bash tools/build-neon-vendor.sh <version>` (needs Node.js), then update the
 | `CRON_SECRET` | Any long random text |
 
 Redeploy after adding or changing these. Never put any of these values in the code.
+
+## Access requests
+
+Anyone with the portal link can sign in with their email and a code. If they're not invited and not on an allowed company domain, they can send a **Request access** form (name, stations, job, message). Management is emailed (same list as reports) and sees the request at the top of **People**, where they choose the role and stations and click **Approve** or **Decline**. Approved people are emailed and get in the next time they open the portal. Invitations work as before.
+
+## Briefings
+
+- **Publishing:** management opens **Briefings → Upload briefings** and chooses the finished Word file (or many at once). The issue number and date are read from the cover (or from file names like `IAA_Briefing_05_2026-02-15.docx`) and can be corrected before publishing. Uploading a number that already exists replaces that issue.
+- **Staff** see the latest issue at the top of **Home**, read every issue as a web page, download the original Word file, and click **I’ve read this briefing** (this replaces the Signatures table). Management sees who has and hasn’t read each issue.
+- **The Monday task** still builds the draft (lunch menu + placeholder). Once the finished version is written, uploading it is what publishes it.
+
+## Roster
+
+Management uploads the roster Excel file under **Roster → Upload roster** and chooses which tabs to show. The portal reads each half-month block (a heading such as “October , 2026”, the day numbers below it, then one row per shift). Home shows who’s on for a day; the Roster page shows the full grid and lets staff download the original file. Uploading a new file replaces what staff see.
+
+## Passes & certificates
+
+Each person records passes and certificates with expiry dates (never card or licence numbers). Reminders go to the person, with management copied, 30 days and 7 days before expiry and when expired. Management sees everyone under **Passes & certificates → Everyone**.
+
+## Requests
+
+- **Leave & availability:** private to the person and management. Management is emailed about new requests and approves or declines; the person is emailed the decision.
+- **Stock, equipment & defects:** shared with all staff. Management, and station leads for their own stations, update the status. Vehicle defects and urgent requests are emailed to management straight away.
