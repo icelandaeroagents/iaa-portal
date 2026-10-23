@@ -10,12 +10,18 @@ iaa-portal/
 │   ├── index.html
 │   ├── styles.css
 │   ├── app.js              ← sign-in, roles, navigation, sections
+│   ├── training.js         ← Training section: lessons, quizzes, certificates, records
+│   ├── training-content.js ← the six modules and 60 quiz questions (edit to change content)
 │   ├── config.js           ← your two Neon addresses go here
 │   └── vendor/
-│       └── neon-js-0.7.0-beta.js   ← Neon's client library, bundled for the browser
+│       ├── neon-js-0.7.0-beta.js   ← Neon's client library, bundled for the browser
+│       └── jspdf-2.5.1.umd.min.js  ← creates the certificate PDFs
 ├── database/
 │   ├── schema.sql          ← run first in Neon's SQL Editor
-│   └── 02-invitations.sql  ← run second: invitations and personal emails
+│   ├── 02-invitations.sql  ← run second: invitations and personal emails
+│   ├── 03-fix-profile-save.sql ← only for databases set up before 23 Oct 2026, 2 pm
+│   ├── 04-training.sql     ← training attempts, sign-offs, certificates
+│   └── 05-import-old-training-records.sql ← records from the old training page
 ├── tools/
 │   └── build-neon-vendor.sh  ← only needed to upgrade the Neon library
 ├── vercel.json             ← security headers
@@ -74,3 +80,11 @@ Role, station and access can only be changed by management. The database enforce
 ## Upgrading the Neon library
 
 Run `bash tools/build-neon-vendor.sh <version>` (needs Node.js), then update the file name in the script tag in `public/index.html`. Pick a version that has been out for at least two weeks.
+
+## Training
+
+- **Staff:** read each module, take its quiz (80% to pass), and see their own record and certificates under **Training**.
+- **Management:** **Training → Records** shows everyone, the sign-off queue, CSV export, and a **Link old records** panel. Sign-off uses your name and job title from the Home page. Certificates can be revoked; revoked ones stay on record.
+- **Station leads:** see records for staff at their own station.
+- **Changing content:** edit `public/training-content.js` and upload it. Questions and lessons are copied unchanged from the old training page (SOP Manual v1.1).
+- Quiz scoring runs in the browser, as on the old page, and the database checks that each score and pass mark add up. Management sign-off remains the confirmation step for each certificate.
