@@ -951,3 +951,66 @@ textarea:focus-visible, input[type="datetime-local"]:focus-visible { border-colo
   .briefing-list .chip { grid-column: 2; justify-self: start; }
   .briefing-latest-head { flex-direction: column; }
 }
+
+/* ---------- Roster ---------- */
+
+.roster-home { border-top: 4px solid var(--chrome); }
+.roster-mine { font-weight: 600; }
+
+.roster-day-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem 2rem;
+}
+
+.roster-day-sheet h3 { margin-bottom: 0.4rem; }
+
+.roster-day {
+  display: grid;
+  grid-template-columns: minmax(7rem, max-content) 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.roster-day dt {
+  color: var(--muted);
+  font-family: var(--font-sign);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.roster-day dd { margin: 0; }
+.roster-day dd.is-me, .roster-grid td.is-me { font-weight: 700; color: var(--brand-strong); }
+
+.roster-wrap { max-height: 70vh; }
+
+.roster-grid { font-size: 0.85rem; border-collapse: separate; border-spacing: 0; }
+.roster-grid th, .roster-grid td { padding: 0.35rem 0.4rem; white-space: nowrap; text-align: center; border-bottom: 1px solid var(--line); }
+.roster-grid thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.roster-grid tbody th {
+  position: sticky; left: 0; background: var(--surface); z-index: 1;
+  text-align: left; font-family: var(--font-sign); font-weight: 600; color: var(--muted);
+}
+.roster-grid .is-today { background: var(--bg); box-shadow: inset 0 3px 0 var(--brand); }
+.roster-grid thead th.is-today { color: var(--brand-strong); }
+
+/* ---------- Requests & attention ---------- */
+
+.attention-list { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.35rem; font-weight: 500; }
+
+.chip-leave-pending { border-color: var(--notice-line); background: var(--notice-bg); color: var(--ink); }
+.chip-leave-approved { background: var(--brand-strong); border-color: var(--brand-strong); color: var(--on-brand); }
+.chip-leave-declined { border-color: var(--danger); color: var(--danger); }
+.chip-leave-cancelled { color: var(--muted); }
+
+.chip-service-open { border-color: var(--notice-line); background: var(--notice-bg); color: var(--ink); }
+.chip-service-in_progress { border-color: var(--brand); color: var(--brand-strong); }
+.chip-service-done { background: var(--brand-strong); border-color: var(--brand-strong); color: var(--on-brand); }
+.chip-service-declined { color: var(--muted); }
+td .chip + .chip { margin-left: 0.3rem; }
+
+.service-manage { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; min-width: 16rem; }
+.service-manage input[type="text"] { flex: 1; min-width: 8rem; }
+
+.roster-grid td.is-struck { color: var(--muted); }

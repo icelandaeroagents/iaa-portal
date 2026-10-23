@@ -42,11 +42,32 @@
       render: renderBriefings
     },
     {
+      id: "roster",
+      title: "Roster",
+      description: "Who’s on today, and the full roster.",
+      roles: ALL_ROLES,
+      render: renderRoster
+    },
+    {
       id: "training",
       title: "Training",
       description: "Your courses, quizzes and certificates.",
       roles: ALL_ROLES,
       render: renderTraining
+    },
+    {
+      id: "passes",
+      title: "Passes & certificates",
+      description: "Your airport passes, permits and certificates, with expiry reminders.",
+      roles: ALL_ROLES,
+      render: renderPasses
+    },
+    {
+      id: "requests",
+      title: "Requests",
+      description: "Leave and availability, stock refills, equipment and vehicle defects.",
+      roles: ALL_ROLES,
+      render: renderRequests
     },
     {
       id: "reports",
@@ -521,13 +542,20 @@
     const nameSave = h("button", { class: "btn", type: "submit" }, "Save details");
 
     let latest = null;
-    if (window.IAABriefings) {
-      try { latest = await window.IAABriefings.homePanel(sectionCtx()); } catch (e) { latest = null; }
-    }
+    let roster = null;
+    let attention = null;
+    const rerenderHome = function () { renderHome(main); };
+    await Promise.all([
+      (async function () { if (window.IAABriefings) { try { latest = await window.IAABriefings.homePanel(sectionCtx()); } catch (e) { latest = null; } } })(),
+      (async function () { if (window.IAARoster) { try { roster = await window.IAARoster.homePanel(sectionCtx(), rerenderHome); } catch (e) { roster = null; } } })(),
+      (async function () { attention = await attentionPanel(); })()
+    ]);
 
     fill(
       main,
       pageHead("Hello, " + firstName(), "Here’s what you can do in the staff portal."),
+      attention,
+      roster,
       latest,
 
       !myStations.length
@@ -602,6 +630,50 @@
   // Shared helpers handed to the section files (training.js, reports.js, briefings.js).
   function sectionCtx() {
     return { db: db, state: state, h: h, fill: fill, pageHead: pageHead, setStatus: setStatus, logEvent: logEvent };
+  }
+
+  function sectionMissing(main, title) {
+    fill(main, pageHead(title), h("p", { class: "notice" }, "This section’s files didn’t load. Reload the page."));
+  }
+
+  async function renderRoster(main) {
+    if (!window.IAARoster || !window.IAARosterParse) return sectionMissing(main, "Roster");
+    return window.IAARoster.render(main, sectionCtx());
+  }
+
+  async function renderPasses(main) {
+    if (!window.IAAPasses) return sectionMissing(main, "Passes & certificates");
+    return window.IAAPasses.render(main, sectionCtx());
+  }
+
+  async function renderRequests(main) {
+    if (!window.IAARequests) return sectionMissing(main, "Requests");
+    return window.IAARequests.render(main, sectionCtx());
+  }
+
+  // Management: one line per thing waiting for them.
+  async function attentionPanel() {
+    if (state.profile.role !== "management") return null;
+    const items = [];
+    try {
+      const [acc, req, exp] = await Promise.all([
+        db.from("access_requests").select("id").eq("status", "pending"),
+        window.IAARequests ? window.IAARequests.counts(sectionCtx()) : Promise.resolve(null),
+        window.IAAPasses ? window.IAAPasses.expiringCount(sectionCtx()) : Promise.resolve(0)
+      ]);
+      const nAcc = (acc.data || []).length;
+      if (nAcc) items.push(["#/people", `${nAcc} access ${nAcc === 1 ? "request" : "requests"} to approve`]);
+      if (req && req.leave) items.push(["#/requests/leave", `${req.leave} leave ${req.leave === 1 ? "request" : "requests"} waiting`]);
+      if (req && req.urgent) items.push(["#/requests/service", `${req.urgent} urgent or vehicle defect ${req.urgent === 1 ? "request" : "requests"} open`]);
+      else if (req && req.service) items.push(["#/requests/service", `${req.service} open stock, equipment or defect ${req.service === 1 ? "request" : "requests"}`]);
+      if (exp) items.push(["#/passes", `${exp} ${exp === 1 ? "pass or certificate" : "passes or certificates"} expired or expiring within 30 days`]);
+    } catch (e) {
+      return null;
+    }
+    if (!items.length) return null;
+    return h("section", { class: "panel panel-attention", "aria-labelledby": "attn-h" },
+      h("h2", { id: "attn-h" }, "Needs attention"),
+      h("ul", { class: "attention-list" }, items.map((i) => h("li", null, h("a", { href: i[0] }, i[1])))));
   }
 
   // ---------- Briefings (briefings.js) ----------
