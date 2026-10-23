@@ -424,8 +424,9 @@
     const sections = MODULES.filter((m) => m.id !== "home" && m.roles.indexOf(p.role) !== -1);
 
     const nameInput = h("input", { id: "my-name", type: "text", autocomplete: "name", value: p.full_name || "" });
+    const titleInput = h("input", { id: "my-title", type: "text", autocomplete: "organization-title", value: p.job_title || "", placeholder: "e.g. Operations Officer" });
     const nameStatus = h("p", { class: "status", role: "status" });
-    const nameSave = h("button", { class: "btn", type: "submit" }, "Save name");
+    const nameSave = h("button", { class: "btn", type: "submit" }, "Save details");
 
     fill(
       main,
@@ -468,6 +469,9 @@
           h("dt", null, "Role"), h("dd", null, ROLE_LABELS[p.role]),
           h("dt", null, "Station"), h("dd", null, station ? `${station.code} – ${station.name}` : "Not assigned")
         ),
+        p.role === "management"
+          ? h("p", { class: "fineprint" }, "Your name and job title are printed on the training certificates you sign off.")
+          : null,
         h(
           "form",
           {
@@ -475,18 +479,21 @@
             onsubmit: async function (e) {
               e.preventDefault();
               const name = nameInput.value.trim();
+              const title = titleInput.value.trim();
               nameSave.disabled = true;
-              const { error } = await db.from("profiles").update({ full_name: name || null }).eq("id", p.id);
+              const { error } = await db.from("profiles").update({ full_name: name || null, job_title: title || null }).eq("id", p.id);
               nameSave.disabled = false;
               if (error) {
                 setStatus(nameStatus, error.message, true);
               } else {
                 state.profile.full_name = name || null;
-                setStatus(nameStatus, "Name saved.", false, true);
+                state.profile.job_title = title || null;
+                setStatus(nameStatus, "Details saved.", false, true);
               }
             }
           },
           h("div", { class: "field" }, h("label", { for: "my-name" }, "Your name"), nameInput),
+          h("div", { class: "field" }, h("label", { for: "my-title" }, "Job title"), titleInput),
           nameSave
         ),
         nameStatus
@@ -494,14 +501,22 @@
     );
   }
 
-  // ---------- Training (placeholder until the migration) ----------
+  // ---------- Training (training.js) ----------
 
   async function renderTraining(main) {
-    fill(
-      main,
-      pageHead("Training", "Your courses, quizzes and certificates."),
-      h("p", { class: "notice" }, "Training is moving here soon. Until then, keep using the current training page.")
-    );
+    if (!window.IAATraining || !window.TRAINING) {
+      fill(main, pageHead("Training"), h("p", { class: "notice" }, "The training files didn’t load. Reload the page."));
+      return;
+    }
+    return window.IAATraining.render(main, {
+      db: db,
+      state: state,
+      h: h,
+      fill: fill,
+      pageHead: pageHead,
+      setStatus: setStatus,
+      logEvent: logEvent
+    });
   }
 
   // ---------- Reports (placeholder) ----------
