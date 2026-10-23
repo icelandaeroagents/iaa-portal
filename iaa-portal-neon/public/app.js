@@ -35,6 +35,13 @@
       render: renderHome
     },
     {
+      id: "briefings",
+      title: "Briefings",
+      description: "This week’s briefing and every issue before it.",
+      roles: ALL_ROLES,
+      render: renderBriefings
+    },
+    {
       id: "training",
       title: "Training",
       description: "Your courses, quizzes and certificates.",
@@ -120,13 +127,7 @@
     if (profileRes.error) {
       const msg = profileRes.error.message || "";
       if (/no invitation/i.test(msg)) {
-        root.replaceChildren(
-          messageScreen(
-            "You don’t have access yet",
-            `${state.user.email} hasn’t been invited to the staff portal. Ask management to invite this email address, then sign in again.`,
-            signOutButton("Sign out")
-          )
-        );
+        await renderRequestAccess();
       } else if (/not verified/i.test(msg)) {
         root.replaceChildren(
           messageScreen(
@@ -154,6 +155,93 @@
     }
     state.stations = stationsRes.data || [];
     render();
+  }
+
+  // ------------------------------------------------------------------
+  // Asking for access (signed in, but not invited)
+  // ------------------------------------------------------------------
+  async function renderRequestAccess(sentNow) {
+    const [reqRes, stRes] = await Promise.all([
+      db.from("access_requests").select("*").eq("user_id", state.user.id).order("created_at", { ascending: false }),
+      db.from("stations").select("*").order("sort_order").order("code")
+    ]);
+    state.stations = stRes.data || [];
+    const latest = (reqRes.data || [])[0];
+
+    if (latest && latest.status === "pending") {
+      root.replaceChildren(
+        messageScreen(
+          sentNow ? "Request sent" : "Your request is waiting",
+          `Management has been asked to give ${latest.email} access to the staff portal. You’ll get an email when it’s approved. Then open the portal again.`,
+          h("div", { class: "row" },
+            h("button", { class: "btn", type: "button", onclick: function () { refreshSession(); } }, "Check again"),
+            signOutButton("Sign out"))
+        )
+      );
+      return;
+    }
+
+    const name = h("input", { id: "ra-name", type: "text", autocomplete: "name", required: true, value: (state.user.name || "").trim() });
+    const stations = stationPicker([], "Stations you work at", true);
+    const job = h("input", { id: "ra-job", type: "text", placeholder: "e.g. ramp agent, operations officer" });
+    const message = h("textarea", { id: "ra-message", rows: "3", placeholder: "Anything that helps management recognise you" });
+    const status = h("p", { class: "status", role: "status" });
+    const submit = h("button", { class: "btn", type: "submit" }, "Request access");
+
+    root.replaceChildren(
+      h(
+        "div",
+        { class: "signin" },
+        h("img", { class: "signin-logo", src: "logo.svg", alt: cfg.companyName, width: "260", height: "85" }),
+        h(
+          "div",
+          { class: "signin-card" },
+          h("div", { class: "signin-head" }, h("h1", null, "Request access")),
+          h("p", null, `You’re signed in as ${state.user.email}, which hasn’t been given access yet. Send a request and management will review it.`),
+          latest && latest.status === "declined"
+            ? h("p", { class: "notice" }, "Your last request was declined. Contact management if you think that was a mistake.")
+            : null,
+          h(
+            "form",
+            {
+              onsubmit: async function (e) {
+                e.preventDefault();
+                if (!name.value.trim()) { setStatus(status, "Enter your full name.", true); name.focus(); return; }
+                submit.disabled = true;
+                setStatus(status, "Sending…");
+                const ins = await db.from("access_requests").insert({
+                  user_id: state.user.id,
+                  email: state.user.email,
+                  full_name: name.value.trim(),
+                  station_codes: stations.values(),
+                  job: job.value.trim() || null,
+                  message: message.value.trim() || null
+                }).select("id").single();
+                if (ins.error) {
+                  submit.disabled = false;
+                  setStatus(status, /duplicate|one_pending/i.test(ins.error.message) ? "You’ve already sent a request." : ins.error.message, true);
+                  return;
+                }
+                try {
+                  await fetch("/api/access-notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ins.data.id }) });
+                } catch (err) {
+                  // management is still emailed by the 10-minute check
+                }
+                renderRequestAccess(true);
+              }
+            },
+            h("div", { class: "field" }, h("label", { for: "ra-name" }, "Full name"), name),
+            h("div", { class: "field" }, h("span", { class: "field-label" }, "Stations you work at"), stations.node),
+            h("div", { class: "field" }, h("label", { for: "ra-job" }, "Job"), job),
+            h("div", { class: "field" }, h("label", { for: "ra-message" }, "Message (optional)"), message),
+            submit
+          ),
+          status,
+          signOutButton("Sign out")
+        )
+      )
+    );
+    name.focus();
   }
 
   // ------------------------------------------------------------------
@@ -432,9 +520,15 @@
     const nameStatus = h("p", { class: "status", role: "status" });
     const nameSave = h("button", { class: "btn", type: "submit" }, "Save details");
 
+    let latest = null;
+    if (window.IAABriefings) {
+      try { latest = await window.IAABriefings.homePanel(sectionCtx()); } catch (e) { latest = null; }
+    }
+
     fill(
       main,
       pageHead("Hello, " + firstName(), "Here’s what you can do in the staff portal."),
+      latest,
 
       !myStations.length
         ? h("p", { class: "notice" }, "You haven’t been given a station yet. Management will add you to one.")
@@ -505,6 +599,21 @@
     );
   }
 
+  // Shared helpers handed to the section files (training.js, reports.js, briefings.js).
+  function sectionCtx() {
+    return { db: db, state: state, h: h, fill: fill, pageHead: pageHead, setStatus: setStatus, logEvent: logEvent };
+  }
+
+  // ---------- Briefings (briefings.js) ----------
+
+  async function renderBriefings(main) {
+    if (!window.IAABriefings || !window.IAABriefingConvert) {
+      fill(main, pageHead("Briefings"), h("p", { class: "notice" }, "The briefing files didn’t load. Reload the page."));
+      return;
+    }
+    return window.IAABriefings.render(main, sectionCtx());
+  }
+
   // ---------- Training (training.js) ----------
 
   async function renderTraining(main) {
@@ -546,10 +655,12 @@
   async function renderPeople(main) {
     fill(main, pageHead("People", "Give staff access and set their role and station."), h("p", { class: "empty" }, "Loading staff…"));
 
-    const [peopleRes, invitesRes] = await Promise.all([
+    const [peopleRes, invitesRes, requestsRes] = await Promise.all([
       db.from("profiles").select("*").order("full_name", { nullsFirst: false }).order("email"),
-      db.from("invitations").select("*").is("accepted_at", null).order("created_at", { ascending: false })
+      db.from("invitations").select("*").is("accepted_at", null).order("created_at", { ascending: false }),
+      db.from("access_requests").select("*").eq("status", "pending").order("created_at")
     ]);
+    const requests = requestsRes.error ? [] : (requestsRes.data || []);
     if (peopleRes.error) throw peopleRes.error;
     if (invitesRes.error) throw invitesRes.error;
     const data = peopleRes.data || [];
@@ -616,6 +727,7 @@
     fill(
       main,
       pageHead("People", "Give staff access and set their role and station."),
+      requests.length ? renderRequestsPanel(requests) : null,
       renderInvitePanel(data, invites),
       h(
         "section",
@@ -635,6 +747,69 @@
           : h("p", { class: "empty" }, "No one has signed in yet. Invite staff above, then share the portal address with them."),
         status
       )
+    );
+  }
+
+  function renderRequestsPanel(requests) {
+    const status = h("p", { class: "status", role: "status" });
+    const rows = requests.map(function (r) {
+      const role = h("select", { "aria-label": "Role for " + r.full_name }, ALL_ROLES.map((x) => h("option", { value: x, selected: x === "staff" }, ROLE_LABELS[x])));
+      const stations = stationPicker(r.station_codes || [], "Stations for " + r.full_name, true);
+      const approve = h("button", {
+        class: "btn btn-small",
+        type: "button",
+        onclick: async function () {
+          approve.disabled = true;
+          const { error } = await db.rpc("approve_access_request", { p_id: r.id, p_role: role.value, p_stations: stations.values() });
+          if (error) { approve.disabled = false; setStatus(status, error.message, true); return; }
+          try {
+            await fetch("/api/access-notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: r.id }) });
+          } catch (err) {
+            // the 10-minute check sends the approval email
+          }
+          render();
+        }
+      }, "Approve");
+      const decline = h("button", {
+        class: "btn btn-quiet btn-small",
+        type: "button",
+        onclick: async function () {
+          if (!confirm(`Decline the request from ${r.full_name} (${r.email})?`)) return;
+          decline.disabled = true;
+          const { error } = await db.rpc("decline_access_request", { p_id: r.id });
+          if (error) { decline.disabled = false; setStatus(status, error.message, true); return; }
+          render();
+        }
+      }, "Decline");
+      return h(
+        "tr",
+        null,
+        h("td", null, r.full_name, h("span", { class: "sub" }, r.email),
+          r.job ? h("span", { class: "sub" }, r.job) : null,
+          r.message ? h("span", { class: "sub request-message" }, "“" + r.message + "”") : null,
+          h("span", { class: "sub" }, "Asked " + new Date(r.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }))),
+        h("td", null, role),
+        h("td", null, stations.node),
+        h("td", null, h("div", { class: "row row-tight" }, approve, decline))
+      );
+    });
+
+    return h(
+      "section",
+      { class: "panel panel-attention", "aria-labelledby": "requests-h" },
+      h("h2", { id: "requests-h" }, `Access requests: ${requests.length}`),
+      h("p", null, "These people signed in with a verified email address and asked for access. Only approve people you know work for Iceland Aero Agents. They’re emailed when you approve them."),
+      h(
+        "div",
+        { class: "table-wrap" },
+        h(
+          "table",
+          null,
+          h("thead", null, h("tr", null, h("th", null, "Person"), h("th", null, "Role"), h("th", null, "Stations"), h("th", null, ""))),
+          h("tbody", null, rows)
+        )
+      ),
+      status
     );
   }
 
