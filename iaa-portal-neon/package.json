@@ -1,0 +1,10 @@
+{
+  "name": "iaa-staff-portal",
+  "private": true,
+  "description": "Iceland Aero Agents staff portal. The website is in public/; api/ holds the server function that emails reports.",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "nodemailer": "6.9.16",
+    "pg": "8.13.1"
+  }
+}

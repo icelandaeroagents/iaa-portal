@@ -12,7 +12,10 @@ iaa-portal/
 │   ├── app.js              ← sign-in, roles, navigation, sections
 │   ├── training.js         ← Training section: lessons, quizzes, certificates, records
 │   ├── training-content.js ← the six modules and 60 quiz questions (edit to change content)
+│   ├── reports.js          ← Reports section: report form, photos, follow-up
 │   ├── config.js           ← your two Neon addresses go here
+│   ├── logo.svg            ← IAA logo (transparent background, for the navy header)
+│   ├── favicon.svg         ← browser tab icon
 │   └── vendor/
 │       ├── neon-js-0.7.0-beta.js   ← Neon's client library, bundled for the browser
 │       └── jspdf-2.5.1.umd.min.js  ← creates the certificate PDFs
@@ -21,7 +24,12 @@ iaa-portal/
 │   ├── 02-invitations.sql  ← run second: invitations and personal emails
 │   ├── 03-fix-profile-save.sql ← only for databases set up before 23 Oct 2026, 2 pm
 │   ├── 04-training.sql     ← training attempts, sign-offs, certificates
-│   └── 05-import-old-training-records.sql ← records from the old training page
+│   ├── 05-import-old-training-records.sql ← records from the old training page
+│   ├── 06-multiple-stations.sql ← people can belong to several stations
+│   └── 07-reports.sql      ← internal reports, photos, follow-up notes, email recipients
+├── api/
+│   └── report-notify.js    ← server function that emails each report to management
+├── package.json            ← libraries for the server function (Vercel installs them)
 ├── tools/
 │   └── build-neon-vendor.sh  ← only needed to upgrade the Neon library
 ├── vercel.json             ← security headers
@@ -88,3 +96,24 @@ Run `bash tools/build-neon-vendor.sh <version>` (needs Node.js), then update the
 - **Station leads:** see records for staff at their own station.
 - **Changing content:** edit `public/training-content.js` and upload it. Questions and lessons are copied unchanged from the old training page (SOP Manual v1.1).
 - Quiz scoring runs in the browser, as on the old page, and the database checks that each score and pass mark add up. Management sign-off remains the confirmation step for each certificate.
+
+## Reports
+
+- **Staff** submit reports under **Reports → New report**, with up to 6 photos (shrunk in the browser before upload). Every active staff member can read every report. The reporter can withhold their name from other staff; management always sees it.
+- **Management** sets status, owner and the "may need reporting to Samgöngustofa" flag, and adds private notes. The original report text can't be changed after it's submitted.
+- **Email:** each report is emailed once to everyone in the `report_recipients` table (josh@, gtv@, hjalti@ and admin@iaa.is to start with), with photos attached. Vercel re-checks every 10 minutes for any report whose email didn't go out. To change recipients, see the end of `database/07-reports.sql`.
+
+### Email settings (Vercel → Project → Settings → Environment Variables)
+
+| Name | Value |
+|---|---|
+| `DATABASE_URL` | Added automatically by the Neon integration. Check it's there. |
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `465` |
+| `SMTP_USER` | `admin@iaa.is` |
+| `SMTP_PASS` | An app password for admin@iaa.is (Google account → Security → App passwords) |
+| `SMTP_FROM` | `IAA Staff Portal <admin@iaa.is>` |
+| `PORTAL_URL` | `https://portal.iaa.is` (or the vercel.app address until that works) |
+| `CRON_SECRET` | Any long random text |
+
+Redeploy after adding or changing these. Never put any of these values in the code.
