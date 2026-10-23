@@ -523,14 +523,22 @@
     });
   }
 
-  // ---------- Reports (placeholder) ----------
+  // ---------- Reports (reports.js) ----------
 
   async function renderReports(main) {
-    fill(
-      main,
-      pageHead("Reports", "Submit and follow up internal reports."),
-      h("p", { class: "notice" }, "Reporting is being set up and will open here.")
-    );
+    if (!window.IAAReports) {
+      fill(main, pageHead("Reports"), h("p", { class: "notice" }, "The reports files didn’t load. Reload the page."));
+      return;
+    }
+    return window.IAAReports.render(main, {
+      db: db,
+      state: state,
+      h: h,
+      fill: fill,
+      pageHead: pageHead,
+      setStatus: setStatus,
+      logEvent: logEvent
+    });
   }
 
   // ---------- People (management) ----------
