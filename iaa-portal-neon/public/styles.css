@@ -8,17 +8,18 @@
   --brand-strong: #07766d;   /* darker teal for text and buttons on light */
   --on-brand: #ffffff;
   --ink: #1a222f;            /* IAA navy */
-  --muted: #566176;
-  --bg: #eef1f5;
+  --muted: #4f6470;
+  --bg: #e4f2ef;             /* light teal page background */
+  --field: #f0f8f6;          /* light teal behind input fields */
   --surface: #ffffff;
-  --line: #d7dce4;
+  --line: #c9e0db;
 
-  --chrome: #1a222f;         /* header and menu */
-  --chrome-raised: #232d3d;
-  --chrome-ink: #eef2f7;
-  --chrome-muted: #9aa5b6;
-  --chrome-line: #2e394b;
-  --chrome-accent: #3cc2b3;
+  --chrome: #263449;         /* header and menu: lighter navy */
+  --chrome-raised: #31415a;
+  --chrome-ink: #f1f6f8;
+  --chrome-muted: #a9ddd5;   /* light teal for unselected menu items */
+  --chrome-line: #3a4b66;
+  --chrome-accent: #5fd0c3;
 
   --notice-bg: #fdf3dc;
   --notice-line: #e2a72e;
@@ -46,14 +47,15 @@
     --brand-strong: #3cc2b3;
     --on-brand: #0f151e;
     --ink: #e6ebf2;
-    --muted: #9aa5b6;
-    --bg: #121923;
+    --muted: #9fb6b8;
+    --bg: #121a24;
+    --field: #182230;
     --surface: #1a222f;
-    --line: #2b3547;
+    --line: #2b3a47;
 
-    --chrome: #0d131b;
-    --chrome-raised: #182130;
-    --chrome-line: #222c3b;
+    --chrome: #1e2a3b;
+    --chrome-raised: #29374c;
+    --chrome-line: #33435a;
 
     --notice-bg: #2c2411;
     --notice-line: #a07a24;
@@ -317,7 +319,7 @@ label, .field-label { font-weight: 500; font-size: 0.95rem; }
 input[type="text"], input[type="email"], input[type="number"], select {
   font: inherit;
   color: var(--ink);
-  background: var(--bg);
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: var(--radius-s);
   padding: 0.5rem 0.65rem;
@@ -347,7 +349,7 @@ input[type="checkbox"] {
   padding: 0.3rem 0.55rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-s);
-  background: var(--bg);
+  background: var(--field);
   font-family: var(--font-sign);
   font-weight: 600;
   letter-spacing: 0.04em;
