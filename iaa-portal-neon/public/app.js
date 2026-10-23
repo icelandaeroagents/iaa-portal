@@ -203,7 +203,7 @@
   }
 
   function renderShell(activeModule, modules, main) {
-    const homeStation = state.profile.station_code;
+    const myStations = state.profile.station_codes || [];
     const activeStations = state.stations.filter((s) => s.active);
 
     const board = h(
@@ -213,8 +213,8 @@
         h(
           "li",
           {
-            class: "plate" + (s.code === homeStation ? " is-home" : ""),
-            title: s.code === homeStation ? `${s.name} – your station` : s.name
+            class: "plate" + (myStations.indexOf(s.code) !== -1 ? " is-home" : ""),
+            title: myStations.indexOf(s.code) !== -1 ? `${s.name} – your station` : s.name
           },
           s.code
         )
@@ -242,8 +242,8 @@
       { class: "topbar" },
       h(
         "a",
-        { class: "brand", href: "#/home" },
-        h("span", { class: "brand-company" }, cfg.companyName),
+        { class: "brand", href: "#/home", "aria-label": `${cfg.companyName} ${cfg.portalName} – Home` },
+        h("img", { class: "brand-logo", src: "logo.svg", alt: cfg.companyName, width: "122", height: "40" }),
         h("span", { class: "brand-portal" }, cfg.portalName)
       ),
       board,
@@ -299,10 +299,11 @@
     return h(
       "div",
       { class: "signin" },
+      h("img", { class: "signin-logo", src: "logo.svg", alt: cfg.companyName, width: "260", height: "85" }),
       h(
         "div",
         { class: "signin-card" },
-        h("div", { class: "signin-head" }, h("span", { class: "brand-company" }, cfg.companyName), h("h1", null, cfg.portalName)),
+        h("div", { class: "signin-head" }, h("h1", null, cfg.portalName)),
         h("p", null, "Training, reports and station information for Iceland Aero Agents staff. Sign in with the email address management invited."),
         parts,
         status
@@ -420,7 +421,10 @@
 
   async function renderHome(main) {
     const p = state.profile;
-    const station = state.stations.find((s) => s.code === p.station_code);
+    const myStations = (p.station_codes || []).map((code) => {
+      const st = state.stations.find((s) => s.code === code);
+      return st ? `${st.code} – ${st.name}` : code;
+    });
     const sections = MODULES.filter((m) => m.id !== "home" && m.roles.indexOf(p.role) !== -1);
 
     const nameInput = h("input", { id: "my-name", type: "text", autocomplete: "name", value: p.full_name || "" });
@@ -432,7 +436,7 @@
       main,
       pageHead("Hello, " + firstName(), "Here’s what you can do in the staff portal."),
 
-      !p.station_code
+      !myStations.length
         ? h("p", { class: "notice" }, "You haven’t been given a station yet. Management will add you to one.")
         : null,
 
@@ -467,7 +471,7 @@
           { class: "facts" },
           h("dt", null, "Email"), h("dd", null, p.email),
           h("dt", null, "Role"), h("dd", null, ROLE_LABELS[p.role]),
-          h("dt", null, "Station"), h("dd", null, station ? `${station.code} – ${station.name}` : "Not assigned")
+          h("dt", null, myStations.length > 1 ? "Stations" : "Station"), h("dd", null, myStations.length ? myStations.join(", ") : "Not assigned")
         ),
         p.role === "management"
           ? h("p", { class: "fineprint" }, "Your name and job title are printed on the training certificates you sign off.")
@@ -555,14 +559,7 @@
         ALL_ROLES.map((r) => h("option", { value: r, selected: r === person.role }, ROLE_LABELS[r]))
       );
 
-      const station = h(
-        "select",
-        { "aria-label": "Station for " + label },
-        h("option", { value: "", selected: !person.station_code }, "None"),
-        state.stations.map((s) =>
-          h("option", { value: s.code, selected: s.code === person.station_code }, s.active ? s.code : s.code + " (inactive)")
-        )
-      );
+      const station = stationPicker(person.station_codes || [], "Stations for " + label);
 
       const active = h("input", { type: "checkbox", checked: person.active, disabled: isMe, "aria-label": "Access for " + label });
 
@@ -575,7 +572,7 @@
             if (isMe && role.value !== "management" && !confirm("You’re removing your own management access. Continue?")) {
               return;
             }
-            const changes = { role: role.value, station_code: station.value || null, active: active.checked };
+            const changes = { role: role.value, station_codes: station.values(), active: active.checked };
             save.disabled = true;
             const { error: upErr } = await db.from("profiles").update(changes).eq("id", person.id);
             save.disabled = false;
@@ -586,7 +583,7 @@
             await logEvent("profile_updated", {
               profile_id: person.id,
               email: person.email,
-              before: { role: person.role, station_code: person.station_code, active: person.active },
+              before: { role: person.role, station_codes: person.station_codes, active: person.active },
               after: changes
             });
             Object.assign(person, changes);
@@ -602,7 +599,7 @@
         null,
         h("td", null, person.full_name || "No name yet", h("span", { class: "sub" }, person.email)),
         h("td", null, role),
-        h("td", null, station),
+        h("td", null, station.node),
         h("td", null, active),
         h("td", null, save)
       );
@@ -623,7 +620,7 @@
               h(
                 "table",
                 null,
-                h("thead", null, h("tr", null, h("th", null, "Name"), h("th", null, "Role"), h("th", null, "Station"), h("th", null, "Access"), h("th", null, ""))),
+                h("thead", null, h("tr", null, h("th", null, "Name"), h("th", null, "Role"), h("th", null, "Stations"), h("th", null, "Access"), h("th", null, ""))),
                 h("tbody", null, rows)
               )
             )
@@ -641,12 +638,7 @@
       { id: "invite-role" },
       ALL_ROLES.map((r) => h("option", { value: r, selected: r === "staff" }, ROLE_LABELS[r]))
     );
-    const station = h(
-      "select",
-      { id: "invite-station" },
-      h("option", { value: "", selected: true }, "None"),
-      state.stations.filter((s) => s.active).map((s) => h("option", { value: s.code }, s.code))
-    );
+    const station = stationPicker([], "Stations for the new person", true);
     const addBtn = h("button", { class: "btn", type: "submit" }, "Invite");
     const status = h("p", { class: "status", role: "status" });
 
@@ -676,7 +668,7 @@
         null,
         h("td", null, inv.full_name || "No name given", h("span", { class: "sub" }, inv.email)),
         h("td", null, ROLE_LABELS[inv.role]),
-        h("td", null, inv.station_code || "None"),
+        h("td", null, (inv.station_codes || []).join(", ") || "None"),
         h("td", null, cancel)
       );
     });
@@ -709,7 +701,7 @@
               email: address,
               full_name: name.value.trim() || null,
               role: role.value,
-              station_code: station.value || null
+              station_codes: station.values()
             };
             addBtn.disabled = true;
             const { error } = await db.from("invitations").insert(invite);
@@ -725,7 +717,7 @@
         h("div", { class: "field" }, h("label", { for: "invite-email" }, "Email"), email),
         h("div", { class: "field" }, h("label", { for: "invite-name" }, "Name"), name),
         h("div", { class: "field" }, h("label", { for: "invite-role" }, "Role"), role),
-        h("div", { class: "field" }, h("label", { for: "invite-station" }, "Station"), station),
+        h("div", { class: "field" }, h("span", { class: "field-label" }, "Stations"), station.node),
         addBtn
       ),
       status,
@@ -737,7 +729,7 @@
               "table",
               null,
               h("caption", { class: "caption" }, "Waiting to sign in"),
-              h("thead", null, h("tr", null, h("th", null, "Name"), h("th", null, "Role"), h("th", null, "Station"), h("th", null, ""))),
+              h("thead", null, h("tr", null, h("th", null, "Name"), h("th", null, "Role"), h("th", null, "Stations"), h("th", null, ""))),
               h("tbody", null, pending)
             )
           )
@@ -874,6 +866,27 @@
     });
   }
 
+  // A row of tick boxes, one per station. Inactive stations only show
+  // when the person already has them (or when hideInactive is false).
+  function stationPicker(selected, label, hideInactive) {
+    const boxes = [];
+    const group = h(
+      "div",
+      { class: "station-picks", role: "group", "aria-label": label },
+      state.stations
+        .filter((s) => s.active || (!hideInactive && selected.indexOf(s.code) !== -1))
+        .map(function (s) {
+          const box = h("input", { type: "checkbox", value: s.code, checked: selected.indexOf(s.code) !== -1 });
+          boxes.push(box);
+          return h("label", { class: "station-pick", title: s.name }, box, h("span", null, s.active ? s.code : s.code + " (inactive)"));
+        })
+    );
+    return {
+      node: group,
+      values: function () { return boxes.filter((b) => b.checked).map((b) => b.value); }
+    };
+  }
+
   // Replaces a container's content, skipping empty (null) entries.
   function fill(node) {
     node.replaceChildren();
@@ -889,10 +902,11 @@
     return h(
       "div",
       { class: "signin" },
+      h("img", { class: "signin-logo", src: "logo.svg", alt: cfg.companyName || "Iceland Aero Agents", width: "260", height: "85" }),
       h(
         "div",
         { class: "signin-card" },
-        h("div", { class: "signin-head" }, h("span", { class: "brand-company" }, cfg.companyName || "Iceland Aero Agents"), h("h1", null, title)),
+        h("div", { class: "signin-head" }, h("h1", null, title)),
         h("p", null, text),
         extras
       )

@@ -50,7 +50,7 @@
     const [a, s, p] = await Promise.all([
       ctx.db.from("training_attempts").select("*").order("attempted_at"),
       ctx.db.from("training_signoffs").select("*").is("revoked_at", null),
-      ctx.db.from("profiles").select("id, email, full_name, station_code, role, active").order("full_name", { nullsFirst: false })
+      ctx.db.from("profiles").select("id, email, full_name, station_codes, role, active").order("full_name", { nullsFirst: false })
     ]);
     if (a.error) throw a.error;
     if (s.error) throw s.error;
@@ -509,7 +509,8 @@
           key: key,
           profileId: row.profile_id || null,
           name: p ? (p.full_name || p.email) : row.learner_name,
-          station: p ? (p.station_code || "") : (row.station || ""),
+          stations: p ? (p.station_codes || []) : (row.station ? [row.station] : []),
+          station: p ? (p.station_codes || []).join(", ") : (row.station || ""),
           atts: [],
           certs: [],
           last: ""
@@ -526,7 +527,7 @@
     data.certs.forEach((c) => learnerFor(c).certs.push(c));
 
     const all = Object.values(learners).sort((x, y) => x.name.localeCompare(y.name));
-    const shown = all.filter((L) => recordsStation === "All" || L.station === recordsStation);
+    const shown = all.filter((L) => recordsStation === "All" || L.stations.indexOf(recordsStation) !== -1);
 
     // ----- station filter and export
     const stationOptions = ["All"].concat(state.stations.map((s) => s.code), ["Multiple"]);
