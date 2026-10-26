@@ -127,7 +127,13 @@
       got.fromCache ? h("p", { class: "fineprint" }, "Couldn’t reach the portal just now, so this is the roster as of " +
         new Date(got.fromCache).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) + ". ",
         h("button", { class: "linkish", type: "button", onclick: function () { rerender(); } }, "Try again")) : null,
-      myShifts.length ? h("p", { class: "notice roster-mine" }, "You’re on: " + myShifts.join(", ")) : null,
+      (function () {
+        const when = homeOffset === 0 ? "today" : homeOffset === 1 ? "tomorrow" : homeOffset === -1 ? "yesterday" : "on " + niceDate(date, { weekday: "long" });
+        const first = String(ctx.state.profile.full_name || "").trim().split(/\s+/)[0];
+        if (myShifts.length) return h("p", { class: "notice roster-mine" }, `You’re on ${when.replace(/^on /, "")}: ` + myShifts.join(", "));
+        if (!first) return h("p", { class: "fineprint" }, "Add your name under Your details below to see your own shifts here.");
+        return h("p", { class: "fineprint" }, `You’re not on the roster ${when} (looking for “${first}”).`);
+      })(),
       h("div", { class: "roster-day-grid" }, sheetsOut),
       h("div", { class: "row" }, h("a", { class: "btn btn-quiet", href: "#/roster" }, "Full roster"))
     );
