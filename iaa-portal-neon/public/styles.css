@@ -1032,3 +1032,8 @@ td .chip + .chip { margin-left: 0.3rem; }
 .transcript td .sub { display: block; }
 
 .sub.is-error { color: var(--danger); }
+
+/* People: editable name and job title */
+.person-edit { min-width: 13rem; }
+.person-edit input { display: block; width: 100%; margin-bottom: 0.3rem; }
+.person-edit input + input { font-size: 0.9rem; }

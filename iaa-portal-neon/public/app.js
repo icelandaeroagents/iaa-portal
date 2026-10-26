@@ -794,6 +794,11 @@
 
       const active = h("input", { type: "checkbox", checked: person.active, disabled: isMe, "aria-label": "Access for " + label });
 
+      // Name and job title: shown on certificates, training records and reports,
+      // and the first name is what the roster on Home looks for.
+      const nameBox = h("input", { type: "text", value: person.full_name || "", placeholder: "Full name", autocomplete: "off", "aria-label": "Name for " + person.email });
+      const titleBox = h("input", { type: "text", value: person.job_title || "", placeholder: "Job title (optional)", autocomplete: "off", "aria-label": "Job title for " + person.email });
+
       const save = h(
         "button",
         {
@@ -803,7 +808,13 @@
             if (isMe && role.value !== "management" && !confirm("You’re removing your own management access. Continue?")) {
               return;
             }
-            const changes = { role: role.value, station_codes: station.values(), active: active.checked };
+            const changes = {
+              role: role.value,
+              station_codes: station.values(),
+              active: active.checked,
+              full_name: nameBox.value.trim().replace(/\s+/g, " ") || null,
+              job_title: titleBox.value.trim() || null
+            };
             save.disabled = true;
             const { error: upErr } = await db.from("profiles").update(changes).eq("id", person.id);
             save.disabled = false;
@@ -814,11 +825,13 @@
             await logEvent("profile_updated", {
               profile_id: person.id,
               email: person.email,
-              before: { role: person.role, station_codes: person.station_codes, active: person.active },
+              before: { role: person.role, station_codes: person.station_codes, active: person.active, full_name: person.full_name, job_title: person.job_title },
               after: changes
             });
             Object.assign(person, changes);
-            setStatus(status, `Saved changes for ${label}.`, false, true);
+            nameBox.value = changes.full_name || "";
+            titleBox.value = changes.job_title || "";
+            setStatus(status, `Saved changes for ${changes.full_name || person.email}.`, false, true);
             if (isMe) loadAndRender();
           }
         },
@@ -828,7 +841,7 @@
       return h(
         "tr",
         null,
-        h("td", null, person.full_name || "No name yet", h("span", { class: "sub" }, person.email)),
+        h("td", { class: "person-edit" }, nameBox, titleBox, h("span", { class: "sub" }, person.email)),
         h("td", null, role),
         h("td", null, station.node),
         h("td", null, active),
@@ -852,7 +865,7 @@
               h(
                 "table",
                 null,
-                h("thead", null, h("tr", null, h("th", null, "Name"), h("th", null, "Role"), h("th", null, "Stations"), h("th", null, "Access"), h("th", null, ""))),
+                h("thead", null, h("tr", null, h("th", null, "Name and job title"), h("th", null, "Role"), h("th", null, "Stations"), h("th", null, "Access"), h("th", null, ""))),
                 h("tbody", null, rows)
               )
             )
