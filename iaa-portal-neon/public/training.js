@@ -631,7 +631,8 @@
         doc.setLineWidth(0.3); doc.rect(11, 11, W - 22, H - 22);
       };
       const txt = function (t, x, y, size, style, col, opts) {
-        doc.setFont("helvetica", style || "normal"); doc.setFontSize(size); doc.setTextColor.apply(doc, col || navy); doc.text(String(t), x, y, opts || {});
+        doc.setFont("helvetica", style || "normal"); doc.setFontSize(size); doc.setTextColor.apply(doc, col || navy);
+        doc.text(Array.isArray(t) ? t : String(t), x, y, opts || {});
       };
       frame();
       txt("ICELAND AERO AGENTS", W / 2, 26, 16, "bold", teal, { align: "center" });
@@ -652,7 +653,9 @@
       txt(`${rec.passed} of ${rec.total} required modules passed  ·  ${rec.certified} certified`, L, y, 10, "bold", teal);
       y += 8;
 
-      const cols = [L, L + 92, L + 116, L + 140];
+      // Module | Result | Passed | Certificate — the certificate column gets the room it needs.
+      const cols = [L, L + 78, L + 98, L + 122];
+      const certW = R - cols[3];   // stays inside the inner border
       const head = function () {
         doc.setFillColor(232, 244, 241); doc.rect(L - 2, y - 5, R - L + 4, 8, "F");
         ["Module", "Result", "Passed", "Certificate"].forEach((c, i) => txt(c, cols[i], y, 9, "bold", navy));
@@ -660,16 +663,23 @@
       };
       head();
       rec.rows.forEach(function (r) {
-        const titleLines = doc.setFont("helvetica", "bold").setFontSize(9).splitTextToSize(r.code + "  " + r.title, 88);
-        const rowH = Math.max(11, titleLines.length * 4.2 + 6);
+        const titleLines = doc.setFont("helvetica", "bold").setFontSize(9).splitTextToSize(r.code + "  " + r.title, 74);
+        const partLines = doc.setFont("helvetica", "normal").setFontSize(7.5).splitTextToSize(r.part + (r.required ? "" : " · not required"), 74);
+        const signLines = r.cert
+          ? doc.setFont("helvetica", "normal").setFontSize(7).splitTextToSize("Signed off by " + r.signer + ", " + fmtDate(r.signed), certW)
+          : [];
+        const leftH = titleLines.length * 4.2 + partLines.length * 3.4;
+        const rightH = r.cert ? 4.2 + signLines.length * 3.2 : 4.2;
+        const rowH = Math.max(11, Math.max(leftH, rightH) + 4);
         if (y + rowH > H - 28) { doc.addPage(); frame(); y = 22; head(); }
         txt(titleLines, cols[0], y, 9, "bold", navy);
-        txt(r.part + (r.required ? "" : " · not required"), cols[0], y + titleLines.length * 4.2, 7.5, "normal", grey);
+        txt(partLines, cols[0], y + titleLines.length * 4.2, 7.5, "normal", grey);
         txt(r.result, cols[1], y, 9, "bold", r.result === "Pass" ? teal : r.result === "Fail" ? red : grey);
         txt(r.date ? fmtDate(r.date) : "–", cols[2], y, 9, "normal", navy);
         if (r.cert) {
-          doc.setFont("courier", "bold"); doc.setFontSize(8); doc.setTextColor.apply(doc, navy); doc.text(r.cert, cols[3], y);
-          txt(doc.splitTextToSize("Signed off by " + r.signer + ", " + fmtDate(r.signed), R - cols[3]), cols[3], y + 4.2, 7, "normal", grey);
+          doc.setFont("courier", "bold"); doc.setFontSize(7.5); doc.setTextColor.apply(doc, navy);
+          doc.text(doc.splitTextToSize(r.cert, certW), cols[3], y);
+          txt(signLines, cols[3], y + 4.2, 7, "normal", grey);
         } else {
           txt(r.result === "Pass" ? "Awaiting sign-off" : "–", cols[3], y, 8, "normal", grey);
         }
