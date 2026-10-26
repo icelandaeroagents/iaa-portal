@@ -1,12 +1,12 @@
 /* Iceland Aero Agents – Staff Portal
-   Training content: Operations Officer SOP Manual v1.1.
+   Training content: Operations Officer SOP Manual v1.2.
    Copied unchanged from the IAA Ops Training page (23 Oct 2026).
    To change a lesson or question, edit it here and upload the file.
    Quiz answers: "a" is the position of the correct option in "o",
    counting from 0. */
 
 window.TRAINING = {
-  manual: "1.1",
+  manual: "1.2",
   passMark: 0.8,
   modules: [
 {

@@ -1021,3 +1021,12 @@ td .chip + .chip { margin-left: 0.3rem; }
 
 .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
 .btn-danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
+
+/* ---------- Training record (transcript) ---------- */
+.transcript { max-width: 60rem; }
+.transcript h1 { font-size: 1.6rem; margin: 0.4rem 0 1rem; letter-spacing: 0.02em; }
+.transcript-who { display: grid; grid-template-columns: max-content 1fr; gap: 0.3rem 1.25rem; margin: 0 0 1rem; }
+.transcript-who dt { color: var(--muted); }
+.transcript-who dd { margin: 0; font-weight: 600; }
+.transcript-summary { font-weight: 600; color: var(--brand-strong); margin-bottom: 0.75rem; }
+.transcript td .sub { display: block; }

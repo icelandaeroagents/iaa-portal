@@ -34,6 +34,7 @@
     if (view === "result") return showResult(main, ctx);
     if (view === "records" && canSeeRecords) return showRecords(main, ctx);
     if (view === "cert" && parts[1]) return showCert(main, ctx, parts[1]);
+    if (view === "record") return showTranscript(main, ctx, parts[1] ? decodeURIComponent(parts[1]) : null);
     if (MODULES.some((m) => m.id === view)) return showModule(main, ctx, view);
     return showHome(main, ctx);
   }
@@ -56,7 +57,7 @@
     const [a, s, p] = await Promise.all([
       ctx.db.from("training_attempts").select("*").order("attempted_at"),
       ctx.db.from("training_signoffs").select("*").is("revoked_at", null),
-      ctx.db.from("profiles").select("id, email, full_name, station_codes, role, active").order("full_name", { nullsFirst: false })
+      ctx.db.from("profiles").select("id, email, full_name, job_title, station_codes, role, active").order("full_name", { nullsFirst: false })
     ]);
     if (a.error) throw a.error;
     if (s.error) throw s.error;
@@ -208,7 +209,8 @@
         h("h2", { id: "rec-h" }, "Your training record"),
         h("p", { class: "progress-line" }, h("span", null, `${done} of ${mine.length} passed, ${certs.length} certified`), progressBar(ctx, done / mine.length)),
         list,
-        noStationNote
+        noStationNote,
+        h("div", { class: "row" }, h("a", { class: "btn btn-quiet", href: "#/training/record" }, "View my training record"))
       ),
       othersPanel,
       h("p", { class: "fineprint" }, "Each module summarises the manual. The manual itself remains the reference: if anything here differs from a newer instruction, follow the newer one and tell management.")
@@ -529,6 +531,160 @@
   }
 
   // ------------------------------------------------------------------
+  // Training record (transcript): every module required for one person,
+  // with Pass / Fail / Not taken, date passed and certificate. No scores.
+  // ------------------------------------------------------------------
+  async function showTranscript(main, ctx, key) {
+    const { h, fill, state } = ctx;
+    const canSeeOthers = state.profile.role === "management" || state.profile.role === "station_lead";
+    const ownKey = "p:" + state.profile.id;
+    if (!key || !canSeeOthers) key = ownKey;
+    fill(main, h("p", { class: "empty" }, "Loading training record…"));
+
+    let person, atts, certs;
+    if (key === ownKey) {
+      const mine = await loadMine(ctx);
+      atts = mine.attempts; certs = mine.certs;
+      person = { name: state.profile.full_name || state.profile.email, job: state.profile.job_title || "", stations: state.profile.station_codes || [] };
+    } else {
+      const data = await loadAll(ctx);
+      const isProfile = key.indexOf("p:") === 0;
+      const id = key.slice(2);
+      const match = (row) => (isProfile ? row.profile_id === id : (!row.profile_id && row.name_key === id));
+      atts = data.attempts.filter(match);
+      certs = data.certs.filter(match);
+      const p = isProfile ? data.people.find((x) => x.id === id) : null;
+      const first = atts[0] || certs[0] || {};
+      if (!p && !first.learner_name) {
+        notice = { text: "That training record isn’t available.", isError: true };
+        return go("#/training/records");
+      }
+      person = p
+        ? { name: p.full_name || p.email, job: p.job_title || "", stations: p.station_codes || [] }
+        : { name: first.learner_name, job: "", stations: first.station ? [first.station] : [], legacy: true };
+    }
+
+    const rows = MODULES
+      .filter((m) => appliesTo(m, person.stations) || atts.some((a) => a.module === m.id) || certs.some((c) => c.module === m.id))
+      .map(function (m) {
+        const b = bestFor(atts, m.id);
+        const cert = certs.find((c) => c.module === m.id);
+        const passed = !!(cert || (b && b.passedAt));
+        return {
+          code: m.code,
+          title: m.title,
+          part: m.part,
+          required: appliesTo(m, person.stations),
+          result: passed ? "Pass" : b ? "Fail" : "Not taken",
+          date: cert ? cert.passed_at : b && b.passedAt ? b.passedAt : null,
+          cert: cert ? cert.cert_no : null,
+          signer: cert ? cert.signer_name : null,
+          signed: cert ? cert.signed_at : null
+        };
+      });
+    const required = rows.filter((r) => r.required);
+    const passed = required.filter((r) => r.result === "Pass").length;
+    const certified = required.filter((r) => r.cert).length;
+    const rec = { person: person, rows: rows, passed: passed, certified: certified, total: required.length, issued: new Date().toISOString() };
+
+    const msg = h("p", { class: "status", role: "status" });
+    const back = key === ownKey ? "#/training" : "#/training/records";
+    fill(
+      main,
+      h("a", { class: "back-link", href: back }, "Back"),
+      h("div", { class: "row" }, h("button", { class: "btn", type: "button", onclick: function () { transcriptPdf(rec, msg, ctx); } }, "Download PDF")),
+      msg,
+      h(
+        "section",
+        { class: "panel transcript" },
+        h("p", { class: "cert-brand" }, "ICELAND AERO AGENTS", h("span", null, "BIKF · BIRK · BIAR")),
+        h("h1", null, "Training Record"),
+        h("dl", { class: "transcript-who" },
+          h("dt", null, "Name"), h("dd", null, person.name),
+          person.job ? [h("dt", null, "Job title"), h("dd", null, person.job)] : null,
+          h("dt", null, "Stations"), h("dd", null, person.stations.length ? person.stations.join(", ") : "Not set"),
+          h("dt", null, "Manual"), h("dd", null, "Operations Officer SOP Manual v" + T.manual),
+          h("dt", null, "Issued"), h("dd", null, fmtDate(rec.issued))),
+        h("p", { class: "transcript-summary" }, `${passed} of ${required.length} required modules passed · ${certified} certified`),
+        h("div", { class: "table-wrap" },
+          h("table", null,
+            h("thead", null, h("tr", null, h("th", null, "Module"), h("th", null, "Result"), h("th", null, "Passed"), h("th", null, "Certificate"))),
+            h("tbody", null, rows.map((r) => h("tr", null,
+              h("td", null, h("b", null, r.code + " "), r.title, h("span", { class: "sub" }, r.part + (r.required ? "" : " · not required for this person"))),
+              h("td", null, h("span", { class: "chip " + (r.result === "Pass" ? "chip-pass" : r.result === "Fail" ? "chip-sev-high" : "chip-none") }, r.result)),
+              h("td", null, r.date ? fmtDate(r.date) : "–"),
+              h("td", null, r.cert ? [h("span", { class: "mono" }, r.cert), h("span", { class: "sub" }, "Signed off by " + r.signer + ", " + fmtDate(r.signed))] : r.result === "Pass" ? h("span", { class: "sub" }, "Awaiting sign-off") : "–")))))),
+        h("p", { class: "fineprint" }, "Results are shown as pass or fail only. This record reflects the IAA Staff Portal on the date issued" + (person.legacy ? "; these are old records not yet linked to a portal account." : "."))
+      )
+    );
+  }
+
+  function transcriptPdf(rec, msg, ctx) {
+    try {
+      const jsPDF = window.jspdf && window.jspdf.jsPDF;
+      if (!jsPDF) throw new Error("PDF library missing");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const W = 210, H = 297, L = 18, R = W - 18;
+      const teal = [8, 143, 131], navy = [27, 42, 65], grey = [91, 104, 102], red = [180, 35, 24];
+      const frame = function () {
+        doc.setDrawColor.apply(doc, teal); doc.setLineWidth(1.6); doc.rect(8, 8, W - 16, H - 16);
+        doc.setLineWidth(0.3); doc.rect(11, 11, W - 22, H - 22);
+      };
+      const txt = function (t, x, y, size, style, col, opts) {
+        doc.setFont("helvetica", style || "normal"); doc.setFontSize(size); doc.setTextColor.apply(doc, col || navy); doc.text(String(t), x, y, opts || {});
+      };
+      frame();
+      txt("ICELAND AERO AGENTS", W / 2, 26, 16, "bold", teal, { align: "center" });
+      txt("BIKF  ·  BIRK  ·  BIAR", W / 2, 32, 8, "normal", grey, { align: "center" });
+      txt("TRAINING RECORD", W / 2, 46, 20, "bold", navy, { align: "center" });
+
+      let y = 60;
+      const p = rec.person;
+      const field = function (label, value) {
+        txt(label, L, y, 9, "normal", grey); txt(value, L + 32, y, 10, "bold", navy); y += 6.5;
+      };
+      field("Name", p.name);
+      if (p.job) field("Job title", p.job);
+      field("Stations", p.stations.length ? p.stations.join(", ") : "Not set");
+      field("Manual", "Operations Officer SOP Manual v" + T.manual);
+      field("Issued", fmtDate(rec.issued));
+      y += 2;
+      txt(`${rec.passed} of ${rec.total} required modules passed  ·  ${rec.certified} certified`, L, y, 10, "bold", teal);
+      y += 8;
+
+      const cols = [L, L + 92, L + 116, L + 140];
+      const head = function () {
+        doc.setFillColor(232, 244, 241); doc.rect(L - 2, y - 5, R - L + 4, 8, "F");
+        ["Module", "Result", "Passed", "Certificate"].forEach((c, i) => txt(c, cols[i], y, 9, "bold", navy));
+        y += 7;
+      };
+      head();
+      rec.rows.forEach(function (r) {
+        const titleLines = doc.setFont("helvetica", "bold").setFontSize(9).splitTextToSize(r.code + "  " + r.title, 88);
+        const rowH = Math.max(11, titleLines.length * 4.2 + 6);
+        if (y + rowH > H - 28) { doc.addPage(); frame(); y = 22; head(); }
+        txt(titleLines, cols[0], y, 9, "bold", navy);
+        txt(r.part + (r.required ? "" : " · not required"), cols[0], y + titleLines.length * 4.2, 7.5, "normal", grey);
+        txt(r.result, cols[1], y, 9, "bold", r.result === "Pass" ? teal : r.result === "Fail" ? red : grey);
+        txt(r.date ? fmtDate(r.date) : "–", cols[2], y, 9, "normal", navy);
+        if (r.cert) {
+          doc.setFont("courier", "bold"); doc.setFontSize(8); doc.setTextColor.apply(doc, navy); doc.text(r.cert, cols[3], y);
+          txt(doc.splitTextToSize("Signed off by " + r.signer + ", " + fmtDate(r.signed), R - cols[3]), cols[3], y + 4.2, 7, "normal", grey);
+        } else {
+          txt(r.result === "Pass" ? "Awaiting sign-off" : "–", cols[3], y, 8, "normal", grey);
+        }
+        y += rowH;
+        doc.setDrawColor(210, 225, 221); doc.setLineWidth(0.2); doc.line(L - 2, y - 4, R + 2, y - 4);
+      });
+      txt("Results are shown as pass or fail only. This record reflects the IAA Staff Portal on the date issued.", W / 2, H - 18, 7.5, "normal", grey, { align: "center" });
+      const safe = p.name.normalize("NFD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_");
+      doc.save(`IAA_Training_Record_${safe}.pdf`);
+    } catch (e) {
+      ctx.setStatus(msg, "The PDF couldn’t be created. Reload the page and try again.", true);
+    }
+  }
+
+  // ------------------------------------------------------------------
   // Records (management and station leads)
   // ------------------------------------------------------------------
   async function showRecords(main, ctx) {
@@ -742,7 +898,7 @@
       return h(
         "tr",
         null,
-        h("td", null, L.name, h("span", { class: "sub" }, (L.station || "No station") + (L.profileId ? "" : " · old records, not linked"))),
+        h("td", null, h("a", { href: "#/training/record/" + encodeURIComponent(L.key) }, L.name), h("span", { class: "sub" }, (L.station || "No station") + (L.profileId ? "" : " · old records, not linked"))),
         cells,
         h("td", null, `${n}/${required.length}`),
         h("td", { class: "sub-cell" }, L.last ? fmtDate(L.last) : "Not started")
