@@ -1018,3 +1018,6 @@ td .chip + .chip { margin-left: 0.3rem; }
 .linkish { background: none; border: 0; padding: 0; color: var(--brand-strong); text-decoration: underline; cursor: pointer; font: inherit; }
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.btn-danger:hover:not(:disabled) { background: var(--danger); color: #fff; }

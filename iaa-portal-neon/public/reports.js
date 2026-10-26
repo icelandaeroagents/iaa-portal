@@ -614,6 +614,23 @@
       }
     }, r.notified_at ? "Send email again" : "Send email now");
 
+    // Delete (management). Photos, notes and the reporter link are removed with it.
+    const delStatus = h("p", { class: "status", role: "status" });
+    const del = h("button", {
+      class: "btn btn-danger",
+      type: "button",
+      onclick: async function () {
+        const no = number(r.id);
+        if (!confirm(`Delete ${no} permanently? Its photos and notes are deleted too. This cannot be undone.`)) return;
+        del.disabled = true;
+        await ctx.logEvent("report_deleted", { report_id: r.id, report_no: no, report_type: r.report_type, station_code: r.station_code, occurred_at: r.occurred_at });
+        const { error } = await ctx.db.from("reports").delete().eq("id", r.id);
+        if (error) { del.disabled = false; setStatus(delStatus, error.message, true); return; }
+        notice = { text: `${no} deleted.` };
+        go("#/reports");
+      }
+    }, "Delete report");
+
     return h(
       "section",
       { class: "panel panel-management", "aria-labelledby": "mg-h" },
@@ -636,7 +653,11 @@
       h("h3", null, "Email"),
       h("p", { class: r.notify_error && !r.notified_at ? "status is-error" : "fineprint" }, emailLine),
       h("div", { class: "row" }, resend),
-      resendStatus
+      resendStatus,
+      h("h3", null, "Delete"),
+      h("p", { class: "fineprint" }, "For test reports or reports entered by mistake. The report, its photos and its notes are removed permanently; the deletion is recorded in the audit log."),
+      h("div", { class: "row" }, del),
+      delStatus
     );
   }
 })();
