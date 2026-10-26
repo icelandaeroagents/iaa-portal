@@ -10,6 +10,12 @@
   const MODULES = T.modules;
   const PASS = T.passMark;
 
+  // Station modules (those with a "stations" list) are only for people who
+  // work at one of those stations. Everyone takes the others.
+  function appliesTo(m, codes) {
+    return !m.stations || (codes || []).some((c) => m.stations.indexOf(c) !== -1);
+  }
+
   let quiz = null;            // the quiz in progress (kept while navigating)
   let notice = null;          // one-off message for the next page shown
   let recordsStation = "All"; // station filter on the Records page
@@ -137,12 +143,45 @@
     fill(main, pageHead("Training", "Operations Officer SOP Manual v" + T.manual + ". Pass mark " + PASS * 100 + "%."), tabs(ctx, "mine"), h("p", { class: "empty" }, "Loading your training record…"));
 
     const { attempts, certs } = await loadMine(ctx);
-    const done = MODULES.filter((m) => (bestFor(attempts, m.id) || {}).passedAt).length;
+    const myCodes = ctx.state.profile.station_codes || [];
+    const mine = MODULES.filter((m) => appliesTo(m, myCodes));
+    const others = MODULES.filter((m) => !appliesTo(m, myCodes));
+    const done = mine.filter((m) => (bestFor(attempts, m.id) || {}).passedAt).length;
+
+    function moduleItem(m) {
+      const cert = certs.find((c) => c.module === m.id);
+      return h(
+        "li",
+        null,
+        h(
+          "a",
+          { href: "#/training/" + m.id },
+          h("span", { class: "module-code" }, m.code),
+          h("span", { class: "module-text" }, h("span", { class: "section-title" }, m.title), h("span", { class: "section-desc" }, m.summary)),
+          chip(ctx, bestFor(attempts, m.id), cert)
+        )
+      );
+    }
+
+    // Management and station leads can open other stations' modules to review them.
+    const showOthers = others.length && ctx.state.profile.role !== "staff";
+    const othersPanel = showOthers
+      ? h(
+          "section",
+          { class: "panel", "aria-labelledby": "other-h" },
+          h("h2", { id: "other-h" }, "Other stations' modules"),
+          h("p", { class: "fineprint" }, "Not required for you. Open them to review what staff at those stations learn."),
+          h("ul", { class: "module-list" }, others.map(moduleItem))
+        )
+      : null;
+    const noStationNote = !myCodes.length && others.length
+      ? h("p", { class: "fineprint" }, "Station winter modules appear here once management has set your station.")
+      : null;
 
     const list = h(
       "ul",
       { class: "module-list" },
-      MODULES.map(function (m) {
+      mine.map(function (m) {
         const cert = certs.find((c) => c.module === m.id);
         return h(
           "li",
@@ -167,9 +206,11 @@
         "section",
         { class: "panel", "aria-labelledby": "rec-h" },
         h("h2", { id: "rec-h" }, "Your training record"),
-        h("p", { class: "progress-line" }, h("span", null, `${done} of ${MODULES.length} passed, ${certs.length} certified`), progressBar(ctx, done / MODULES.length)),
-        list
+        h("p", { class: "progress-line" }, h("span", null, `${done} of ${mine.length} passed, ${certs.length} certified`), progressBar(ctx, done / mine.length)),
+        list,
+        noStationNote
       ),
+      othersPanel,
       h("p", { class: "fineprint" }, "Each module summarises the manual. The manual itself remains the reference: if anything here differs from a newer instruction, follow the newer one and tell management.")
     );
   }
@@ -681,16 +722,19 @@
     const head = h("tr", null, h("th", null, "Person"), MODULES.map((m) => h("th", { title: m.title }, m.code)), h("th", null, "Passed"), h("th", null, "Last activity"));
     const rows = shown.map(function (L) {
       let n = 0;
+      const required = MODULES.filter((m) => appliesTo(m, L.stations));
       const cells = MODULES.map(function (m) {
         const b = bestFor(L.atts, m.id);
         const cert = L.certs.find((c) => c.module === m.id);
+        const needed = appliesTo(m, L.stations);
+        if (!needed && !b && !cert) return h("td", null, h("span", { class: "cell cell-none", title: "Not required: other station" }, "n/a"));
         if (cert) {
-          n += 1;
+          if (needed) n += 1;
           return h("td", null, h("a", { class: "cell cell-cert", href: "#/training/cert/" + cert.id }, "★ " + (b ? b.best : cert.pct) + "%"), h("span", { class: "sub" }, "Certified"));
         }
         if (!b) return h("td", null, h("span", { class: "cell cell-none" }, "–"));
         if (b.passedAt) {
-          n += 1;
+          if (needed) n += 1;
           return h("td", null, h("span", { class: "cell cell-pass" }, "✓ " + b.best + "%"), h("span", { class: "sub" }, "Awaiting sign-off"));
         }
         return h("td", null, h("span", { class: "cell cell-fail" }, b.best + "%"), h("span", { class: "sub" }, b.tries + (b.tries === 1 ? " try" : " tries")));
@@ -700,12 +744,12 @@
         null,
         h("td", null, L.name, h("span", { class: "sub" }, (L.station || "No station") + (L.profileId ? "" : " · old records, not linked"))),
         cells,
-        h("td", null, `${n}/${MODULES.length}`),
+        h("td", null, `${n}/${required.length}`),
         h("td", { class: "sub-cell" }, L.last ? fmtDate(L.last) : "Not started")
       );
     });
 
-    const fullyDone = shown.filter((L) => MODULES.every((m) => (bestFor(L.atts, m.id) || {}).passedAt)).length;
+    const fullyDone = shown.filter((L) => MODULES.filter((m) => appliesTo(m, L.stations)).every((m) => (bestFor(L.atts, m.id) || {}).passedAt)).length;
 
     fill(
       main,
@@ -718,7 +762,7 @@
         h("div", { class: "field" }, h("label", { for: "records-station" }, "Station"), filter),
         exportBtn
       ),
-      h("p", { class: "fineprint" }, `${shown.length} people, ${fullyDone} with all ${MODULES.length} modules passed.`),
+      h("p", { class: "fineprint" }, `${shown.length} people, ${fullyDone} with all their required modules passed.`),
       queuePanel,
       linkPanel,
       h(
@@ -726,7 +770,7 @@
         { class: "panel", "aria-labelledby": "matrix-h" },
         h("h2", { id: "matrix-h" }, "Everyone"),
         h("div", { class: "table-wrap" }, h("table", { class: "matrix" }, h("thead", null, head), h("tbody", null, rows))),
-        h("p", { class: "fineprint" }, "★ certified (select to view) · ✓ passed, awaiting sign-off · % best score so far"),
+        h("p", { class: "fineprint" }, "★ certified (select to view) · ✓ passed, awaiting sign-off · % best score so far · n/a not required (other station)"),
         h("p", { class: "fineprint" }, MODULES.map((m) => m.code + " " + m.title).join(" · "))
       )
     );

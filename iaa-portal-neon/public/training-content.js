@@ -133,7 +133,11 @@ window.TRAINING = {
         <tr><td>Blue fuel pump</td><td>Fuel/tech stop — arrives and departs the same day</td></tr>
         <tr><td>Red plus</td><td>Ambulance / medevac</td></tr>
         <tr><td>Red X</td><td>Cancelled — out of Border Police emails, red on calendar. Never delete.</td></tr>
-      </table></div>` },
+        <tr><td>Red temple</td><td>In the hangar — on the ground</td></tr>
+        <tr><td>Orange dashed circle</td><td>AOG — on the ground with a technical problem</td></tr>
+        <tr><td>Pink X</td><td>Handled by another agent — left off the ops board</td></tr>
+      </table></div>
+      <p>For Ready to Sync flights, green arrival → red departure moves automatically 15 minutes after the Arrival time, and red departure or red temple → red circle 15 minutes after the Departure time. Delayed? Update the time in Notion. All other icons are set by hand.</p>` },
     { h: "Creating and verifying a flight", html: `
       <ol>
         <li>Check whether the automation has already created it — never make a duplicate.</li>
@@ -307,8 +311,8 @@ window.TRAINING = {
       <p>Flugverk is the technical authority — relay their updates, don't guess repair times. Flag an ongoing AOG in the WhatsApp handover.</p>` },
     { h: "Incident reporting — both channels, every time", key: true, html: `
       <ul>
-        <li>Report through IAA's internal system <b>and</b> the airport authority's system — never one instead of the other.</li>
-        <li>Make safe first. Internal report before the end of your shift.</li>
+        <li>Report on the <b>IAA Portal (Reports)</b> <b>and</b> through the airport authority's system — never one instead of the other.</li>
+        <li>Make safe first. Portal report before the end of your shift.</li>
         <li>Report injuries, any aircraft/GSE contact (even with no visible damage), FOD, near-misses, fuel issues, dangerous goods, security, and de-icing/AOG events that went wrong.</li>
         <li>Unsure? Report it anyway.</li>
       </ul>` },
@@ -325,11 +329,107 @@ window.TRAINING = {
     { q: "The departure is delayed 25 minutes after de-icing finished. What do you do?", o: ["Nothing — the crew will know", "Tell the crew immediately so they can check their holdover time", "Order a second de-icing yourself", "Record it in Notion only"], a: 1, e: "Delays erode holdover. Tell the crew straight away; they decide whether re-application is needed.", r: "19.2" },
     { q: "Who supplies Jet A-1 at BIKF?", o: ["Skeljungur", "EAK", "Icelandair", "Self-service pump"], a: 1, e: "EAK at BIKF; Skeljungur at BIRK; Icelandair fuel desk at BIAR.", r: "20" },
     { q: "A crew reports a technical fault that will stop departure. What is your first action?", o: ["Estimate the repair time for the client", "Contact Flugverk to arrange engineering", "Tow the aircraft to Apron 1 North", "Cancel the flight in Notion"], a: 1, e: "Flugverk is IAA's AOG partner and the technical authority on status and timeline.", r: "21.1" },
-    { q: "A tug lightly touches a GPU. No visible damage. What must you report?", o: ["Nothing — no damage", "Report through IAA's internal system and the airport authority's system", "Only the internal report", "Only tell the duty manager"], a: 1, e: "Any contact, even without visible damage, is reportable — through both channels.", r: "22.1" },
-    { q: "When must the internal incident report be made?", o: ["Within a week", "As soon as practical, and before the end of your shift", "At the monthly safety meeting", "Only if the airport authority asks"], a: 1, e: "Make the area safe first, then report before the end of your shift.", r: "22.2" },
+    { q: "A tug lightly touches a GPU. No visible damage. What must you report?", o: ["Nothing — no damage", "Report on the IAA Portal and through the airport authority's system", "Only the IAA Portal report", "Only tell the duty manager"], a: 1, e: "Any contact, even without visible damage, is reportable — through both channels.", r: "22.1" },
+    { q: "When must the report on the IAA Portal be made?", o: ["Within a week", "As soon as practical, and before the end of your shift", "At the monthly safety meeting", "Only if the airport authority asks"], a: 1, e: "Make the area safe first, then report before the end of your shift.", r: "22.2" },
     { q: "You're not sure an event is serious enough to report. What should you do?", o: ["Skip it", "Report it anyway", "Ask the crew", "Wait and see if anyone complains"], a: 1, e: "A precautionary report costs little; an unreported incident is a much bigger risk.", r: "22.2" },
     { q: "Fuel is spilling during fuelling. Which is correct?", o: ["Finish fuelling quickly, then clean up", "Stop fuelling, shut off the source if safe, keep ignition sources clear, notify the supplier and duty manager", "Start the APU to move the aircraft", "Hose it away with water"], a: 1, e: "Stop, isolate if safe, keep ignition sources away, notify, and follow the airport's spill procedure.", r: "23.4" },
     { q: "You find an unattended bag airside. What do you do?", o: ["Open it to check for a name tag", "Don't touch it; move people away; notify Border Police/security and the duty manager", "Take it to lost property", "Leave it and carry on"], a: 1, e: "Never touch or move a suspicious item. Clear the area and notify.", r: "23.5" },
+  ]
+},
+{
+  id: "w1", code: "W", title: "Winter Operations", part: "Part 6 · Sections 24–28",
+  summary: "De-icing (email first), ramp safety on ice and snow, marshalling in the dark, vehicles stuck in snow, aircraft care in the cold and winter planning — all stations.",
+  lesson: [
+    { h: "De-icing: email first", key: true, html: "<ul><li>Email <b>every</b> de-icing request to Icelandair Jet Center, <b>jetcenter@icelandair.is</b>, for all stations. A call can follow to speed it up, but never replaces the email.</li><li>Ask about de-icing at the handling request. If snow or frost is forecast, email the request the evening before — slots fill quickly.</li><li>Type II fluid is used at all stations: tell crews early so they can plan.</li><li>Record the completion time and fluid type in Notion.</li></ul>" },
+    { h: "The de-icing slip stays with us", html: "<ul><li><b>Never give the de-icing slip to the pilots.</b> De-icing is on IAA's account, and the slip stays with us.</li><li>Photograph the litres used. In Regla: two lines — De-icing Truck + litres used. NetJets invoices with de-icing go to Josh, Guðmundur and Hjalti.</li></ul>" },
+    { h: "Moving safely on ice", html: "<ul><li>Wear footwear with good grip and consider ice grips. Walk, never run. Three points of contact on stairs, steps and GSE.</li><li>Hi-vis and a torch in the dark: mid-winter daylight lasts only a few hours.</li><li>Icy or snow-covered stand? Request sanding or snow clearing before working there (BIKF: APOC · BIRK: Fire Department · BIAR: 896 1270).</li></ul>" },
+    { h: "Marshalling, GSE and chocks", html: "<ul><li><b>Always marshal with illuminated wands.</b> Check the batteries before your shift.</li><li>Drive GSE slowly. If a tug loses grip, stop, and report a near-miss on the IAA Portal.</li><li>Recheck chocks after placing them and after strong winds. Ice falling from vehicles or aircraft is FOD.</li><li>Never climb on or brush snow off an aircraft — clearing aircraft surfaces is part of the de-icing service.</li></ul>" },
+    { h: "Vehicle stuck in snow", key: true, html: "<ul><li>On or crossing a runway, or driving across the airport: <b>tell the tower straight away</b> — by radio, or by phone if you can't reach them. This matters most at BIRK.</li><li>Then ask for assistance: BIKF APOC 425 6200 · BIRK Fire Department 894 3201 · BIAR 896 1270.</li><li>Hazards and beacon on. Don't dig out on a runway unless the tower clears you. Tell the duty manager and report it on the IAA Portal.</li></ul>" },
+    { h: "Strong winds", html: "<ul><li>Park nose into wind and add tie-downs. Secure GSE, stairs and cones.</li><li>Agree with the crew before opening doors in gusts.</li></ul>" },
+    { h: "Aircraft care in the cold", html: "<ul><li>Ask the crew about water and lav drain, heating or GPU, covers, preheat and the hangar. The crew decides; we arrange it and log it in Notion and the Services Log.</li><li>Aircraft in the hangar: set the Notion icon to the <b>red temple</b>.</li></ul>" },
+    { h: "Weather and communication", html: "<ul><li>Check veður.is, METAR/TAF and ATIS each shift. Warn crews and operators early about de-icing, delays and closures.</li><li>Check road conditions on umferdin.is before booking transport. Flag winter items in the WhatsApp handover.</li></ul>" },
+  ],
+  quiz: [
+    { q: "Snow is forecast overnight for an aircraft departing at 07:00. When should de-icing be requested?", o: ["At 06:30 on the day", "The evening before, after agreeing a time with the crew", "Only if the crew asks on the day", "Not needed if the aircraft is parked nose into wind"], a: 1, e: "Slots fill quickly in icing conditions.", r: "25.1" },
+    { q: "How must a de-icing request be made?", o: ["A phone call only", "By email to Icelandair Jet Center, then a call to speed it up if needed", "Ask the pilots to arrange it", "A text to the duty manager"], a: 1, e: "Email first, every time — a call never replaces it.", r: "25.1" },
+    { q: "After de-icing, the pilot asks for the de-icing slip. What do you do?", o: ["Give it to them", "Give them a copy", "Keep it: the slip is never given to pilots, as de-icing is on IAA's account", "Throw it away"], a: 2, e: "The slip stays with IAA.", r: "25.3" },
+    { q: "Who decides whether the holdover time has been exceeded?", o: ["The flight crew", "The de-icing operator", "IAA ramp staff", "The tower"], a: 0, e: "We tell the crew about delays; they assess holdover.", r: "19.2" },
+    { q: "The apron at your stand is icy. What do you do?", o: ["Work carefully and carry on", "Request sanding or snow clearing before working there", "Spread de-icing fluid on it", "Move the aircraft yourself"], a: 1, e: "Make it safe first.", r: "26.1" },
+    { q: "You are about to marshal an aircraft in the dark. What must you check?", o: ["Nothing extra", "That your marshalling wands' batteries work: wands must be lit", "That the aircraft lights are off", "That the tower can see you"], a: 1, e: "Marshalling wands must always be illuminated.", r: "26.1" },
+    { q: "During pushback on snow, the tug starts to slide. What do you do?", o: ["Accelerate to regain grip", "Stop, continue only when safe, and report a near-miss on the IAA Portal", "Finish the pushback quickly", "Ask the crew to use engine power"], a: 1, e: "Loss of grip is a reportable near-miss.", r: "26.2" },
+    { q: "There is snow on the wings of a parked aircraft. What do you do?", o: ["Brush it off from a ladder", "Climb on the wing to clear it", "Arrange de-icing: clearing aircraft surfaces is part of that service", "Leave it; it will blow off on take-off"], a: 2, e: "Never climb on or brush an aircraft.", r: "26.2" },
+    { q: "Strong gusts are forecast for an aircraft staying overnight. Which is correct?", o: ["Leave it as parked", "Nose into wind, add tie-downs, and secure GSE, stairs and cones", "Only remove the cones", "Ask the crew to stay on board"], a: 1, e: "Wind is a major winter risk.", r: "26.3" },
+    { q: "Your vehicle gets stuck in snow while you are crossing a runway. What do you do first?", o: ["Call for assistance and wait", "Try to dig yourself out quickly", "Tell the tower straight away, by radio or phone", "Email the duty manager"], a: 2, e: "The tower must know at once; assistance comes next.", r: "26.5" },
+    { q: "An aircraft stays overnight in freezing temperatures. What should you ask the crew?", o: ["Nothing; they will call if needed", "Whether to drain water and lavs, and whether they need heating, covers, preheat or the hangar", "Only whether they want fuel", "Whether you can run the APU all night"], a: 1, e: "The crew decides; IAA arranges and logs it.", r: "27" },
+    { q: "An aircraft is moved into the hangar. How is that shown in Notion?", o: ["A comment only", "Set the page icon to the red temple (hangar)", "Change the icon to the green tick", "Untick Ready to Sync"], a: 1, e: "The hangar icon keeps the board and status right.", r: "27" },
+    { q: "Before booking a crew car to Akureyri in winter, what should you check?", o: ["Nothing extra", "The METAR only", "Road conditions on umferdin.is", "The fuel price"], a: 2, e: "Roads can close in winter.", r: "28" },
+  ]
+},
+{
+  id: "w2", code: "W-BIRK", title: "Winter at BIRK", part: "Part 6 · Sections 25, 26.4–26.5, 29.1",
+  stations: ["BIRK"],
+  summary: "Requesting and charging de-icing at BIRK, Hangar 3, sanding and snow help from the Fire Department, and runway crossings.",
+  lesson: [
+    { h: "Requesting de-icing", html: "<ul><li>Email Icelandair Jet Center (jetcenter@icelandair.is), which coordinates with the BIRK base.</li><li>Then call to speed it up: Jet Center 425 0933, or Icelandair Ground Ops 617 8156 (preferred), 862 7413, 570 3577.</li><li>De-icing is done at the aircraft — there are no de-icing stands at BIRK.</li></ul>" },
+    { h: "Recording and charging", key: true, html: "<ul><li>Photograph the litres used when it finishes. Keep the slip — never give it to the pilots.</li><li>Litres not noted? Email jetcenter@icelandair.is.</li><li>Record time and fluid in Notion. In Regla add two lines: <b>De-icing Truck</b> + <b>litres used</b>.</li><li>NetJets invoices with de-icing go to Josh, Guðmundur and Hjalti.</li></ul>" },
+    { h: "Hangar", html: "<ul><li>IAA arranges it ourselves: <b>Hangar 3</b> is available. Set the flight's Notion icon to the red temple.</li></ul>" },
+    { h: "BIRK winter ramp", html: "<ul><li>Sanding, snow clearing or a stuck vehicle: Fire Department, 894 3201.</li><li>Stuck crossing a runway: tell the tower first (radio or 424 4040), then call the Fire Department.</li><li>Cones around every aircraft, checked after strong winds. Long-term aircraft on Apron 1 North usually need de-icing before departure — email the request the evening before.</li></ul>" },
+  ],
+  quiz: [
+    { q: "How do you request de-icing at BIRK?", o: ["Call Isavia at BIRK", "Email Icelandair Jet Center, then call to speed it up if needed", "Call Skeljungur", "Ask the tower"], a: 1, e: "Email first; the Jet Center coordinates with the BIRK base.", r: "25.1–25.2" },
+    { q: "Where is an aircraft de-iced at BIRK?", o: ["At a de-icing stand", "At the aircraft: BIRK has no de-icing stands", "At BIKF", "In Hangar 3"], a: 1, e: "De-icing comes to the aircraft at BIRK.", r: "29.1" },
+    { q: "De-icing has just finished. What do you do first to record it?", o: ["Nothing until the invoice arrives", "Photograph the litres of fluid used", "Ask the crew to estimate the litres", "Email the client"], a: 1, e: "The litres are needed for charging.", r: "25.3" },
+    { q: "Nobody noted the litres used. How do you find out?", o: ["Estimate from the aircraft size", "Email jetcenter@icelandair.is", "Leave it off the invoice", "Ask the tower"], a: 1, e: "The Jet Center has the figure.", r: "25.3" },
+    { q: "How is de-icing charged in Regla?", o: ["One line, \"De-icing\"", "Two lines: De-icing Truck + amount of litres used", "Included in the handling fee", "Only the litres"], a: 1, e: "Both the truck and the fluid are charged.", r: "25.3" },
+    { q: "A crew at BIRK asks for a hangar overnight. Who arranges it?", o: ["Isavia", "The crew themselves", "IAA arranges it ourselves: Hangar 3 is available", "The Fire Department"], a: 2, e: "IAA arranges BIRK hangarage directly.", r: "29.1" },
+    { q: "The apron next to your aircraft at BIRK needs sanding. Who do you ask?", o: ["APOC", "The Fire Department, 894 3201", "Skeljungur", "Icelandair"], a: 1, e: "The Fire Department handles sanding and snow clearing at BIRK.", r: "26.4" },
+    { q: "At BIRK, your vehicle gets stuck while crossing a runway. What is the right order?", o: ["Call the Fire Department, then tell the tower later", "Tell the tower straight away (radio or 424 4040), then call the Fire Department (894 3201) for help", "Dig out first, then tell the tower", "Email ops@iaa.is"], a: 1, e: "The tower must know at once.", r: "26.5" },
+    { q: "Strong winds hit overnight. What do you check at BIRK in the morning?", o: ["Only the fuel", "That cones and chocks are still in place", "Nothing; cones are optional in winter", "Only the hangar"], a: 1, e: "Cones are required around every parked aircraft at BIRK.", r: "29.1" },
+  ]
+},
+{
+  id: "w3", code: "W-BIKF", title: "Winter at BIKF", part: "Part 6 · Sections 25, 26.4–26.5, 29.2",
+  stations: ["BIKF"],
+  summary: "De-icing on stand at BIKF, APOC for sanding, snow and stuck vehicles, no hangar, and pushback on contaminated surfaces.",
+  lesson: [
+    { h: "Requesting de-icing", html: "<ul><li>Email Icelandair Jet Center (jetcenter@icelandair.is), then call 425 0933 to speed it up.</li><li>De-icing is done <b>on stand</b> — APOC does not need to be involved.</li><li>Log the request, confirmed time and fluid in Notion.</li></ul>" },
+    { h: "APOC: sanding, snow and stands", html: "<ul><li>Sanding and snow clearing: email apoc@kefairport.is, then call 425 6200.</li><li>Vehicle stuck in snow: call APOC straight away (on a runway, tell the tower first — radio 118.300 or 424 4050).</li><li>APOC assigns stands: tell them early when a longer stay affects the stand plan.</li></ul>" },
+    { h: "No hangar at BIKF", html: "<ul><li>There is no hangar. Only in extreme circumstances, and only for an AOG aircraft, can space be arranged with the Coast Guard (545 2000).</li></ul>" },
+    { h: "Pushback on contaminated surfaces", key: true, html: "<ul><li>Category C and larger need a pushback (except stands 220 and 221).</li><li>If the tug loses grip, stop, and report a near-miss on the IAA Portal.</li></ul>" },
+  ],
+  quiz: [
+    { q: "How do you request de-icing at BIKF?", o: ["Call EAK", "Email Icelandair Jet Center, then call 425 0933 to speed it up if needed", "Ask APOC", "Call Silver Gate"], a: 1, e: "Email first, every time.", r: "25.1–25.2" },
+    { q: "Where is an aircraft de-iced at BIKF, and does APOC need to be involved?", o: ["At a remote pad, booked through APOC", "On stand; APOC does not need to be involved", "In the hangar", "On stand, but only with APOC's approval"], a: 1, e: "De-icing is done on stand at BIKF.", r: "29.2" },
+    { q: "A BIKF stand is icy and needs sanding. Who do you ask?", o: ["The Fire Department", "APOC: email apoc@kefairport.is, then call to speed it up", "EAK", "Border Police"], a: 1, e: "APOC handles sanding and snow clearing at BIKF.", r: "26.4" },
+    { q: "Your vehicle is stuck in snow on the BIKF apron. Who do you call for help?", o: ["The Fire Department", "APOC, 425 6200: they can pull you out or clear the snow", "EAK", "Icelandair Jet Center"], a: 1, e: "APOC arranges assistance at BIKF; on a runway, tell the tower first.", r: "26.5" },
+    { q: "A client asks for a hangar at BIKF for a serviceable aircraft. What do you tell them?", o: ["Hangar 3 is available", "There is no hangar at BIKF; the Coast Guard option is only for AOG aircraft in extreme circumstances", "APOC will assign one", "Icelandair can provide one"], a: 1, e: "No hangar is available at BIKF.", r: "29.2" },
+    { q: "An aircraft's stay is extended because of snow. Who needs to know about the stand?", o: ["Nobody; keep the same stand", "APOC", "Border Police", "The fuel supplier"], a: 1, e: "APOC assigns and plans stands.", r: "29.2" },
+    { q: "A Category C aircraft is ready to leave a stand other than 220/221. How does it leave?", o: ["Under its own power", "With a pushback", "It is towed by its crew", "It waits for the snow to melt"], a: 1, e: "Category C+ needs a pushback except stands 220/221.", r: "3.1" },
+    { q: "During pushback on ice, the tug starts sliding. What do you do?", o: ["Push faster", "Stop, continue only when safe, and report a near-miss on the IAA Portal", "Ask the crew to start engines", "Carry on and mention it later"], a: 1, e: "Safety over schedule.", r: "26.2" },
+    { q: "De-icing is completed but the slot is delayed by 30 minutes. What do you do?", o: ["Nothing", "Tell the crew immediately", "Book a second de-icing yourself", "Note it in Notion only"], a: 1, e: "The crew must check their holdover time.", r: "19.2" },
+  ]
+},
+{
+  id: "w4", code: "W-BIAR", title: "Winter at BIAR", part: "Part 6 · Sections 25, 26.4–26.5, 29.3",
+  stations: ["BIAR"],
+  summary: "De-icing via the Jet Center and the Icelandair duty manager, Isavia snow clearing, the BIAR tower phone, and hangar options for very small aircraft.",
+  lesson: [
+    { h: "Requesting de-icing", html: "<ul><li>Email Icelandair Jet Center at BIKF (jetcenter@icelandair.is), which coordinates with the BIAR base.</li><li>Then call the Icelandair duty manager (vaktstjóri) on 618 1225 to speed it up. Log the request, time and fluid in Notion.</li></ul>" },
+    { h: "Type II fluid", key: true, html: "<ul><li>Type II is the fluid at BIAR, as at all IAA stations. Tell the crew at the handling-request stage so they can plan.</li></ul>" },
+    { h: "Snow clearing", html: "<ul><li>Isavia clears and sands without being asked, within the airport's operating hours.</li><li>If more is needed, or a vehicle is stuck: call <b>896 1270</b>.</li><li>On a runway, tell the tower first: radio 118.200 or call <b>424 4360</b>.</li></ul>" },
+    { h: "Hangar", html: "<ul><li>None, except for very small aircraft. For those, contact Arctic Maintenance (Gulli, 896 8266) or Guðmundur (Gummi): gtv@iaa.is, 897 2774.</li></ul>" },
+    { h: "BIAR winter ramp", html: "<ul><li>Parking positions are flexible: confirm them with the duty manager on site. Cones and chocks are required, as at BIRK, and checked after strong winds.</li></ul>" },
+  ],
+  quiz: [
+    { q: "How do you request de-icing at BIAR?", o: ["Call the BIAR tower", "Email Icelandair Jet Center at BIKF, then call the duty manager on 618 1225 to speed it up", "Call the fuel desk only", "Ask the pilots to arrange it"], a: 1, e: "The Jet Center coordinates with the BIAR base; email first.", r: "25.1–25.2" },
+    { q: "Which de-icing fluid is used at BIAR?", o: ["Types I, II and IV", "Type IV only", "Type II", "None"], a: 2, e: "Type II is used at all IAA stations.", r: "25.2" },
+    { q: "When should a crew be told which de-icing fluid is available?", o: ["After de-icing", "At the handling-request stage", "Only if they ask", "At pushback"], a: 1, e: "So they can plan before arriving.", r: "25.2" },
+    { q: "When is snow cleared at BIAR, and do you need to request it?", o: ["Only when IAA requests it", "Isavia clears it without being asked, within the airport's operating hours", "Only at night", "Only for scheduled flights"], a: 1, e: "Isavia is self-sufficient at BIAR; call 896 1270 if more is needed.", r: "29.3" },
+    { q: "Your vehicle is stuck in snow at BIAR, away from the runway. Who do you call for help?", o: ["The Icelandair duty manager", "896 1270", "The fuel desk", "Nobody; dig yourself out"], a: 1, e: "The same number handles snow assistance.", r: "26.5" },
+    { q: "You are stuck crossing the runway at BIAR and cannot reach the tower by radio. What do you do?", o: ["Wait for someone to notice", "Call the tower on 424 4360", "Email biartwr@isavia.is", "Call ops@iaa.is"], a: 1, e: "The tower must know at once.", r: "26.5" },
+    { q: "A large business jet at BIAR asks for a hangar. What do you tell them?", o: ["Hangar 3 is available", "There is no hangar for larger aircraft at BIAR; only very small aircraft, through Arctic Maintenance or Guðmundur (Gummi)", "Isavia will provide one", "Ask the Coast Guard"], a: 1, e: "BIAR has no hangar except for very small aircraft.", r: "29.3" },
+    { q: "Where do you park an arriving aircraft at BIAR in winter?", o: ["Always the same stand", "Where the duty manager on site confirms", "Next to the Avgas pump", "Wherever is closest"], a: 1, e: "Positions are flexible at BIAR.", r: "5.1" },
+    { q: "After a windy night, what do you check on parked aircraft at BIAR?", o: ["Nothing", "That cones and chocks are still in place", "Only the cabin temperature", "Only the fuel"], a: 1, e: "Cones and chocks are required, as at BIRK.", r: "26.3" },
   ]
 },
 ]
