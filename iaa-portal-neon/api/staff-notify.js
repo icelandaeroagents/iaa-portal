@@ -6,8 +6,10 @@
      to management straight away
    – passes & certificates: the person (with management copied) is
      reminded 30 days and 7 days before expiry, and when it has expired
+   – invitations: the invited person gets the portal link and how to sign in
 
    POST /api/staff-notify  { "kind": "leave" | "service", "id": 12 }
+                           { "kind": "invite", "email": "name@gmail.com" }
    GET  /api/staff-notify  – Vercel every 10 minutes: sends anything missed
                              and any expiry reminders that are due
 
@@ -59,6 +61,11 @@ module.exports = async function handler(req, res) {
   try {
     if (req.method === "POST") {
       const body = typeof req.body === "string" ? safeJson(req.body) : (req.body || {});
+      if (body.kind === "invite") {
+        const email = String(body.email || "").trim().toLowerCase();
+        if (!email) return send(res, 400, { error: "email needed" });
+        return send(res, 200, { results: [await inviteEmail(email)] });
+      }
       const id = parseInt(body.id, 10);
       if (!id || ["leave", "service"].indexOf(body.kind) === -1) return send(res, 400, { error: "kind and id needed" });
       const results = body.kind === "leave"
@@ -84,6 +91,12 @@ module.exports = async function handler(req, res) {
           order by id limit 20`);
       for (const r of service.rows) results.push(await serviceEmail(r.id));
       results.push.apply(results, await expiryReminders());
+      const invites = await db().query(
+        `select email from public.invitations
+          where accepted_at is null and invite_sent_at is null and invite_attempts < 5
+            and created_at > now() - interval '60 days'
+          order by created_at limit 20`);
+      for (const r of invites.rows) results.push(await inviteEmail(r.email));
       return send(res, 200, { results: results });
     }
 
@@ -230,10 +243,58 @@ async function expiryReminders() {
   return out;
 }
 
+const ROLE_LABELS = { staff: "Staff", station_lead: "Station lead", management: "Management" };
+
+async function inviteEmail(email) {
+  const c = await db().query(
+    `update public.invitations
+        set invite_claimed_at = now(), invite_attempts = invite_attempts + 1
+      where email = $1 and accepted_at is null and invite_sent_at is null and invite_attempts < 5
+        and (invite_claimed_at is null or invite_claimed_at < now() - interval '5 minutes')
+      returning *`, [email]);
+  if (!c.rows.length) return { email: email, kind: "invite", status: "nothing to send" };
+  const inv = c.rows[0];
+  try {
+    const by = inv.invited_by
+      ? (await db().query("select full_name, email from public.profiles where id = $1", [inv.invited_by])).rows[0]
+      : null;
+    const byName = by ? (by.full_name || by.email) : "Iceland Aero Agents management";
+    const stations = (inv.station_codes || []).length ? inv.station_codes.join(", ") : null;
+    await mail({
+      to: [inv.email],
+      replyTo: by && by.email ? by.email : undefined,
+      subject: "You're invited to the Iceland Aero Agents Staff Portal",
+      kicker: "Invitation",
+      title: (inv.full_name ? "Hi " + inv.full_name.split(/\s+/)[0] + ", you're invited" : "You're invited") + " to the IAA Staff Portal",
+      rows: [
+        ["Sign in with", inv.email],
+        ["Role", ROLE_LABELS[inv.role] || inv.role],
+        ["Stations", stations],
+        ["Invited by", byName]
+      ],
+      steps: [
+        "Open the staff portal with the button below.",
+        "Enter this email address (" + inv.email + ") and press Send code.",
+        "We email you a 6-digit code from admin@iaa.is. If it doesn't arrive within a couple of minutes, check Spam or Promotions.",
+        "Enter the code and you're in. Next time, sign in the same way."
+      ],
+      note: "In the portal you'll find the weekly briefings, the roster, your training and certificates, reports, and leave and other requests.",
+      link: portal() + "/", linkLabel: "Open the staff portal"
+    });
+    await db().query("update public.invitations set invite_sent_at = now(), invite_claimed_at = null, invite_error = null where email = $1", [email]);
+    return { email: email, kind: "invite", status: "sent" };
+  } catch (err) {
+    await db().query("update public.invitations set invite_claimed_at = null, invite_error = $2 where email = $1", [email, msg(err)]);
+    return { email: email, kind: "invite", status: "failed" };
+  }
+}
+
 // ----------------------------------------------------------------------
 async function mail(o) {
   const rows = (o.rows || []).filter((r) => r[1] !== null && r[1] !== undefined && String(r[1]).trim() !== "");
+  const steps = o.steps || [];
   const text = rows.map((r) => r[0] + ": " + r[1]).join("\n") +
+    (steps.length ? "\n\nHow to sign in:\n" + steps.map((t, i) => (i + 1) + ". " + t).join("\n") : "") +
     (o.note ? "\n\n" + o.note : "") + (portal() && o.link ? "\n\n" + o.linkLabel + ": " + o.link : "");
   const html = '<div style="font-family:Arial,Helvetica,sans-serif;color:#1a222f;max-width:620px">' +
     '<div style="background:#263449;color:#ffffff;padding:16px 20px;border-radius:8px 8px 0 0">' +
@@ -243,6 +304,8 @@ async function mail(o) {
     '<table style="width:100%;border-collapse:collapse">' + rows.map((r) =>
       '<tr><td style="padding:6px 0;vertical-align:top;width:34%;color:#4f6470;font-size:14px">' + esc(r[0]) +
       '</td><td style="padding:6px 0;font-size:14px;white-space:pre-wrap">' + esc(r[1]) + "</td></tr>").join("") + "</table>" +
+    (steps.length ? '<p style="font-size:14px;font-weight:bold;margin:16px 0 6px">How to sign in</p><ol style="font-size:14px;padding-left:20px;margin:0">' +
+      steps.map((t) => '<li style="margin:4px 0">' + esc(t) + "</li>").join("") + "</ol>" : "") +
     (o.note ? '<p style="font-size:14px">' + esc(o.note) + "</p>" : "") +
     (portal() && o.link ? '<p style="margin:18px 0"><a href="' + esc(o.link) + '" style="background:#07766d;color:#ffffff;padding:10px 16px;border-radius:4px;text-decoration:none;font-weight:bold">' + esc(o.linkLabel) + "</a></p>" : "") +
     "</div></div>";
