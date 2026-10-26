@@ -273,7 +273,7 @@ async function inviteEmail(email) {
         ["Invited by", byName]
       ],
       steps: [
-        "Open the staff portal with the button below.",
+        "Open the staff portal with the button below. On a phone, if it opens inside your email app, choose Open in Safari or Chrome.",
         "Enter this email address (" + inv.email + ") and press Send code.",
         "We email you a 6-digit code from admin@iaa.is. If it doesn't arrive within a couple of minutes, check Spam or Promotions.",
         "Enter the code and you're in. Next time, sign in the same way."
