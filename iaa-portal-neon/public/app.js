@@ -885,6 +885,23 @@
     );
   }
 
+  let inviteNotice = null;   // one-off message shown after inviting or resending
+
+  function sendInvite(address) {
+    return fetch("/api/staff-notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "invite", email: address })
+    })
+      .then((r) => r.json())
+      .then((j) => ((j.results || [])[0] || {}).status === "sent")
+      .catch(() => false);
+  }
+
+  function inviteTime(v) {
+    return new Date(v).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  }
+
   function renderInvitePanel(people, invites) {
     const email = h("input", { id: "invite-email", type: "email", required: true, autocomplete: "off", placeholder: "name@gmail.com" });
     const name = h("input", { id: "invite-name", type: "text", autocomplete: "off", placeholder: "Full name" });
@@ -898,6 +915,32 @@
     const status = h("p", { class: "status", role: "status" });
 
     const pending = invites.map(function (inv) {
+      const resend = h(
+        "button",
+        {
+          class: "btn btn-quiet btn-small",
+          type: "button",
+          onclick: async function () {
+            resend.disabled = true;
+            const { error } = await db.from("invitations")
+              .update({ invite_sent_at: null, invite_error: null, invite_attempts: 0, invite_claimed_at: null })
+              .eq("email", inv.email);
+            if (error) { resend.disabled = false; setStatus(status, error.message, true); return; }
+            const ok = await sendInvite(inv.email);
+            await logEvent("invitation_resent", { email: inv.email });
+            inviteNotice = ok
+              ? { text: `Invitation emailed again to ${inv.email}.` }
+              : { text: `The invitation to ${inv.email} couldn’t be sent just now. It will be retried within 10 minutes.`, isError: true };
+            render();
+          }
+        },
+        inv.invite_sent_at ? "Resend invite" : "Send invite"
+      );
+      const emailState = inv.invite_sent_at
+        ? h("span", { class: "sub" }, "Emailed " + inviteTime(inv.invite_sent_at))
+        : inv.invite_error
+          ? h("span", { class: "sub is-error" }, "Not sent: " + inv.invite_error)
+          : h("span", { class: "sub" }, "Sending…");
       const cancel = h(
         "button",
         {
@@ -924,7 +967,8 @@
         h("td", null, inv.full_name || "No name given", h("span", { class: "sub" }, inv.email)),
         h("td", null, ROLE_LABELS[inv.role]),
         h("td", null, (inv.station_codes || []).join(", ") || "None"),
-        h("td", null, cancel)
+        h("td", null, emailState),
+        h("td", null, h("div", { class: "row row-tight" }, resend, cancel))
       );
     });
 
@@ -935,7 +979,7 @@
       h(
         "p",
         null,
-        "Add the email address the person will sign in with. Personal addresses are fine. This doesn’t send an email: tell them the portal address and to sign in with this address. Anyone with an @iaa.is address can also sign in without an invitation, as Staff with no station."
+        "Add the email address the person will sign in with. Personal addresses are fine. They are emailed an invitation with the portal link and how to sign in. Anyone with an @iaa.is address can also sign in without an invitation, as Staff with no station."
       ),
       h(
         "form",
@@ -966,6 +1010,10 @@
               return;
             }
             await logEvent("invitation_created", invite);
+            const ok = await sendInvite(address);
+            inviteNotice = ok
+              ? { text: `Invitation emailed to ${address}.` }
+              : { text: `${address} has been invited, but the email couldn’t be sent just now. It will be retried within 10 minutes.`, isError: true };
             render();
           }
         },
@@ -976,6 +1024,12 @@
         addBtn
       ),
       status,
+      (function () {
+        if (!inviteNotice) return null;
+        const n = h("p", { class: inviteNotice.isError ? "notice is-error" : "notice" }, inviteNotice.text);
+        inviteNotice = null;
+        return n;
+      })(),
       pending.length
         ? h(
             "div",
@@ -984,7 +1038,7 @@
               "table",
               null,
               h("caption", { class: "caption" }, "Waiting to sign in"),
-              h("thead", null, h("tr", null, h("th", null, "Name"), h("th", null, "Role"), h("th", null, "Stations"), h("th", null, ""))),
+              h("thead", null, h("tr", null, h("th", null, "Name"), h("th", null, "Role"), h("th", null, "Stations"), h("th", null, "Invitation email"), h("th", null, ""))),
               h("tbody", null, pending)
             )
           )

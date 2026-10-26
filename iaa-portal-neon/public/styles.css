@@ -1030,3 +1030,5 @@ td .chip + .chip { margin-left: 0.3rem; }
 .transcript-who dd { margin: 0; font-weight: 600; }
 .transcript-summary { font-weight: 600; color: var(--brand-strong); margin-bottom: 0.75rem; }
 .transcript td .sub { display: block; }
+
+.sub.is-error { color: var(--danger); }
