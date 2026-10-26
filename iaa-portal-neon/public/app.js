@@ -118,6 +118,9 @@
 
   async function init() {
     readReturnErrorFromUrl();
+    if (restoreSignin() && !state.message) {
+      state.message = { text: `Enter the code we sent to ${state.signin.email}.`, isError: false };
+    }
     window.addEventListener("hashchange", render);
     await refreshSession();
   }
@@ -369,6 +372,29 @@
 
   // ---------- Sign-in ----------
 
+  // The sign-in step is remembered for 10 minutes, so switching to the email
+  // app to read the code (which often reloads the page on phones) doesn't
+  // send people back to the start.
+  function saveSignin() {
+    const SIGNIN_KEY = "iaa-portal-signin";
+    try {
+      if (state.signin.step === "code") localStorage.setItem(SIGNIN_KEY, JSON.stringify({ email: state.signin.email, at: Date.now() }));
+      else localStorage.removeItem(SIGNIN_KEY);
+    } catch (e) { /* storage off */ }
+  }
+  function restoreSignin() {
+    const SIGNIN_KEY = "iaa-portal-signin";
+    try {
+      const saved = JSON.parse(localStorage.getItem(SIGNIN_KEY) || "null");
+      if (saved && saved.email && Date.now() - saved.at < 10 * 60000) {
+        state.signin = { step: "code", email: saved.email };
+        return true;
+      }
+      localStorage.removeItem(SIGNIN_KEY);
+    } catch (e) { /* storage off */ }
+    return false;
+  }
+
   function renderSignIn() {
     const methods = Array.isArray(cfg.signInMethods) && cfg.signInMethods.length ? cfg.signInMethods : ["email"];
     const status = h("p", { class: "status", role: "status" });
@@ -448,6 +474,7 @@
             return;
           }
           state.signin = { step: "code", email: address };
+          saveSignin();
           state.message = { text: `We sent a 6-digit code to ${address}. It can take a minute to arrive.`, isError: false };
           render();
         }
@@ -493,6 +520,7 @@
         type: "button",
         onclick: function () {
           state.signin = { step: "email", email: state.signin.email };
+          saveSignin();
           render();
         }
       },
@@ -516,11 +544,23 @@
             setStatus(status, friendlyAuthError(error), true);
             return;
           }
+          const address = state.signin.email;
           state.signin = { step: "email", email: "" };
+          saveSignin();
           await refreshSession();
+          if (!state.user) {
+            // The code was accepted but the browser didn't keep the sign-in.
+            state.signin = { step: "email", email: address };
+            state.message = {
+              text: "Your code was correct, but this browser didn’t keep you signed in. This usually happens inside an email or social app. Open the portal in Safari or Chrome and sign in again.",
+              isError: true
+            };
+            render();
+          }
         }
       },
       h("div", { class: "field" }, h("label", { for: "signin-code" }, "Code from the email"), code),
+      h("p", { class: "fineprint" }, "Use the code from the newest email: asking for a new code cancels the old one."),
       submit,
       h("div", { class: "row" }, resend, back)
     );
