@@ -798,6 +798,11 @@
       // and the first name is what the roster on Home looks for.
       const nameBox = h("input", { type: "text", value: person.full_name || "", placeholder: "Full name", autocomplete: "off", "aria-label": "Name for " + person.email });
       const titleBox = h("input", { type: "text", value: person.job_title || "", placeholder: "Job title (optional)", autocomplete: "off", "aria-label": "Job title for " + person.email });
+      // Only shown once database update 15 (roster names) has been run.
+      const hasRosterNames = Object.prototype.hasOwnProperty.call(person, "roster_names");
+      const rosterBox = hasRosterNames
+        ? h("input", { type: "text", value: person.roster_names || "", placeholder: "Name on the roster, e.g. Beggi", autocomplete: "off", "aria-label": "Roster name for " + person.email, title: "How this person appears on the roster. Separate several with commas, e.g. Josh, Joshy" })
+        : null;
 
       const save = h(
         "button",
@@ -815,6 +820,7 @@
               full_name: nameBox.value.trim().replace(/\s+/g, " ") || null,
               job_title: titleBox.value.trim() || null
             };
+            if (rosterBox) changes.roster_names = rosterBox.value.split(",").map((x) => x.trim()).filter(Boolean).join(", ") || null;
             save.disabled = true;
             const { error: upErr } = await db.from("profiles").update(changes).eq("id", person.id);
             save.disabled = false;
@@ -825,12 +831,13 @@
             await logEvent("profile_updated", {
               profile_id: person.id,
               email: person.email,
-              before: { role: person.role, station_codes: person.station_codes, active: person.active, full_name: person.full_name, job_title: person.job_title },
+              before: { role: person.role, station_codes: person.station_codes, active: person.active, full_name: person.full_name, job_title: person.job_title, roster_names: person.roster_names },
               after: changes
             });
             Object.assign(person, changes);
             nameBox.value = changes.full_name || "";
             titleBox.value = changes.job_title || "";
+            if (rosterBox) rosterBox.value = changes.roster_names || "";
             setStatus(status, `Saved changes for ${changes.full_name || person.email}.`, false, true);
             if (isMe) loadAndRender();
           }
@@ -841,7 +848,7 @@
       return h(
         "tr",
         null,
-        h("td", { class: "person-edit" }, nameBox, titleBox, h("span", { class: "sub" }, person.email)),
+        h("td", { class: "person-edit" }, nameBox, titleBox, rosterBox, h("span", { class: "sub" }, person.email)),
         h("td", null, role),
         h("td", null, station.node),
         h("td", null, active),
@@ -865,7 +872,7 @@
               h(
                 "table",
                 null,
-                h("thead", null, h("tr", null, h("th", null, "Name and job title"), h("th", null, "Role"), h("th", null, "Stations"), h("th", null, "Access"), h("th", null, ""))),
+                h("thead", null, h("tr", null, h("th", null, "Name, job title and roster name"), h("th", null, "Role"), h("th", null, "Stations"), h("th", null, "Access"), h("th", null, ""))),
                 h("tbody", null, rows)
               )
             )

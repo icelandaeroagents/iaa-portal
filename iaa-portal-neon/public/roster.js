@@ -29,12 +29,34 @@
     else location.hash = hash;
   }
 
-  // The person's own name, matched against roster cells ("Cesar", "Atli short", "Josh in Aus - ").
-  function nameMatcher(profile) {
+  // Letters folded so "Audur" matches "AUÐUR", "Briet" matches "Bríet" and
+  // "Thrainn" matches "Þráinn"; capitals are ignored too.
+  function fold(text) {
+    return String(text || "")
+      .toLowerCase()
+      .replace(/ð/g, "d").replace(/þ/g, "th").replace(/æ/g, "ae").replace(/ø/g, "o")
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  // The names to look for: the roster names management set on the People
+  // page (e.g. "Beggi" or "Josh, Joshy"), plus the person's first name.
+  function namesFor(profile) {
+    const names = String(profile.roster_names || "").split(/[,;\/]+/).map((x) => x.trim()).filter(Boolean);
     const first = String(profile.full_name || "").trim().split(/\s+/)[0];
-    if (!first || first.length < 2) return function () { return false; };
-    const re = new RegExp("(^|[^\\p{L}])" + first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^\\p{L}]|$)", "iu");
-    return function (text) { return re.test(String(text || "")); };
+    if (first && names.every((n) => fold(n) !== fold(first))) names.push(first);
+    return names.filter((n) => fold(n).length >= 2);
+  }
+
+  // Matches a whole word in a roster cell ("Cesar", "Atli short", "Beggi -1600").
+  function nameMatcher(profile) {
+    const res = namesFor(profile).map(function (n) {
+      return new RegExp("(^|[^\\p{L}])" + fold(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^\\p{L}]|$)", "u");
+    });
+    if (!res.length) return function () { return false; };
+    return function (text) {
+      const t = fold(text);
+      return res.some((re) => re.test(t));
+    };
   }
 
   async function latest(ctx, withFile) {
@@ -129,10 +151,10 @@
         h("button", { class: "linkish", type: "button", onclick: function () { rerender(); } }, "Try again")) : null,
       (function () {
         const when = homeOffset === 0 ? "today" : homeOffset === 1 ? "tomorrow" : homeOffset === -1 ? "yesterday" : "on " + niceDate(date, { weekday: "long" });
-        const first = String(ctx.state.profile.full_name || "").trim().split(/\s+/)[0];
+        const looking = namesFor(ctx.state.profile);
         if (myShifts.length) return h("p", { class: "notice roster-mine" }, `You’re on ${when.replace(/^on /, "")}: ` + myShifts.join(", "));
-        if (!first) return h("p", { class: "fineprint" }, "Add your name under Your details below to see your own shifts here.");
-        return h("p", { class: "fineprint" }, `You’re not on the roster ${when} (looking for “${first}”).`);
+        if (!looking.length) return h("p", { class: "fineprint" }, "Add your name under Your details below to see your own shifts here.");
+        return h("p", { class: "fineprint" }, `You’re not on the roster ${when} (looking for ${looking.map((n) => "“" + n + "”").join(" or ")}).`);
       })(),
       h("div", { class: "roster-day-grid" }, sheetsOut),
       h("div", { class: "row" }, h("a", { class: "btn btn-quiet", href: "#/roster" }, "Full roster"))
