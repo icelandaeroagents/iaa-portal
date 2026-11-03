@@ -316,7 +316,7 @@ label, .field-label { font-weight: 500; font-size: 0.95rem; }
   align-items: flex-end;
 }
 
-input[type="text"], input[type="email"], input[type="number"], select {
+input[type="text"], input[type="email"], input[type="number"], input[type="search"], input[type="date"], select {
   font: inherit;
   color: var(--ink);
   background: var(--field);
@@ -1037,3 +1037,39 @@ td .chip + .chip { margin-left: 0.3rem; }
 .person-edit { min-width: 13rem; }
 .person-edit input { display: block; width: 100%; margin-bottom: 0.3rem; }
 .person-edit input + input { font-size: 0.9rem; }
+
+/* ---------- News ---------- */
+.news-home { border-top: 4px solid var(--brand); }
+.news-list { display: flex; flex-direction: column; gap: 1.1rem; }
+.news-item h3, .news-item > h2 { margin: 0; }
+.news-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; color: var(--muted); font-size: 0.85rem; margin: 0.25rem 0 0.4rem; }
+.news-body { white-space: pre-wrap; line-height: 1.55; max-width: 70ch; overflow-wrap: anywhere; }
+.news-list .news-item + .news-item { border-top: 1px solid var(--line); padding-top: 1.1rem; }
+.choice-inline { display: inline-flex; margin-right: 0.6rem; }
+
+/* ---------- Equipment Info ---------- */
+.equipment-table td { vertical-align: top; }
+.equipment-table tr.is-out td { background: var(--notice-bg); }
+.equipment-editor { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.5rem 0; }
+.prewrap { white-space: pre-wrap; }
+
+/* Equipment cards, levels and history */
+.equipment-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); gap: 1rem; align-items: start; }
+.eq-card { display: flex; flex-direction: column; gap: 0.6rem; }
+.eq-card.is-out { box-shadow: inset 4px 0 0 var(--danger); }
+.eq-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
+.eq-head h2 { margin: 0; font-size: 1.15rem; }
+.eq-line { margin: 0; }
+.levels { display: grid; gap: 0.55rem; }
+.level-head { display: flex; justify-content: space-between; font-size: 0.9rem; }
+.level-bar { height: 0.55rem; border-radius: 999px; background: var(--line); overflow: hidden; margin: 0.2rem 0; }
+.level-bar span { display: block; height: 100%; background: var(--brand); border-radius: 999px; }
+.level.is-low .level-bar span { background: var(--danger); }
+.level.is-low .level-head b { color: var(--danger); }
+.eq-comment { background: var(--bg); border-radius: var(--radius-s); padding: 0.5rem 0.65rem; }
+.eq-comment p { margin: 0.15rem 0 0; }
+.eq-log { display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid var(--line); padding-top: 0.6rem; }
+.pct-input { max-width: 7rem; }
+.eq-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid var(--line); padding-top: 0.5rem; }
+.eq-history li { display: flex; flex-direction: column; gap: 0.1rem; font-size: 0.92rem; }
+.eq-history li .linkish { align-self: flex-start; font-size: 0.85rem; }
