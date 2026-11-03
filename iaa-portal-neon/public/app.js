@@ -35,6 +35,13 @@
       render: renderHome
     },
     {
+      id: "news",
+      title: "News",
+      description: "Updates from management.",
+      roles: ALL_ROLES,
+      render: renderNews
+    },
+    {
       id: "briefings",
       title: "Briefings",
       description: "This week’s briefing and every issue before it.",
@@ -68,6 +75,13 @@
       description: "Leave and availability, stock refills, equipment and vehicle defects.",
       roles: ALL_ROLES,
       render: renderRequests
+    },
+    {
+      id: "equipment",
+      title: "Equipment Info",
+      description: "Where equipment is kept at each station, with important notes.",
+      roles: ALL_ROLES,
+      render: renderEquipment
     },
     {
       id: "reports",
@@ -586,7 +600,7 @@
     let attention = null;
     const rerenderHome = function () { renderHome(main); };
     await Promise.all([
-      (async function () { if (window.IAABriefings) { try { latest = await window.IAABriefings.homePanel(sectionCtx()); } catch (e) { latest = null; } } })(),
+      (async function () { if (window.IAANews) { try { latest = await window.IAANews.homePanel(sectionCtx()); } catch (e) { latest = null; } } })(),
       (async function () { if (window.IAARoster) { try { roster = await window.IAARoster.homePanel(sectionCtx(), rerenderHome); } catch (e) { roster = null; } } })(),
       (async function () { attention = await attentionPanel(); })()
     ]);
@@ -595,8 +609,8 @@
       main,
       pageHead("Hello, " + firstName(), "Here’s what you can do in the staff portal."),
       attention,
-      roster,
       latest,
+      roster,
 
       !myStations.length
         ? h("p", { class: "notice" }, "You haven’t been given a station yet. Management will add you to one.")
@@ -674,6 +688,16 @@
 
   function sectionMissing(main, title) {
     fill(main, pageHead(title), h("p", { class: "notice" }, "This section’s files didn’t load. Reload the page."));
+  }
+
+  async function renderNews(main) {
+    if (!window.IAANews) return sectionMissing(main, "News");
+    return window.IAANews.render(main, sectionCtx());
+  }
+
+  async function renderEquipment(main) {
+    if (!window.IAAEquipment) return sectionMissing(main, "Equipment Info");
+    return window.IAAEquipment.render(main, sectionCtx());
   }
 
   async function renderRoster(main) {
