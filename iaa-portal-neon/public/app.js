@@ -63,6 +63,13 @@
       render: renderPolicies
     },
     {
+      id: "manuals",
+      title: "Manuals",
+      description: "Company manuals: safety management, health and safety, and more.",
+      roles: ALL_ROLES,
+      render: renderManuals
+    },
+    {
       id: "roster",
       title: "Roster",
       description: "Who’s on today, and the full roster.",
@@ -715,6 +722,11 @@
   async function renderEmergency(main) {
     if (!window.IAADocuments) return sectionMissing(main, "Emergency");
     return window.IAADocuments.renderEmergency(main, sectionCtx());
+  }
+
+  async function renderManuals(main) {
+    if (!window.IAAManuals) return sectionMissing(main, "Manuals");
+    return window.IAAManuals.render(main, sectionCtx());
   }
 
   async function renderNews(main) {

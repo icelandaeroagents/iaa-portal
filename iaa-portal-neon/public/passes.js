@@ -14,6 +14,7 @@
     ["first_aid", "First aid"],
     ["dangerous_goods", "Dangerous goods"],
     ["security", "Security awareness training"],
+    ["escort", "Escort training"],
     ["data_protection", "Data protection training"],
     ["driving_licence", "Driving licence"],
     ["other", "Other"]

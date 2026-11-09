@@ -1104,3 +1104,10 @@ td .chip + .chip { margin-left: 0.3rem; }
   .emergency-card a { color: #000; text-decoration: none; }
   .doc-table th, .doc-table td { border-bottom: 1px solid #999; }
 }
+
+/* Manuals */
+.manual-body { max-width: 80ch; }
+.manual-body h1 { font-size: 1.35rem; margin-top: 1.2rem; }
+.manual-body h2 { font-size: 1.12rem; }
+.manual-body table { font-size: 0.92rem; }
+.manual-body td, .manual-body th { padding: 0.35rem 0.5rem; }
