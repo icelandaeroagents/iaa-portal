@@ -1073,3 +1073,34 @@ td .chip + .chip { margin-left: 0.3rem; }
 .eq-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid var(--line); padding-top: 0.5rem; }
 .eq-history li { display: flex; flex-direction: column; gap: 0.1rem; font-size: 0.92rem; }
 .eq-history li .linkish { align-self: flex-start; font-size: 0.85rem; }
+
+/* ---------- Policies and emergency cards ---------- */
+.doc-body { display: flex; flex-direction: column; gap: 0.7rem; max-width: 72ch; line-height: 1.55; }
+.doc-body h2 { font-size: 1.25rem; margin: 0.6rem 0 0; }
+.doc-body h3 { font-size: 1.05rem; margin: 0.6rem 0 0; padding-top: 0.6rem; border-top: 1px solid var(--line); }
+.doc-body h3:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+.doc-body p { margin: 0; }
+.doc-body ul, .doc-body ol { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.doc-table { border-collapse: collapse; width: 100%; max-width: 40rem; }
+.doc-table th, .doc-table td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+.doc-table th { font-weight: 500; color: var(--muted); width: 55%; }
+.doc-table td { font-weight: 600; font-variant-numeric: tabular-nums; }
+.doc-editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.doc-editor-text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88rem; line-height: 1.5; }
+.doc-preview { max-height: 80vh; overflow: auto; }
+.just-culture { font-size: 0.92rem; }
+.emergency-card { border-top: 6px solid var(--danger); }
+.emergency-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.5rem 1rem; margin-bottom: 0.5rem; }
+.emergency-head .briefing-kicker { flex-basis: 100%; margin: 0; }
+.emergency-head h2 { margin: 0; }
+.emergency-112 { margin: 0; font-size: 1.6rem; font-weight: 800; color: var(--danger); }
+.emergency-112 a { color: inherit; text-decoration: none; }
+@media (max-width: 860px) { .doc-editor { grid-template-columns: 1fr; } }
+
+@media print {
+  .topbar, .shell > nav, nav, .no-print, .back-link, button, .btn { display: none !important; }
+  body, .app, .shell, main { background: #fff !important; color: #000 !important; margin: 0 !important; padding: 0 !important; display: block !important; }
+  .emergency-card { border: 2px solid #000; border-top: 8px solid #b42318; box-shadow: none; padding: 12mm; }
+  .emergency-card a { color: #000; text-decoration: none; }
+  .doc-table th, .doc-table td { border-bottom: 1px solid #999; }
+}

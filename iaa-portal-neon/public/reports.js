@@ -9,14 +9,20 @@
   const TYPES = [
     ["incident", "Incident"],
     ["near_miss", "Near miss"],
-    ["injury", "Injury"],
+    ["injury", "Injury or accident"],
     ["aircraft_damage", "Aircraft damage"],
     ["equipment_damage", "Equipment (GSE) damage"],
     ["hazard", "Safety hazard"],
-    ["security", "Security"],
+    ["fod", "FOD or apron defect"],
+    ["fuel_spill", "Fuel spill or contamination"],
+    ["dangerous_goods", "Dangerous goods"],
+    ["security", "Security occurrence"],
+    ["data_breach", "Data protection breach"],
     ["customer_complaint", "Customer complaint"],
     ["other", "Other"]
   ];
+  // Seen only by management and the person who submitted them.
+  const PRIVATE_TYPES = ["security", "data_breach"];
   const TYPE_LABEL = Object.fromEntries(TYPES);
   const SEVERITY = [["low", "Low"], ["medium", "Medium"], ["high", "High"]];
   const SEVERITY_LABEL = Object.fromEntries(SEVERITY);
@@ -236,6 +242,20 @@
       h("option", { value: "", selected: true }, "Choose…"),
       TYPES.map((t) => h("option", { value: t[0] }, t[1])));
     f.occurred = h("input", { id: "r-occurred", type: "datetime-local", required: true, value: localNow(), max: localNow() });
+    // Extra guidance for some report types.
+    const typeNote = h("p", { class: "notice", hidden: true });
+    f.type.addEventListener("change", function () {
+      const t = f.type.value;
+      const notes = {
+        security: "Only management and you can see this report. If there is a threat now, call Border Police or airport security first.",
+        data_breach: "Only management and you can see this report. Describe what happened, but do not include the personal data itself (no passport numbers, dates of birth or health details). Tell the Data Protection Lead straight away as well.",
+        fuel_spill: "Make sure the fuel supplier and the duty manager have been told, and report it through the airport’s own system too.",
+        dangerous_goods: "Tell the duty manager straight away, and report it through the airport’s own system too.",
+        injury: "Report accidents and injuries within 24 hours at the latest, and tell your supervisor immediately."
+      };
+      typeNote.textContent = notes[t] || "";
+      typeNote.hidden = !notes[t];
+    });
     f.station = h("select", { id: "r-station" },
       orderedStations.map((s, i) => h("option", { value: s.code, selected: i === 0 }, `${s.code} – ${s.name}`)),
       h("option", { value: "" }, "Not at a station"));
@@ -351,12 +371,16 @@
 
       h("section", { class: "panel", "aria-labelledby": "s1" },
         h("h2", { id: "s1" }, "What happened"),
+        h("p", { class: "notice just-culture" },
+          h("b", null, "Just Culture: "),
+          "you will not be disciplined for reporting an honest mistake, a hazard or a near-miss. The only exceptions are gross negligence, wilful violation or a criminal act. If you're unsure whether to report, report."),
         h("div", { class: "form-grid" },
           field("type", "Report type", f.type, null, true),
           field("occurred", "Date and time it happened", f.occurred, "Iceland time.", true),
           field("station", "Station", f.station),
           field("location", "Location", text("location", { placeholder: "e.g. Stand 3, Apron 1 North, FBO lounge, vehicle" }))
         ),
+        typeNote,
         field("description", "Description", area("description", { rows: "5" }), "What happened, in the order it happened.", true),
         field("people", "Who was involved", area("people", { rows: "2", placeholder: "e.g. tug driver, marshaller, aircraft crew, passenger, fuel contractor" }),
           "All staff can read reports, so describe people by their role where you can. Management can always ask for names.")

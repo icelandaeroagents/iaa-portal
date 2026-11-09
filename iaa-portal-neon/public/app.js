@@ -35,6 +35,13 @@
       render: renderHome
     },
     {
+      id: "emergency",
+      title: "Emergency",
+      description: "Emergency numbers and first actions for each station.",
+      roles: ALL_ROLES,
+      render: renderEmergency
+    },
+    {
       id: "news",
       title: "News",
       description: "Updates from management.",
@@ -47,6 +54,13 @@
       description: "This week’s briefing and every issue before it.",
       roles: ALL_ROLES,
       render: renderBriefings
+    },
+    {
+      id: "policies",
+      title: "Policies",
+      description: "Company policies and what they mean for you.",
+      roles: ALL_ROLES,
+      render: renderPolicies
     },
     {
       id: "roster",
@@ -598,17 +612,20 @@
     let latest = null;
     let roster = null;
     let attention = null;
+    let toRead = null;
     const rerenderHome = function () { renderHome(main); };
     await Promise.all([
       (async function () { if (window.IAANews) { try { latest = await window.IAANews.homePanel(sectionCtx()); } catch (e) { latest = null; } } })(),
       (async function () { if (window.IAARoster) { try { roster = await window.IAARoster.homePanel(sectionCtx(), rerenderHome); } catch (e) { roster = null; } } })(),
-      (async function () { attention = await attentionPanel(); })()
+      (async function () { attention = await attentionPanel(); })(),
+      (async function () { if (window.IAADocuments) { try { toRead = await window.IAADocuments.homePanel(sectionCtx()); } catch (e) { toRead = null; } } })()
     ]);
 
     fill(
       main,
       pageHead("Hello, " + firstName(), "Here’s what you can do in the staff portal."),
       attention,
+      toRead,
       latest,
       roster,
 
@@ -690,6 +707,16 @@
     fill(main, pageHead(title), h("p", { class: "notice" }, "This section’s files didn’t load. Reload the page."));
   }
 
+  async function renderPolicies(main) {
+    if (!window.IAADocuments) return sectionMissing(main, "Policies");
+    return window.IAADocuments.renderPolicies(main, sectionCtx());
+  }
+
+  async function renderEmergency(main) {
+    if (!window.IAADocuments) return sectionMissing(main, "Emergency");
+    return window.IAADocuments.renderEmergency(main, sectionCtx());
+  }
+
   async function renderNews(main) {
     if (!window.IAANews) return sectionMissing(main, "News");
     return window.IAANews.render(main, sectionCtx());
@@ -720,10 +747,11 @@
     if (state.profile.role !== "management") return null;
     const items = [];
     try {
-      const [acc, req, exp] = await Promise.all([
+      const [acc, req, exp, rev] = await Promise.all([
         db.from("access_requests").select("id").eq("status", "pending"),
         window.IAARequests ? window.IAARequests.counts(sectionCtx()) : Promise.resolve(null),
-        window.IAAPasses ? window.IAAPasses.expiringCount(sectionCtx()) : Promise.resolve(0)
+        window.IAAPasses ? window.IAAPasses.expiringCount(sectionCtx()) : Promise.resolve(0),
+        db.from("access_reviews").select("reviewed_at").order("reviewed_at", { ascending: false }).limit(1)
       ]);
       const nAcc = (acc.data || []).length;
       if (nAcc) items.push(["#/people", `${nAcc} access ${nAcc === 1 ? "request" : "requests"} to approve`]);
@@ -731,6 +759,12 @@
       if (req && req.urgent) items.push(["#/requests/service", `${req.urgent} urgent or vehicle defect ${req.urgent === 1 ? "request" : "requests"} open`]);
       else if (req && req.service) items.push(["#/requests/service", `${req.service} open stock, equipment or defect ${req.service === 1 ? "request" : "requests"}`]);
       if (exp) items.push(["#/passes", `${exp} ${exp === 1 ? "pass or certificate" : "passes or certificates"} expired or expiring within 30 days`]);
+      if (rev && !rev.error) {
+        const last = (rev.data || [])[0];
+        if (!last || Date.now() - new Date(last.reviewed_at).getTime() > 90 * 86400000) {
+          items.push(["#/people", last ? "Quarterly access review is due" : "Record the first quarterly access review"]);
+        }
+      }
     } catch (e) {
       return null;
     }
@@ -787,6 +821,50 @@
   }
 
   // ---------- People (management) ----------
+
+  // Quarterly access review (Security Programme 4.2; Data Protection Policy 9.5).
+  const ACCESS_REVIEW_DAYS = 90;
+
+  async function renderAccessReviewPanel(people) {
+    const res = await db.from("access_reviews").select("*").order("reviewed_at", { ascending: false }).limit(8);
+    if (res.error) return null;   // database update 18 not run yet
+    const reviews = res.data || [];
+    const last = reviews[0];
+    const due = last ? new Date(new Date(last.reviewed_at).getTime() + ACCESS_REVIEW_DAYS * 86400000) : null;
+    const overdue = !last || due.getTime() < Date.now();
+    const active = people.filter((p) => p.active);
+    const note = h("textarea", { id: "ar-notes", rows: "2", placeholder: "Optional, e.g. removed access for a leaver, checked airport passes" });
+    const status = h("p", { class: "status", role: "status" });
+    const save = h("button", {
+      class: "btn", type: "button",
+      onclick: async function () {
+        if (!confirm(`Confirm you have checked all ${active.length} people with access, and that everyone still needs it?`)) return;
+        save.disabled = true;
+        const snapshot = active.map((p) => ({ email: p.email, name: p.full_name || null, role: p.role, stations: p.station_codes || [] }));
+        const { error } = await db.from("access_reviews").insert({ active_accounts: snapshot, notes: note.value.trim() || null });
+        save.disabled = false;
+        if (error) { setStatus(status, error.message, true); return; }
+        await logEvent("access_review_recorded", { accounts: snapshot.length });
+        render();
+      }
+    }, "Record review");
+    const fmtDay = (v) => new Date(v).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    return h("section", { class: "panel" + (overdue ? " panel-attention" : ""), "aria-labelledby": "ar-h" },
+      h("h2", { id: "ar-h" }, "Quarterly access review"),
+      h("p", null, last
+        ? `Last reviewed ${fmtDay(last.reviewed_at)} by ${last.reviewer_name || "management"}. ${overdue ? "The next review is due now." : "Next review due by " + fmtDay(due) + "."}`
+        : "No review recorded yet."),
+      h("p", { class: "fineprint" }, "Every three months, check that everyone listed under Staff with access still needs it, untick anyone who has left, and check their airport pass has been returned. This is the access review promised in the Security Programme and the Data Protection Policy."),
+      h("div", { class: "field field-wide" }, h("label", { for: "ar-notes" }, "Notes"), note),
+      h("div", { class: "row" }, save),
+      status,
+      reviews.length
+        ? h("details", null, h("summary", null, `Previous reviews (${reviews.length})`),
+            h("ul", { class: "plain-list" }, reviews.map((r) => h("li", null,
+              `${fmtDay(r.reviewed_at)} · ${r.reviewer_name || "management"} · ${(r.active_accounts || []).length} people with access`,
+              r.notes ? h("span", { class: "sub" }, r.notes) : null))))
+        : null);
+  }
 
   async function renderPeople(main) {
     fill(main, pageHead("People", "Give staff access and set their role and station."), h("p", { class: "empty" }, "Loading staff…"));
@@ -885,6 +963,7 @@
       pageHead("People", "Give staff access and set their role and station."),
       requests.length ? renderRequestsPanel(requests) : null,
       renderInvitePanel(data, invites),
+      await renderAccessReviewPanel(data),
       h(
         "section",
         { class: "panel", "aria-labelledby": "staff-h" },

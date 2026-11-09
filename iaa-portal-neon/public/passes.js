@@ -13,7 +13,8 @@
     ["deicing", "De-icing"],
     ["first_aid", "First aid"],
     ["dangerous_goods", "Dangerous goods"],
-    ["security", "Security training"],
+    ["security", "Security awareness training"],
+    ["data_protection", "Data protection training"],
     ["driving_licence", "Driving licence"],
     ["other", "Other"]
   ];
