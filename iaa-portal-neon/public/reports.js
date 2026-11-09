@@ -22,7 +22,7 @@
     ["other", "Other"]
   ];
   // Seen only by management and the person who submitted them.
-  const PRIVATE_TYPES = ["security", "data_breach"];
+  const PRIVATE_TYPES = ["security", "data_breach", "injury"];
   const TYPE_LABEL = Object.fromEntries(TYPES);
   const SEVERITY = [["low", "Low"], ["medium", "Medium"], ["high", "High"]];
   const SEVERITY_LABEL = Object.fromEntries(SEVERITY);
@@ -251,7 +251,7 @@
         data_breach: "Only management and you can see this report. Describe what happened, but do not include the personal data itself (no passport numbers, dates of birth or health details). Tell the Data Protection Lead straight away as well.",
         fuel_spill: "Make sure the fuel supplier and the duty manager have been told, and report it through the airport’s own system too.",
         dangerous_goods: "Tell the duty manager straight away, and report it through the airport’s own system too.",
-        injury: "Report accidents and injuries within 24 hours at the latest, and tell your supervisor immediately."
+        injury: "Only management and you can see this report, as it may contain health information. Report accidents and injuries within 24 hours at the latest, and tell your supervisor immediately. Don’t include medical details beyond what happened."
       };
       typeNote.textContent = notes[t] || "";
       typeNote.hidden = !notes[t];
