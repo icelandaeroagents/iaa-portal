@@ -128,7 +128,9 @@ async function notifyOne(id) {
     const to = recipients.rows.map((x) => x.email);
     if (!to.length) throw new Error("No report recipients set up");
 
-    const who = reporter.rows[0] || {};
+    // Confidential and anonymous reports: never put the reporter in an email.
+    const mode = r.reporting_mode || "normal";
+    const who = mode === "normal" ? reporter.rows[0] || {} : {};
     const stationText = r.station_code ? r.station_code + (station.rows[0] ? " – " + station.rows[0].name : "") : "Not given";
     const number = reportNumber(r.id);
     const link = (process.env.PORTAL_URL || "").replace(/\/+$/, "") + "/#/reports/" + r.id;
@@ -154,7 +156,9 @@ async function notifyOne(id) {
       ["Consequences", r.consequences],
       ["Immediate actions taken", r.immediate_actions],
       ["Suggestion for improvement", r.suggestion],
-      ["Reported by", (who.reporter_name || r.reporter_display || "Unknown") + (who.reporter_email ? " <" + who.reporter_email + ">" : "") +
+      ["Reported by", mode === "confidential" ? "Confidential reporter – only the Safety & Security Manager can see who in the portal"
+        : mode === "anonymous" ? "Anonymous – no name was recorded"
+        : (who.reporter_name || r.reporter_display || "Unknown") + (who.reporter_email ? " <" + who.reporter_email + ">" : "") +
         (who.hide_name ? " (name withheld from other staff)" : "")],
       ["Submitted", formatTime(r.created_at)],
       ["Photos", photos.rows.length ? photos.rows.length + " attached" : "None"]
