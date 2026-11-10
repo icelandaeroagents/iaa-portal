@@ -7,6 +7,8 @@
    – passes & certificates: the person (with management copied) is
      reminded 30 days and 7 days before expiry, and when it has expired
    – invitations: the invited person gets the portal link and how to sign in
+   – training renewals: when a module is due (P1–P5 6 months after passing,
+     winter modules each 1 October), the person gets one email listing it
 
    POST /api/staff-notify  { "kind": "leave" | "service", "id": 12 }
                            { "kind": "invite", "email": "name@gmail.com" }
@@ -19,6 +21,9 @@
 
 const { Pool } = require("pg");
 const nodemailer = require("nodemailer");
+const fs = require("fs");
+const path = require("path");
+const vm = require("vm");
 
 let pool = null;
 function db() {
@@ -91,6 +96,7 @@ module.exports = async function handler(req, res) {
           order by id limit 20`);
       for (const r of service.rows) results.push(await serviceEmail(r.id));
       results.push.apply(results, await expiryReminders());
+      results.push.apply(results, await trainingReminders());
       const invites = await db().query(
         `select email from public.invitations
           where accepted_at is null and invite_sent_at is null and invite_attempts < 5
@@ -241,6 +247,70 @@ async function expiryReminders() {
     }
   }
   return out;
+}
+
+// ----------------------------------------------------------------------
+// Training renewals. The modules and renewal rules come from the same file
+// the portal uses (public/training-content.js), included with this function
+// in vercel.json.
+function trainingContent() {
+  const file = path.join(process.cwd(), "public", "training-content.js");
+  const sandbox = { window: {} };
+  vm.runInNewContext(fs.readFileSync(file, "utf8"), sandbox);
+  return sandbox.window.TRAINING;
+}
+
+async function trainingReminders() {
+  let T;
+  try { T = trainingContent(); } catch (err) { return [{ kind: "training", status: "skipped – training content not found" }]; }
+  const today = new Date().toISOString().slice(0, 10);
+  const iso = (v) => (v instanceof Date ? v.toISOString() : String(v));
+  const [people, atts, certs, sentRows] = await Promise.all([
+    db().query("select id, email, full_name, station_codes from public.profiles where active"),
+    db().query("select profile_id, module, attempted_at from public.training_attempts where profile_id is not null and passed"),
+    db().query("select profile_id, module, passed_at, signed_at from public.training_signoffs where profile_id is not null and revoked_at is null"),
+    db().query("select profile_id, module, due_on::text as due_on from public.training_reminders")
+  ]);
+  const sent = new Set(sentRows.rows.map((r) => r.profile_id + "|" + r.module + "|" + r.due_on));
+  const results = [];
+  for (const p of people.rows) {
+    const codes = p.station_codes || [];
+    const due = [];
+    for (const m of T.modules) {
+      if (m.stations && !m.stations.some((c) => codes.indexOf(c) !== -1)) continue;
+      // Same rule as the portal: the latest completion decides the due date.
+      const passes = atts.rows.filter((a) => a.profile_id === p.id && a.module === m.id).map((a) => iso(a.attempted_at)).sort();
+      const cs = certs.rows.filter((c) => c.profile_id === p.id && c.module === m.id)
+        .sort((x, y) => iso(x.signed_at || x.passed_at).localeCompare(iso(y.signed_at || y.passed_at)));
+      const lastPass = passes.length ? passes[passes.length - 1] : null;
+      const lastCert = cs.length ? cs[cs.length - 1] : null;
+      const certTime = lastCert ? iso(lastCert.signed_at || lastCert.passed_at) : "";
+      const completed = lastPass && (!lastCert || lastPass > certTime) ? lastPass : lastCert ? iso(lastCert.passed_at) : lastPass;
+      if (!completed) continue;
+      const dueOn = T.dueDate(completed, m);
+      if (dueOn && dueOn <= today && !sent.has(p.id + "|" + m.id + "|" + dueOn)) due.push({ m: m, completed: completed, dueOn: dueOn });
+    }
+    if (!due.length) continue;
+    try {
+      const fmt = (d) => new Date(d.length === 10 ? d + "T12:00:00Z" : d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+      await mail({
+        to: [p.email],
+        subject: due.length === 1 ? `Training due for renewal: ${due[0].m.code} ${due[0].m.title}` : `${due.length} training modules due for renewal`,
+        kicker: "Training",
+        title: "Your training is due for renewal",
+        rows: due.map((x) => [x.m.code + " " + x.m.title, "Completed " + fmt(x.completed) + ". Due " + fmt(x.dueOn) + "."]),
+        note: "Open each module in the IAA Staff Portal, read through it and retake the quiz. Modules P1–P5 are renewed every 6 months, and the winter modules every year before 1 October. Your earlier completions and certificates stay on your record.",
+        link: portal() + "/#/training", linkLabel: "Open my training"
+      });
+      for (const x of due) {
+        await db().query("insert into public.training_reminders (profile_id, module, due_on) values ($1, $2, $3) on conflict do nothing", [p.id, x.m.id, x.dueOn]);
+      }
+      results.push({ kind: "training", email: p.email, modules: due.map((x) => x.m.code), status: "sent" });
+    } catch (err) {
+      results.push({ kind: "training", email: p.email, status: "failed", error: msg(err) });
+    }
+  }
+  return results;
 }
 
 const ROLE_LABELS = { staff: "Staff", station_lead: "Station lead", management: "Management" };
