@@ -19,8 +19,10 @@ window.TRAINING = {
     "Towing and pushback",
     "GPU operation",
     "Air stairs",
+    "Aircraft doors and baggage hold doors",
     "Lavatory servicing",
     "Potable water servicing",
+    "Aircraft interior cleaning",
     "Baggage loading and safe lifting",
     "Airside driving (company check)"
   ],
