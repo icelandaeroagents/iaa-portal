@@ -299,7 +299,7 @@ async function trainingReminders() {
         kicker: "Training",
         title: "Your training is due for renewal",
         rows: due.map((x) => [x.m.code + " " + x.m.title, "Completed " + fmt(x.completed) + ". Due " + fmt(x.dueOn) + "."]),
-        note: "Open each module in the IAA Staff Portal, read through it and retake the quiz. Modules P1–P5 are renewed every 6 months, and the winter modules every year before 1 October. Your earlier completions and certificates stay on your record.",
+        note: "Open each module in the IAA Staff Portal, read through it and retake the quiz. Each module is renewed on its own cycle: most every 6 months, the winter modules every year before 1 October. Your earlier completions and certificates stay on your record.",
         link: portal() + "/#/training", linkLabel: "Open my training"
       });
       for (const x of due) {
