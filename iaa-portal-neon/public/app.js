@@ -798,6 +798,9 @@
         const late = await window.IAAManagement.overdueCount(db);
         if (late) items.push(["#/management", `${late} management ${late === 1 ? "action is" : "actions are"} overdue`]);
       }
+      if (window.IAAManagement && window.IAAManagement.riskAttention) {
+        (await window.IAAManagement.riskAttention(db)).forEach((t) => items.push(["#/management", t]));
+      }
       if (rev && !rev.error) {
         const last = (rev.data || [])[0];
         if (!last || Date.now() - new Date(last.reviewed_at).getTime() > 90 * 86400000) {

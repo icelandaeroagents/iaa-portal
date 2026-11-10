@@ -70,6 +70,7 @@
     const isManagement = ctx.state.profile.role === "management";
     const part = (location.hash.match(/^#\/manuals\/([^/?]+)/) || [])[1];
     if (part === "upload" && isManagement) return showUpload(main, ctx, null);
+    if (part === "hazards") return showHazards(main, ctx);
     if (part && /^\d+$/.test(part)) return showManual(main, ctx, parseInt(part, 10));
     return showList(main, ctx);
   }
@@ -89,6 +90,11 @@
             : "Company manuals shared with staff. The policies you need to confirm are under Policies.")),
         isManagement ? h("a", { class: "btn", href: "#/manuals/upload" }, "Upload manual") : null),
       takeNotice(h),
+      h("section", { class: "panel" },
+        h("ul", { class: "module-list" }, h("li", null, h("a", { href: "#/manuals/hazards" },
+          h("span", { class: "module-code" }, "Live"),
+          h("span", { class: "module-text" }, h("span", { class: "section-title" }, "Hazards and controls"),
+            h("span", { class: "section-desc" }, "The hazards in our work and the controls you must follow, from the risk register")))))),
       h("section", { class: "panel" },
         list.length
           ? h("ul", { class: "module-list" }, list.map((m) => h("li", null, h("a", { href: "#/manuals/" + m.id },
@@ -166,6 +172,35 @@
       h("div", { class: "row" }, download), status,
       h("article", { class: "panel briefing-article" }, body),
       manage);
+  }
+
+  // ------------------------------------------------------------------
+  // Hazards and controls (everyone): read-only, from the risk register
+  // ------------------------------------------------------------------
+  async function showHazards(main, ctx) {
+    const { h, fill } = ctx;
+    fill(main, h("p", { class: "empty" }, "Loading…"));
+    const res = await ctx.db.from("risk_controls").select("*").order("ref");
+    const list = res.error ? [] : res.data || [];
+    const CATS = { aviation: "Aviation safety", workplace: "Workplace (health and safety)", security: "Security" };
+    const mine = ctx.state.profile.station_codes || [];
+    const relevant = list.filter((r) => !(r.stations || []).length || (r.stations || []).some((c) => mine.indexOf(c) !== -1) || ctx.state.profile.role === "management");
+    fill(main,
+      h("a", { class: "back-link", href: "#/manuals" }, "Manuals"),
+      h("div", { class: "page-head" }, h("h1", null, "Hazards and controls"),
+        h("p", null, "The main hazards in our work and the controls everyone must follow. They come from our risk register and change when reports show something new. If you spot a hazard that isn’t here, report it.")),
+      relevant.length
+        ? Object.keys(CATS).map(function (cat) {
+            const rows = relevant.filter((r) => r.category === cat);
+            if (!rows.length) return null;
+            return h("section", { class: "panel" }, h("h2", null, CATS[cat]),
+              h("div", { class: "hazard-list" }, rows.map((r) => h("article", { class: "hazard-item" },
+                h("h3", null, r.activity, (r.stations || []).length ? h("span", { class: "chip chip-none" }, r.stations.join(", ")) : null),
+                r.hazard ? h("p", { class: "sub" }, "Hazard: " + r.hazard) : null,
+                h("p", null, h("b", null, "Controls: "), [r.current_controls, r.extra_controls].filter(Boolean).join(". "))))));
+          })
+        : h("section", { class: "panel" }, h("p", { class: "empty" }, "The hazards will appear here once management has assessed them.")),
+      h("div", { class: "row" }, h("a", { class: "btn", href: "#/reports/new" }, "Report a hazard")));
   }
 
   // ------------------------------------------------------------------
