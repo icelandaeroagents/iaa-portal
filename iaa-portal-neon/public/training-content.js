@@ -1,12 +1,12 @@
 /* Iceland Aero Agents – Staff Portal
-   Training content: Operations Officer SOP Manual v1.2.
+   Training content: Operations Officer SOP Manual v1.3.
    Copied unchanged from the IAA Ops Training page (23 Oct 2026).
    To change a lesson or question, edit it here and upload the file.
    Quiz answers: "a" is the position of the correct option in "o",
    counting from 0. */
 
 window.TRAINING = {
-  manual: "1.2",
+  manual: "1.3",
   passMark: 0.8,
   // How long a completed module stays valid before it must be retaken.
   //   { months: 6 }        – due 6 months after the person passed it
@@ -25,12 +25,13 @@ window.TRAINING = {
     "Aircraft interior cleaning",
     "Baggage loading and safe lifting",
     "Airside driving (company check)",
-    "Fire safety and extinguisher use"
+    "Fire safety and extinguisher use",
+    "Turnaround coordination"
   ],
   practicalRenewal: { months: 12 },
   modules: [
 {
-  id: "m1", code: "P1", title: "Station Familiarisation", part: "Part 1 · Sections 1–6",
+  id: "m1", code: "P1", title: "Station Familiarisation", part: "Part 1 · Sections 1–6, including 2.4 Turnaround",
   summary: "Standard ramp rules at all three stations, CIQ sequencing, and what is different at BIKF, BIRK and BIAR.",
   lesson: [
     { h: "Standard at every station", html: `
@@ -68,6 +69,10 @@ window.TRAINING = {
         <li>Runs as a variant of BIRK: cones and chocks, Avgas pump, Jet A-1 D2A, full CIQ rule.</li>
         <li>Parking is flexible — confirm positions with the duty manager on site. No APU restriction.</li>
       </ul>` },
+    { h: "Turnaround coordination", key: true, html: "<ul><li>Every aircraft has one <b>turnaround coordinator</b> from our staff – normally the Operations Officer on the aircraft. They plan the services with the crew, keep the CIQ sequence, coordinate our staff and third parties, and are the crew’s single point of contact.</li><li>If there is too much to do safely, tell the duty manager. The turnaround is slowed, not rushed.</li><li>The coordinator releases the aircraft only when all our services are complete and the departure walk-around is done.</li><li>The operator’s own procedures always take priority. The airport’s rules take priority for apron safety, driving, winter and night operations.</li></ul>" },
+    { h: "Arrival and securing the aircraft", html: "<ul><li>Before arrival: inspect the stand for FOD, equipment, vehicles and people, and have chocks, cones and GSE ready but parked clear.</li><li>Nobody approaches until the engines are off and the beacon is off – except the marshaller and staff with a briefed task.</li><li>Chocks first, then cones at the nose, wingtips and tail. Only then may GSE approach, one unit at a time, following the no-touch rule.</li></ul>" },
+    { h: "Fuelling with passengers on board, and baggage", html: "<ul><li>Only when the operator allows it and the fuel provider agrees. Keep exits, escape routes and the fuel vehicle’s path clear, and the air stairs at the main door. If an exit is blocked, tell the fuel provider at once.</li><li>Baggage: the crew decide where bags go and are responsible for mass and balance. Load only as the crew instructs, secure every item, and tell the crew the final bag count.</li><li>Do not load dangerous goods, damaged or leaking bags, or anything suspicious – tell the crew and the duty manager.</li></ul>" },
+    { h: "Departure walk-around", html: "<ul><li>Panels and doors we used closed, hoses and cables stowed, all GSE removed, stand clear of FOD.</li><li>Cones removed. Chocks removed only on the crew’s signal.</li><li>If anything is wrong, stop the departure and tell the crew.</li></ul>" },
   ],
   quiz: [
     { q: "An aircraft has arrived from the USA and Border Police have not attended yet. Which of these is allowed?", o: ["Start fuelling so the turn stays on time", "Meet and greet the crew and passengers", "Hand the bags to the waiting taxi driver", "Let the caterer board the aircraft"], a: 1, e: "Only IAA staff may meet, greet and assist before CIQ clears. Fuel, services, third-party transport and bag handoff all wait.", r: "2.3" },
@@ -79,10 +84,15 @@ window.TRAINING = {
     { q: "At BIRK, an aircraft will be running its APU on stand. Where does it park?", o: ["Apron 1 North, no time limit", "Apron 1 Center, 20-minute APU limit", "At the Avgas pump", "Apron 1 North, 20-minute APU limit"], a: 1, e: "Apron 1 Center is for APU use (20 min). Apron 1 North is non-APU and long-term, with a 0-minute APU limit.", r: "4.2" },
     { q: "What must be placed around every parked aircraft at BIRK and BIAR?", o: ["Chocks only", "Cones at nose, tail and wingtips, as well as chocks", "Cones instead of chocks", "Tie-downs only in high wind"], a: 1, e: "Cones are a standing requirement in addition to chocks — not instead of them.", r: "4.1 / 5.1" },
     { q: "An Avgas aircraft from abroad parks at the BIRK Avgas pump. When can fuelling start?", o: ["Straight away — it's already at the pump", "Once CIQ has cleared, if clearance is required for that movement", "After the crew have paid", "Once the tower approves"], a: 1, e: "The CIQ rule applies in full at the pump. After fuelling, move the aircraft to the right ramp.", r: "4.3" },
+    { q: "Who is the crew’s single point of contact during a turnaround?", o: ["Whoever is nearest the door", "The turnaround coordinator – normally the Operations Officer on the aircraft", "The fuel provider", "The tower"], a: 1, e: "One coordinator per aircraft plans and coordinates all the services.", r: "SOP 2.4" },
+    { q: "The aircraft has stopped on stand, but the beacon is still on. Can the GPU approach?", o: ["Yes, if the engines are off", "No – wait until the engines and beacon are off, and the chocks and cones are in place", "Yes, at walking pace", "Only at night"], a: 1, e: "Chocks first, then cones, then GSE one at a time.", r: "SOP 2.4" },
+    { q: "Fuelling is under way with passengers on board and a baggage cart is blocking an exit. What do you do?", o: ["Nothing – fuelling is nearly finished", "Move the cart and tell the fuel provider at once", "Ask the passengers to use another exit", "Carry on loading"], a: 1, e: "Exits and escape routes must stay clear while fuel is flowing.", r: "SOP 2.4" },
+    { q: "Where should the passengers’ golf bags be loaded?", o: ["Wherever they fit best", "Where the crew instructs – the crew are responsible for mass and balance", "In the rearmost hold always", "In the cabin"], a: 1, e: "We load as the crew instructs.", r: "SOP 2.4" },
+    { q: "During the departure walk-around you find a service panel open. What do you do?", o: ["Close it and say nothing", "Stop the departure and tell the crew", "Let the aircraft go", "Report it tomorrow"], a: 1, e: "If anything is wrong, stop the departure and tell the crew.", r: "SOP 2.4" },
   ]
 },
 {
-  id: "m2", code: "P2", title: "GSE & Marshalling", part: "Part 2 · Sections 7–8",
+  id: "m2", code: "P2", title: "GSE & Marshalling", part: "Part 2 · Sections 7–8, including 7.1–7.3 updates",
   summary: "Safe operation of lav, water, GPU, air-stairs and tugs, and standard marshalling practice.",
   lesson: [
     { h: "Before you touch any equipment", key: true, html: `
@@ -113,6 +123,7 @@ window.TRAINING = {
         <li><b>Anyone</b> who sees a hazard may give the Emergency Stop. If in doubt, stop.</li>
         <li>Marshalling authorisation is revalidated every 12 months, or sooner after an incident, procedure change or long absence.</li>
       </ul>` },
+    { h: "No-touch rule, leaks and water quality", key: true, html: "<ul><li><b>No-touch rule:</b> GSE never touches the aircraft. Stop short, test the brakes, then make the final approach at creep speed with a guide where required. Only equipment designed to make contact – air stairs with buffers, hoses and cables – touches the aircraft, as its procedure says.</li><li><b>Lavatory leak or spill:</b> stop, close the drain valve if safe, keep people and vehicles away, contain and clean it up as the airport says, tell the crew if waste reached the aircraft, and report it. Take a leaking unit out of service.</li><li><b>Potable water:</b> fill only from approved sources. A unit whose water test has failed or is overdue is out of service until it passes.</li></ul>" },
   ],
   quiz: [
     { q: "You operated air-stairs at your previous employer. Can you drive IAA's air-stairs unsupervised?", o: ["Yes, the procedure is the same", "Only on BIRK where traffic is lighter", "No — not until you are trained and signed off at IAA", "Yes, if a colleague watches the first time"], a: 2, e: "Never operate GSE you have not been trained and signed off on, even if you've used similar equipment elsewhere.", r: "7.1" },
@@ -124,6 +135,9 @@ window.TRAINING = {
     { q: "Who may give the Emergency Stop signal?", o: ["Only the marshaller", "Only the duty manager", "Anyone who observes a hazard", "Only the flight crew"], a: 2, e: "The Emergency Stop may be given by anyone who sees a hazard, regardless of role.", r: "8.2 / 23.1" },
     { q: "Where does the marshaller stand?", o: ["Directly under the nose", "Ahead of the aircraft or to the side, in the captain's line of sight", "Wherever the wing walkers can see you, even out of the captain's view", "Behind the aircraft"], a: 1, e: "Ahead of the aircraft or to the side, clearly visible to the captain, with a safe retreat path.", r: "8.3" },
     { q: "How often must marshalling authorisation be revalidated?", o: ["Every 3 years", "Every 12 months, or sooner after an incident or long absence", "Only after an incident", "Every 6 months"], a: 1, e: "12 months, or sooner after an incident, procedural change or extended absence.", r: "8.8" },
+    { q: "You are driving the GPU towards the aircraft. What is the rule?", o: ["Drive up until it touches the fuselage", "Stop short, test the brakes, then make the final approach at creep speed – the GPU must not touch the aircraft", "Approach at walking pace without stopping", "Let the crew guide you from the cockpit"], a: 1, e: "No-touch rule: GSE never touches the aircraft.", r: "SOP 7.1" },
+    { q: "Waste spills on the stand while servicing a lavatory. What do you do first?", o: ["Hose it into the drain", "Stop servicing, close the drain valve if safe and keep people and vehicles away", "Finish the servicing, then clean up", "Cover it with sand and leave"], a: 1, e: "Stop, contain and report. Prevent it reaching drains.", r: "SOP 7.2" },
+    { q: "The water unit’s quality test is overdue. Can you use it?", o: ["Yes, if the water looks clear", "No – it is out of service until it passes", "Yes, for crew water only", "Only at BIRK"], a: 1, e: "A unit with a failed or overdue test is out of service.", r: "SOP 7.3" },
   ]
 },
 {
