@@ -260,7 +260,15 @@
       orderedStations.map((s, i) => h("option", { value: s.code, selected: i === 0 }, `${s.code} – ${s.name}`)),
       h("option", { value: "" }, "Not at a station"));
     const severityInputs = SEVERITY.map((s) => h("input", { type: "radio", name: "severity", value: s[0] }));
-    f.hide = h("input", { type: "checkbox", id: "r-hide" });
+    // Who can see who reported it.
+    const MODES = [
+      ["normal", "Show my name", "Management and staff who can see the report see that you reported it."],
+      ["withheld", "Withhold my name from other staff", "Management still sees that you reported it."],
+      ["confidential", "Confidential", "Only the Safety & Security Manager sees that you reported it. The report is shared with management without your name, and is not shown to other staff. The Safety & Security Manager can contact you if they need more details."],
+      ["anonymous", "Anonymous", "No name is stored at all, so nobody can see who reported it, including you later. Nobody can contact you for more details or tell you what was done, so describe everything clearly."]
+    ];
+    const modeInputs = MODES.map((m, i) => h("input", { type: "radio", name: "reporting-mode", value: m[0], checked: i === 0 }));
+    f.mode = { get value() { const c = modeInputs.find((x) => x.checked); return c ? c.value : "normal"; } };
 
     // Photos
     const photoInput = h("input", { id: "r-photos", type: "file", accept: "image/*", multiple: true, class: "file-input" });
@@ -333,18 +341,23 @@
             immediate_actions: val(f.actions),
             severity: sev ? sev.value : null,
             suggestion: val(f.suggestion),
-            reporter_display: f.hide.checked ? "withheld" : null
+            reporter_display: f.mode.value === "withheld" ? "withheld" : null,
+            reporting_mode: f.mode.value === "confidential" || f.mode.value === "anonymous" ? f.mode.value : "normal"
           };
+          const anonymous = row.reporting_mode === "anonymous";
 
           submit.disabled = true;
           setStatus(formStatus, "Submitting…");
-          const ins = await ctx.db.from("reports").insert(row).select("id").single();
+          // Anonymous reports are saved by the database without any link to you.
+          const ins = anonymous
+            ? await ctx.db.rpc("submit_anonymous_report", { p_report: row })
+            : await ctx.db.from("reports").insert(row).select("id").single();
           if (ins.error) {
             submit.disabled = false;
             setStatus(formStatus, "The report wasn’t submitted: " + ins.error.message, true);
             return;
           }
-          const id = ins.data.id;
+          const id = anonymous ? ins.data : ins.data.id;
 
           let photoFails = 0;
           for (let i = 0; i < photos.length; i++) {
@@ -364,7 +377,7 @@
             emailed = false;
           }
 
-          lastSubmitted = { id: id, photos: photos.length - photoFails, photoFails: photoFails, emailed: emailed };
+          lastSubmitted = { id: id, photos: photos.length - photoFails, photoFails: photoFails, emailed: emailed, mode: row.reporting_mode };
           go("#/reports/sent");
         }
       },
@@ -424,7 +437,10 @@
 
       h("section", { class: "panel", "aria-labelledby": "s5" },
         h("h2", { id: "s5" }, "Submit"),
-        h("label", { class: "choice" }, f.hide, h("span", null, "Withhold my name from other staff. Management will still see who reported it.")),
+        h("fieldset", { class: "reporting-mode" },
+          h("legend", null, "Who can see that you reported this?"),
+          MODES.map((m, i) => h("label", { class: "choice choice-block" }, modeInputs[i],
+            h("span", null, h("b", null, m[1]), h("span", { class: "sub" }, m[2]))))),
         h("div", { class: "row" }, submit, h("a", { class: "btn btn-quiet", href: "#/reports" }, "Cancel")),
         formStatus
       )
@@ -444,7 +460,9 @@
     if (!s) return go("#/reports");
     fill(
       main,
-      h("div", { class: "page-head" }, h("h1", null, `Report ${number(s.id)} submitted`), h("p", null, "Thank you for reporting.")),
+      h("div", { class: "page-head" }, h("h1", null, `Report ${number(s.id)} submitted`),
+        h("p", null, s.mode === "anonymous" ? "Thank you for reporting. It was submitted anonymously: no name was stored, so it won’t appear in your reports."
+          : s.mode === "confidential" ? "Thank you for reporting. Only the Safety & Security Manager can see that it was you." : "Thank you for reporting.")),
       h(
         "section",
         { class: "panel" },
@@ -453,7 +471,7 @@
           s.photos ? h("li", null, `${s.photos} ${s.photos === 1 ? "photo" : "photos"} attached.`) : null,
           s.photoFails ? h("li", { class: "is-error" }, `${s.photoFails} ${s.photoFails === 1 ? "photo" : "photos"} couldn’t be uploaded. Open the report to add them again within 2 hours.`) : null),
         h("div", { class: "row" },
-          h("a", { class: "btn", href: "#/reports/" + s.id }, "View the report"),
+          s.mode === "anonymous" ? null : h("a", { class: "btn", href: "#/reports/" + s.id }, "View the report"),
           h("a", { class: "btn btn-quiet", href: "#/reports" }, "Back to reports"))
       )
     );
@@ -508,7 +526,10 @@
       fact("Consequences", r.consequences),
       fact("Immediate actions taken", r.immediate_actions),
       fact("Suggestion for improvement", r.suggestion),
-      fact("Reported by", who ? who.reporter_name + (who.hide_name ? " (name withheld from other staff)" : "") : r.reporter_display),
+      fact("Reported by", r.reporting_mode === "anonymous" ? "Anonymous – no name was recorded"
+        : r.reporting_mode === "confidential"
+          ? (who ? who.reporter_name + " (confidential: only the Safety & Security Manager and the reporter see this name)" : "Confidential reporter – only the Safety & Security Manager can see who")
+          : who ? who.reporter_name + (who.hide_name ? " (name withheld from other staff)" : "") : r.reporter_display),
       fact("Submitted", fmt(r.created_at))
     );
 

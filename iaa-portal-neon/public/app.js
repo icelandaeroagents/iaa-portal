@@ -947,6 +947,13 @@
       const rosterBox = hasRosterNames
         ? h("input", { type: "text", value: person.roster_names || "", placeholder: "Name on the roster, e.g. Beggi", autocomplete: "off", "aria-label": "Roster name for " + person.email, title: "How this person appears on the roster. Separate several with commas, e.g. Josh, Joshy" })
         : null;
+      // Only shown once database update 27 has been run. One person at a time.
+      const hasSafetyFlag = Object.prototype.hasOwnProperty.call(person, "safety_manager");
+      const safetyBox = hasSafetyFlag ? h("input", { type: "checkbox", checked: !!person.safety_manager }) : null;
+      const safetyLabel = hasSafetyFlag
+        ? h("label", { class: "choice choice-inline", title: "Receives the reporter’s name on confidential reports. Must have the Management role." },
+            safetyBox, h("span", null, "Safety & Security Manager"))
+        : null;
 
       const save = h(
         "button",
@@ -965,7 +972,20 @@
               job_title: titleBox.value.trim() || null
             };
             if (rosterBox) changes.roster_names = rosterBox.value.split(",").map((x) => x.trim()).filter(Boolean).join(", ") || null;
+            if (safetyBox) {
+              changes.safety_manager = safetyBox.checked;
+              if (changes.safety_manager && changes.role !== "management") {
+                setStatus(status, "The Safety & Security Manager must have the Management role.", true);
+                return;
+              }
+            }
             save.disabled = true;
+            const safetyChanged = !!safetyBox && !!changes.safety_manager !== !!person.safety_manager;
+            // Moving the Safety & Security Manager role: clear it from the previous holder first.
+            if (safetyBox && changes.safety_manager && !person.safety_manager) {
+              const clear = await db.from("profiles").update({ safety_manager: false }).eq("safety_manager", true).neq("id", person.id);
+              if (clear.error) { save.disabled = false; setStatus(status, clear.error.message, true); return; }
+            }
             const { error: upErr } = await db.from("profiles").update(changes).eq("id", person.id);
             save.disabled = false;
             if (upErr) {
@@ -975,7 +995,7 @@
             await logEvent("profile_updated", {
               profile_id: person.id,
               email: person.email,
-              before: { role: person.role, station_codes: person.station_codes, active: person.active, full_name: person.full_name, job_title: person.job_title, roster_names: person.roster_names },
+              before: { role: person.role, station_codes: person.station_codes, active: person.active, full_name: person.full_name, job_title: person.job_title, roster_names: person.roster_names, safety_manager: person.safety_manager },
               after: changes
             });
             Object.assign(person, changes);
@@ -983,7 +1003,7 @@
             titleBox.value = changes.job_title || "";
             if (rosterBox) rosterBox.value = changes.roster_names || "";
             setStatus(status, `Saved changes for ${changes.full_name || person.email}.`, false, true);
-            if (isMe) loadAndRender();
+            if (isMe || safetyChanged) loadAndRender();
           }
         },
         "Save"
@@ -992,7 +1012,7 @@
       return h(
         "tr",
         null,
-        h("td", { class: "person-edit" }, nameBox, titleBox, rosterBox, h("span", { class: "sub" }, person.email)),
+        h("td", { class: "person-edit" }, nameBox, titleBox, rosterBox, safetyLabel, h("span", { class: "sub" }, person.email)),
         h("td", null, role),
         h("td", null, station.node),
         h("td", null, active),

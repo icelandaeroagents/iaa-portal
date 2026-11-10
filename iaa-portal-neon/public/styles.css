@@ -1162,3 +1162,9 @@ td .chip + .chip { margin-left: 0.3rem; }
   .chip.risk-tolerable, td.risk-tolerable { background: rgba(217, 119, 6, 0.25); color: #fde68a; }
   .chip.risk-acceptable, td.risk-acceptable { background: rgba(22, 163, 74, 0.22); color: #bbf7d0; }
 }
+
+/* Reporting mode on the report form */
+.reporting-mode { border: 0; padding: 0; margin: 0 0 0.75rem; display: flex; flex-direction: column; gap: 0.55rem; }
+.reporting-mode legend { font-weight: 600; margin-bottom: 0.4rem; }
+.choice-block { align-items: flex-start; }
+.choice-block > span { display: flex; flex-direction: column; gap: 0.1rem; }
