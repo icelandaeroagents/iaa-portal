@@ -13,9 +13,15 @@
     ["deicing", "De-icing"],
     ["first_aid", "First aid"],
     ["dangerous_goods", "Dangerous goods"],
-    ["security", "Security awareness training"],
+    ["airport_awareness", "Airport airside safety and security course"],
+    ["security", "Aviation security training (company)"],
     ["escort", "Escort training"],
+    ["inflight_supplies", "In-flight supplies procedures"],
     ["data_protection", "Data protection training"],
+    ["operator_training", "Customer operator training"],
+    ["sms_course", "SMS course (management)"],
+    ["internal_auditor", "Internal auditor course"],
+    ["security_management", "Security management course"],
     ["driving_licence", "Driving licence"],
     ["other", "Other"]
   ];

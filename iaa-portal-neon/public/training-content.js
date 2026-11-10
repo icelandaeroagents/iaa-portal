@@ -24,7 +24,8 @@ window.TRAINING = {
     "Potable water servicing",
     "Aircraft interior cleaning",
     "Baggage loading and safe lifting",
-    "Airside driving (company check)"
+    "Airside driving (company check)",
+    "Fire safety and extinguisher use"
   ],
   practicalRenewal: { months: 12 },
   modules: [
@@ -342,6 +343,7 @@ window.TRAINING = {
         <li><b>Suspicious item:</b> don't touch it, move people away, notify Border Police/security and the duty manager.</li>
         <li>The aerodrome's own emergency procedures always take precedence.</li>
       </ul>` },
+    { h: "Your part in the Emergency Response Plan", html: "<ul><li>In a serious emergency, management activates the Crisis Management Team: the Accountable Manager leads, the Safety & Security Manager coordinates, the Operations Manager takes charge on scene.</li><li>Do not speak to the media and do not post about it online. Say: “I can’t comment, please contact our management.”</li><li>Family or public enquiries about passengers or crew go to the aircraft operator. Never confirm names.</li><li>Preserve evidence: do not move equipment involved unless needed for safety, take photos, and write a short statement before the end of your shift.</li><li>If you were closely involved, you will be relieved from duty and offered support.</li></ul>" },
   ],
   quiz: [
     { q: "Who provides de-icing at IAA's stations?", o: ["IAA ramp staff", "Icelandair ehf", "Isavia", "The fuel supplier"], a: 1, e: "De-icing is a third-party service by Icelandair ehf. IAA coordinates, sequences and confirms.", r: "19" },
@@ -353,6 +355,9 @@ window.TRAINING = {
     { q: "You're not sure an event is serious enough to report. What should you do?", o: ["Skip it", "Report it anyway", "Ask the crew", "Wait and see if anyone complains"], a: 1, e: "A precautionary report costs little; an unreported incident is a much bigger risk.", r: "22.2" },
     { q: "Fuel is spilling during fuelling. Which is correct?", o: ["Finish fuelling quickly, then clean up", "Stop fuelling, shut off the source if safe, keep ignition sources clear, notify the supplier and duty manager", "Start the APU to move the aircraft", "Hose it away with water"], a: 1, e: "Stop, isolate if safe, keep ignition sources away, notify, and follow the airport's spill procedure.", r: "23.4" },
     { q: "You find an unattended bag airside. What do you do?", o: ["Open it to check for a name tag", "Don't touch it; move people away; notify Border Police/security and the duty manager", "Take it to lost property", "Leave it and carry on"], a: 1, e: "Never touch or move a suspicious item. Clear the area and notify.", r: "23.5" },
+    { q: "A journalist calls asking about an incident on the ramp this morning. What do you say?", o: ["Tell them what you saw", "“I can’t comment, please contact our management.”", "Give them the passengers’ names", "Post your own account online first"], a: 1, e: "Only the Accountable Manager speaks to the media.", r: "ERP §9" },
+    { q: "A family member calls asking if their relative was on the aircraft involved. What do you do?", o: ["Confirm the names on the handling request", "Refer them to the aircraft operator", "Say nothing and hang up", "Give them the crew’s phone numbers"], a: 1, e: "Information about people on board goes through the operator.", r: "ERP §7" },
+    { q: "A tug was involved in a collision with an aircraft. What do you do with the tug?", o: ["Drive it back to the parking area straight away", "Leave it where it is unless it must be moved for safety, photograph it, and take it out of service", "Wash it", "Use it for the next flight"], a: 1, e: "Preserve evidence for the investigation.", r: "ERP §8" },
   ]
 },
 {
@@ -365,6 +370,8 @@ window.TRAINING = {
     { h: "What happens to a report", html: "<ul><li>The Safety & Security Manager reviews every new report within 2 working days.</li><li>Serious occurrences are investigated for their root cause, and actions are tracked until they are done.</li><li>Where EU Regulation 376/2014 requires, management notifies Samgöngustofa within 72 hours.</li></ul>" },
     { h: "Risk and change", html: "<ul><li>Hazards are scored on a 5 × 5 matrix: likelihood × severity.</li><li>15–25 is intolerable: the activity stops until the risk is reduced. 6–12 is tolerable only with the Accountable Manager’s approval. 1–5 is acceptable.</li><li>Before any significant change – a new station, new equipment such as a towbarless tractor, a new aircraft type or service – a risk assessment is approved first.</li></ul>" },
     { h: "Your part on the ramp", html: "<ul><li>Never approach an aircraft until its engines are stopped, its anti-collision light is off and it is chocked.</li><li>If something is unsafe, stop and make it safe. Anyone can give the Emergency Stop signal.</li><li>Tell the duty manager straight away about injury, aircraft damage, dangerous goods or security.</li></ul>" },
+    { h: "Confidential reporting", html: "<ul><li>If you would rather not report through the portal, or want only the Safety & Security Manager to know who you are, report confidentially: in person, by phone, or by email marked “Confidential”.</li><li>The Safety & Security Manager records the event without your name and protects your identity throughout any investigation.</li><li>Confidential reporting is extra to normal reporting. It never replaces a mandatory report.</li></ul>" },
+    { h: "Human factors", html: "<ul><li>Most incidents involve ordinary human factors: fatigue, distraction, rushing under time pressure, complacency on a familiar task, poor communication, or not speaking up.</li><li>Watch for them in yourself and others. Slow down, use the checklist, confirm with the crew, and say so if something does not feel right.</li><li>Speaking up is always right, whatever your role or experience.</li></ul>" },
   ],
   quiz: [
     { q: "What does Just Culture mean at Iceland Aero Agents?", o: ["Nobody is ever disciplined for anything", "You are not disciplined for reporting an honest mistake, hazard or near-miss – except gross negligence, wilful violation or a criminal act", "Only management reports occurrences", "Reports are anonymous to everyone, including management"], a: 1, e: "Just Culture protects honest reporting, with three exceptions.", r: "SMS §4.3" },
@@ -377,6 +384,8 @@ window.TRAINING = {
     { q: "A towbarless tractor is arriving. What must happen before it is used?", o: ["Nothing – it is just a new tug", "A risk assessment is approved and operators are trained first", "Use it and report any problems", "Ask the supplier to drive it"], a: 1, e: "Significant change needs a risk assessment first (management of change).", r: "SMS §3.4" },
     { q: "When may you approach an arriving aircraft?", o: ["As soon as it stops", "When the engines are stopped, the anti-collision light is off and it is chocked", "When the crew waves", "When the propellers slow down"], a: 1, e: "All three conditions must be met.", r: "SMS §3.2" },
     { q: "Who can give the Emergency Stop signal?", o: ["Only the marshaller", "Only management", "Anyone", "Only the crew"], a: 2, e: "Anyone who sees danger can stop the operation.", r: "SMS §3.2" },
+    { q: "You want to report a near-miss but only want the Safety & Security Manager to know it was you. What can you do?", o: ["Nothing – all reports show your name to everyone", "Report confidentially to the Safety & Security Manager in person, by phone or by email marked “Confidential”", "Tell a colleague to report it for you", "Wait until someone else reports it"], a: 1, e: "Your identity is protected throughout any investigation.", r: "SMS §4.3" },
+    { q: "You have done the same task a hundred times and start skipping steps. Which human factor is this?", o: ["Complacency", "Fatigue", "Distraction", "Lack of training"], a: 0, e: "Familiar tasks invite short cuts. Use the checklist every time.", r: "Training Manual §8" },
   ]
 },
 {
@@ -389,6 +398,10 @@ window.TRAINING = {
     { h: "Equipment, vehicles and aircraft", html: "<ul><li>Only operate GSE and drive airside if you are trained and authorised. Do the pre-use check and log levels in Equipment Info.</li><li>A safety defect takes the equipment out of service until it is repaired.</li><li>Keep clear of propellers, jet blast and intakes. Never climb onto an aircraft – clearing snow is part of the de-icing service.</li><li>Driving between stations: check road conditions on umferdin.is.</li></ul>" },
     { h: "Winter, fuel and lavatory servicing", html: "<ul><li>Get icy areas sanded or cleared before working there, and take warm-up breaks in severe cold.</li><li>Keep ignition sources away from fuelling, and follow the spill procedure.</li><li>Lavatory servicing: gloves and eye protection, then wash your hands.</li></ul>" },
     { h: "Working alone, fatigue and injuries", html: "<ul><li>Working alone, for example a night arrival: tell the duty manager when you start and finish, and carry a charged phone. Two-person tasks are never done alone.</li><li>Rosters give at least 11 hours’ rest in every 24. If you are too tired to work safely, tell the duty manager – you will not be penalised.</li><li>Report any accident, injury or near-miss to the duty manager <b>immediately</b>, and on the portal within 24 hours at the latest.</li></ul>" },
+    { h: "Fitness for duty", key: true, html: "<ul><li>Zero tolerance for alcohol and drugs: nobody works, drives airside or operates equipment under their influence.</li><li>Taking medication that may affect alertness or judgement? Tell the duty manager before you start.</li><li>No personal headphones, earbuds or phone use while working airside, other than for work communication.</li><li>Unwell or infectious? Tell the duty manager and do not come to work.</li></ul>" },
+    { h: "Fire safety", html: "<ul><li>Know where the extinguishers and exits are in every building and vehicle you use.</li><li>Use an extinguisher only on a small fire, and only if it is safe. Never put yourself at risk.</li><li>Raise the alarm, call 112 and the tower, and evacuate to the assembly point.</li><li>Extinguishers are checked every month. Report any that are missing, used or out of date.</li></ul>" },
+    { h: "Cleaning products and cabin cleaning", html: "<ul><li>Use only cleaning products approved for aircraft use, as their safety data sheets say, with gloves.</li><li>Take care with cabin materials: leather, wood and screens are easily damaged by the wrong product.</li><li>Three points of contact on the stairs, and care at the aircraft door.</li><li>If a product gets on your skin or in your eyes, rinse straight away and tell the duty manager.</li></ul>" },
+    { h: "Looking after the environment", html: "<ul><li>Switch off vehicles and GSE when you are not using them.</li><li>Report every fuel or oil spill straight away, and help contain it if it is safe.</li><li>Empty lavatory waste only at the designated points.</li><li>Sort waste and recycle according to each airport’s rules.</li></ul>" },
   ],
   quiz: [
     { q: "Which PPE is mandatory airside at all times?", o: ["Hi-vis only", "Hi-vis, hearing protection and safety footwear", "Gloves and a hat", "None – it depends on the weather"], a: 1, e: "All three, at all times airside.", r: "H&S §5.1" },
@@ -401,6 +414,10 @@ window.TRAINING = {
     { q: "At least how much rest must rosters give you in every 24 hours?", o: ["8 hours", "11 hours", "6 hours", "There is no rule"], a: 1, e: "Icelandic law requires at least 11 hours’ rest in every 24 hours.", r: "H&S §5.9" },
     { q: "You twist your ankle on icy stairs. When do you report it?", o: ["Only if you need a doctor", "Tell the duty manager immediately, and report on the portal within 24 hours", "At the end of the month", "Never – it was minor"], a: 1, e: "Report immediately, and on the portal within 24 hours at the latest.", r: "H&S §6" },
     { q: "Who do staff elect to represent them on health and safety?", o: ["The Accountable Manager", "A safety representative", "The duty manager", "The airport"], a: 1, e: "Act No. 46/1980 requires a safety representative at 10 or more staff.", r: "H&S §3.3" },
+    { q: "A colleague arrives for an early shift still smelling of alcohol. What is the rule?", o: ["Fine if they feel OK", "Nobody works, drives airside or operates equipment under the influence of alcohol or drugs – tell the duty manager", "Fine for office work and driving", "Let them start and keep an eye on them"], a: 1, e: "Zero tolerance for alcohol and drugs.", r: "H&S §5.12" },
+    { q: "May you listen to music on earbuds while loading baggage?", o: ["Yes, at low volume", "No – no personal headphones or earbuds airside", "Yes, in one ear", "Only at night"], a: 1, e: "You must be able to hear aircraft, vehicles and warnings.", r: "H&S §5.12" },
+    { q: "A small fire starts in a waste bin in the office. What do you do first?", o: ["Raise the alarm, then use an extinguisher only if it is small and safe", "Ignore it", "Pour coffee on it", "Carry the bin outside"], a: 0, e: "Raise the alarm and never put yourself at risk.", r: "H&S §5.11" },
+    { q: "A GPU is running at the stand but no aircraft needs it. What do you do?", o: ["Leave it running in case it is needed", "Switch it off", "Turn it up", "Ask the passengers"], a: 1, e: "Equipment is switched off when not in use.", r: "Environmental Policy §6" },
   ]
 },
 {
@@ -413,6 +430,7 @@ window.TRAINING = {
     { h: "Baggage and supplies", html: "<ul><li>Only load bags the crew or passengers of that flight identify as theirs.</li><li>Never leave baggage unattended airside. Unidentified or suspicious items are not loaded and are reported.</li><li>Prohibited articles, dangerous goods and firearms are referred to the aircraft’s crew. We do not accept cargo or mail.</li><li>Catering and supplies are checked against the order and not left unattended airside.</li></ul>" },
     { h: "Aircraft, vehicles and equipment", html: "<ul><li>Keep handled aircraft under observation while on duty, and report any sign of tampering to the crew and airport security.</li><li>Drive airside only with a valid permit and vehicle pass. Never leave a vehicle unattended with the keys accessible, and secure unattended GSE.</li><li>Hangar access, such as Hangar 3 at BIRK, is limited to authorised people.</li></ul>" },
     { h: "Suspicious items and reporting", html: "<ul><li>Do not touch a suspicious item. Move people away and keep the area clear.</li><li>Call 112, airport security or Border Police, and tell the duty manager.</li><li>Record it on the portal as a <b>Security occurrence</b> report – only management and you can see it.</li></ul>" },
+    { h: "In-flight supplies and cabin cleaning", html: "<ul><li>Catering and supplies come only from approved suppliers and are checked against the order.</li><li>From collection until they are loaded, they stay closed and with you, or locked or sealed. Never leave them unattended airside.</li><li>Any sign of tampering or an unexpected item: do not load it, and report it to the Safety & Security Manager.</li><li>Cleaning a cabin and you find something suspicious or out of place? Do not touch it. Tell the crew and the Safety & Security Manager.</li></ul>" },
   ],
   quiz: [
     { q: "Where must you display your airport ID?", o: ["Only at the gate", "At all times inside security restricted areas", "Only when asked", "Only at BIKF"], a: 1, e: "Always display it airside.", r: "SEC §6.1" },
@@ -425,6 +443,8 @@ window.TRAINING = {
     { q: "The VIP Lounge door to the airside is propped open. What do you do?", o: ["Leave it – it is convenient", "Close and secure it", "Ask a passenger to watch it", "Report it next week"], a: 1, e: "Doors leading airside are kept closed and secured.", r: "SEC §6.1" },
     { q: "You see a suspicious unattended item. What is your first action?", o: ["Open it to check", "Do not touch it – move people away and keep the area clear", "Carry it to the office", "Kick it out of the way"], a: 1, e: "Then call 112, airport security or Border Police, and the duty manager.", r: "SEC §7.1" },
     { q: "Who can see a Security occurrence report on the portal?", o: ["All staff", "Only management and the person who reported it", "Only the airport", "Everyone at that station"], a: 1, e: "Security reports are private.", r: "SEC §7" },
+    { q: "You collect a catering order and one box has a broken seal. What do you do?", o: ["Load it anyway – the crew will check", "Do not load it, and report it to the Safety & Security Manager", "Reseal it with tape", "Throw it away and say nothing"], a: 1, e: "Any sign of tampering means the supplies are not loaded.", r: "SEC §6.6" },
+    { q: "While cleaning a cabin you find an unattended bag that is not the crew’s. What do you do?", o: ["Open it to see whose it is", "Do not touch it – tell the crew and the Safety & Security Manager", "Put it in lost property", "Leave it and finish cleaning"], a: 1, e: "Never touch a suspicious item.", r: "SEC §6.4" },
   ]
 },
 {
@@ -449,6 +469,28 @@ window.TRAINING = {
     { q: "May you share your Notion or Google login with a colleague who forgot theirs?", o: ["Yes, if they are on shift", "No – never share your login", "Yes, for one day", "Only with management"], a: 1, e: "Logins are personal.", r: "DP Policy §9" },
     { q: "Writing an internal report about a flight, how do you refer to passengers?", o: ["By full name and passport number", "By their role (e.g. ‘a passenger’), without travel document details", "By date of birth", "By seat number and passport number"], a: 1, e: "Travel document details never go into the portal.", r: "DP Policy §6" },
     { q: "Which law protects personal data in Iceland, alongside the GDPR?", o: ["Act No. 46/1980", "Act No. 90/2018", "Act No. 145/1994", "There is none"], a: 1, e: "The Icelandic Data Protection Act No. 90/2018.", r: "DP Policy" },
+  ]
+},
+{
+  id: "q1", renewal: { months: 36 }, code: "QA", title: "Quality Awareness", part: "QA and Compliance Monitoring Programme GH-QA-001",
+  summary: "What quality means for us, audits and inspections, findings and corrective action, your daily checks, controlled documents and approved suppliers.",
+  lesson: [
+    { h: "What quality means for us", key: true, html: "<ul><li>Quality means doing the job safely, securely and to the standard our customers, the airports and the regulators expect, every time.</li><li>Our Quality Policy commits us to check our own work honestly, fix root causes and keep improving.</li><li>Everyone is responsible for quality, not just management.</li></ul>" },
+    { h: "Audits and inspections", html: "<ul><li>Every area of our work is audited on a plan, and ramp inspections are unannounced, at least once a quarter at each station.</li><li>Auditors may look at any area, record or person needed for the audit. Answer openly and show how you really work.</li><li>Inspections check the operation, not you personally.</li></ul>" },
+    { h: "Findings and corrective action", html: "<ul><li>A finding is something that does not meet a regulation, a customer requirement or our procedures.</li><li>Level 1 is critical and is fixed straight away, and closed within 7 days. Level 2 and 3 get a corrective action plan within 14 or 30 days.</li><li>The aim is to fix the root cause, then check after 90 days that it worked.</li></ul>" },
+    { h: "Your daily quality checks", html: "<ul><li>Complete the close-shift checklist and handover.</li><li>Do the equipment checks and log levels in Equipment Info.</li><li>Use the current version of every document: the copy in the IAA Staff Portal. Printed copies are uncontrolled.</li></ul>" },
+    { h: "Suppliers", html: "<ul><li>We use only approved suppliers for fuel, de-icing, catering, hangarage, GSE, transport and hotels.</li><li>If a supplier does not deliver what was agreed, report it so it can be followed up.</li></ul>" },
+    { h: "Speak up", html: "<ul><li>Report deviations, complaints and ideas for improvement on the portal. Nobody is blamed for an honest report.</li><li>If a procedure does not work in practice, tell your manager so it can be fixed.</li></ul>" },
+  ],
+  quiz: [
+    { q: "Who is responsible for quality at Iceland Aero Agents?", o: ["Only the Quality & Compliance Manager", "Everyone", "Only management", "The airport"], a: 1, e: "Quality is everyone’s job.", r: "Quality Policy" },
+    { q: "An auditor asks how you connect the GPU. What do you do?", o: ["Show them how you really do it, openly", "Show them the textbook way, then go back to your own way", "Refuse – you are busy", "Ask a colleague to answer"], a: 0, e: "Audits only help if they see the real operation.", r: "QA §4" },
+    { q: "How quickly must a Level 1 (critical) finding be closed?", o: ["Within 7 days", "Within 30 days", "Within 90 days", "At the next annual review"], a: 0, e: "Level 1 findings are closed within 7 days and cannot be extended.", r: "QA §5" },
+    { q: "You find a printed copy of the SOP Manual in the office. Can you rely on it?", o: ["Yes, always", "No – printed copies are uncontrolled. Use the current version in the portal", "Only if it is recent", "Only for winter procedures"], a: 1, e: "The portal holds the controlled version.", r: "QA §9" },
+    { q: "What is checked about 90 days after a corrective action is completed?", o: ["That the problem has not come back", "The cost", "Who made the mistake", "Nothing"], a: 0, e: "The effectiveness check confirms the fix worked.", r: "QA §6" },
+    { q: "A catering supplier keeps delivering late and incomplete orders. What do you do?", o: ["Accept it", "Report it so it can be followed up with the supplier", "Change supplier yourself", "Tell the crew it is their problem"], a: 1, e: "Approved suppliers are reviewed, and problems are followed up.", r: "QA §4.8" },
+    { q: "When are ramp inspections carried out?", o: ["Unannounced, at least once a quarter at each station", "Only when staff are told in advance", "Once every five years", "Only after an accident"], a: 0, e: "Unannounced inspections show the real operation.", r: "QA §4.2" },
+    { q: "What should you do with an idea that would make a procedure safer or simpler?", o: ["Keep it to yourself", "Report it on the portal or tell your manager", "Change the procedure yourself", "Wait for the audit"], a: 1, e: "Improvements come from the people doing the work.", r: "Quality Policy" },
   ]
 },
 {

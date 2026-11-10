@@ -300,7 +300,7 @@
         h("h2", { id: "rec-h" }, "Your training record"),
         h("p", { class: "progress-line" }, h("span", null, `${done} of ${mine.length} current`), progressBar(ctx, mine.length ? done / mine.length : 0)),
         dueNow.length ? h("p", { class: "notice is-error" }, `${dueNow.length === 1 ? "1 module is" : dueNow.length + " modules are"} due for renewal: ${dueNow.map((m) => m.code).join(", ")}. Open each one and retake the quiz.`) : null,
-        h("p", { class: "fineprint" }, "Modules P1–P5 are retaken every 6 months and the winter modules every year before 1 October. You’ll get an email when one is due."),
+        h("p", { class: "fineprint" }, "Most modules are retaken every 6 months, the winter modules every year before 1 October and Quality Awareness every 36 months. Each module shows its own due date, and you’ll get an email when one is due."),
         list,
         noStationNote,
         h("div", { class: "row" }, h("a", { class: "btn btn-quiet", href: "#/training/record" }, "View my training record"))
@@ -788,7 +788,7 @@
                   h("td", null, fmtDate(r.date)),
                   h("td", null, h("span", { class: "mono" }, r.cert), h("span", { class: "sub" }, "Signed off by " + (r.signer || "–") + ", " + fmtDate(r.signed)))))))))
           : null,
-        h("p", { class: "fineprint" }, "Modules P1–P5 are retaken every 6 months and the winter modules every year before 1 October. Results are shown as pass or fail only. This record reflects the IAA Staff Portal on the date issued" + (person.legacy ? "; these are old records not yet linked to a portal account." : "."))
+        h("p", { class: "fineprint" }, "Most modules are retaken every 6 months, the winter modules every year before 1 October and Quality Awareness every 36 months. Results are shown as pass or fail only. This record reflects the IAA Staff Portal on the date issued" + (person.legacy ? "; these are old records not yet linked to a portal account." : "."))
       )
     );
   }
@@ -888,7 +888,7 @@
           y += 9;
         });
       }
-      txt("P1–P5 are retaken every 6 months, winter modules every year before 1 October. Results are pass or fail only. This record reflects the IAA Staff Portal on the date issued.", W / 2, H - 18, 7, "normal", grey, { align: "center" });
+      txt("Most modules are retaken every 6 months, winter modules every year before 1 October, Quality Awareness every 36 months. Results are pass or fail only. This record reflects the IAA Staff Portal on the date issued.", W / 2, H - 18, 7, "normal", grey, { align: "center" });
       const safe = p.name.normalize("NFD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_");
       doc.save(`IAA_Training_Record_${safe}.pdf`);
     } catch (e) {
