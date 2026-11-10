@@ -46,5 +46,10 @@
   ],
   "regions": [
     "fra1"
-  ]
+  ],
+  "functions": {
+    "api/staff-notify.js": {
+      "includeFiles": "public/training-content.js"
+    }
+  }
 }
