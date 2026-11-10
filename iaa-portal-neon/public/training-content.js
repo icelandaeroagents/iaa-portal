@@ -12,6 +12,19 @@ window.TRAINING = {
   //   { months: 6 }        – due 6 months after the person passed it
   //   { everyYearOn: 10 }  – due each 1 October (winter modules, retaken before each winter)
   renewal: { months: 6 },
+  // Practical assessments management can sign off, where a person needs them.
+  // Renewed every year (the newest assessment counts).
+  practical: [
+    "Marshalling and wing-walking",
+    "Towing and pushback",
+    "GPU operation",
+    "Air stairs",
+    "Lavatory servicing",
+    "Potable water servicing",
+    "Baggage loading and safe lifting",
+    "Airside driving (company check)"
+  ],
+  practicalRenewal: { months: 12 },
   modules: [
 {
   id: "m1", code: "P1", title: "Station Familiarisation", part: "Part 1 · Sections 1–6",
@@ -338,6 +351,102 @@ window.TRAINING = {
     { q: "You're not sure an event is serious enough to report. What should you do?", o: ["Skip it", "Report it anyway", "Ask the crew", "Wait and see if anyone complains"], a: 1, e: "A precautionary report costs little; an unreported incident is a much bigger risk.", r: "22.2" },
     { q: "Fuel is spilling during fuelling. Which is correct?", o: ["Finish fuelling quickly, then clean up", "Stop fuelling, shut off the source if safe, keep ignition sources clear, notify the supplier and duty manager", "Start the APU to move the aircraft", "Hose it away with water"], a: 1, e: "Stop, isolate if safe, keep ignition sources away, notify, and follow the airport's spill procedure.", r: "23.4" },
     { q: "You find an unattended bag airside. What do you do?", o: ["Open it to check for a name tag", "Don't touch it; move people away; notify Border Police/security and the duty manager", "Take it to lost property", "Leave it and carry on"], a: 1, e: "Never touch or move a suspicious item. Clear the area and notify.", r: "23.5" },
+  ]
+},
+{
+  id: "s1", code: "SMS", title: "Safety Management and Reporting", part: "SMS Manual GH-SMS-001",
+  summary: "How our Safety Management System works, Just Culture, what to report and how, what happens to a report, risk and change.",
+  lesson: [
+    { h: "Our Safety Management System", html: "<ul><li>Our SMS follows ICAO Annex 19: a safety policy, managing risk, checking that it works, and promoting safety.</li><li>The Accountable Manager is ultimately responsible. The Safety & Security Manager runs it day to day.</li><li>Our target is simple: no damage to aircraft caused by our handling, and nobody hurt.</li></ul>" },
+    { h: "Just Culture", key: true, html: "<ul><li>You will not be disciplined for reporting an honest mistake, a hazard or a near-miss.</li><li>The only exceptions are gross negligence, wilful violation of procedures, or a criminal act.</li><li>Reporting is how we stop the same thing happening to someone else. If in doubt, report.</li></ul>" },
+    { h: "What to report, and how", html: "<ul><li>Report every incident, near-miss, damage, injury and hazard – even with no damage done.</li><li>Use <b>Reports</b> in the IAA Staff Portal, and the airport’s own system where it requires, <b>before the end of your shift</b>.</li><li>You can ask for your name to be withheld from other staff. Management can always see it.</li><li>Injury, security and data protection reports are seen only by management and you.</li></ul>" },
+    { h: "What happens to a report", html: "<ul><li>The Safety & Security Manager reviews every new report within 2 working days.</li><li>Serious occurrences are investigated for their root cause, and actions are tracked until they are done.</li><li>Where EU Regulation 376/2014 requires, management notifies Samgöngustofa within 72 hours.</li></ul>" },
+    { h: "Risk and change", html: "<ul><li>Hazards are scored on a 5 × 5 matrix: likelihood × severity.</li><li>15–25 is intolerable: the activity stops until the risk is reduced. 6–12 is tolerable only with the Accountable Manager’s approval. 1–5 is acceptable.</li><li>Before any significant change – a new station, new equipment such as a towbarless tractor, a new aircraft type or service – a risk assessment is approved first.</li></ul>" },
+    { h: "Your part on the ramp", html: "<ul><li>Never approach an aircraft until its engines are stopped, its anti-collision light is off and it is chocked.</li><li>If something is unsafe, stop and make it safe. Anyone can give the Emergency Stop signal.</li><li>Tell the duty manager straight away about injury, aircraft damage, dangerous goods or security.</li></ul>" },
+  ],
+  quiz: [
+    { q: "What does Just Culture mean at Iceland Aero Agents?", o: ["Nobody is ever disciplined for anything", "You are not disciplined for reporting an honest mistake, hazard or near-miss – except gross negligence, wilful violation or a criminal act", "Only management reports occurrences", "Reports are anonymous to everyone, including management"], a: 1, e: "Just Culture protects honest reporting, with three exceptions.", r: "SMS §4.3" },
+    { q: "When must you submit a report about an occurrence?", o: ["Within a week", "Before the end of your shift", "Only if there was damage", "When your manager asks"], a: 1, e: "Report on the portal, and the airport’s system where it requires, before the end of your shift.", r: "SMS §4.2" },
+    { q: "A tug stops 30 cm from a wingtip. No damage. Do you report it?", o: ["No – nothing happened", "Yes – it is a near-miss", "Only if the crew saw it", "Only if it happens twice"], a: 1, e: "Near-misses are reported. They show where the next accident could happen.", r: "SMS §4.2" },
+    { q: "Who can see an injury report?", o: ["All staff", "Only management and the person who reported it", "Only the injured person", "Everyone at that station"], a: 1, e: "Injury reports can contain health data, so they are private.", r: "SMS App. B" },
+    { q: "Where EU Regulation 376/2014 requires, how soon does management notify Samgöngustofa?", o: ["Within 72 hours", "Within 30 days", "At the end of the year", "Only after an investigation"], a: 0, e: "Mandatory occurrences are notified within 72 hours.", r: "SMS §4.2" },
+    { q: "How soon is a new report reviewed by the Safety & Security Manager?", o: ["Within 2 working days", "Within a month", "At the next quarterly meeting", "Only if it is serious"], a: 0, e: "Every report is reviewed within 2 working days.", r: "SMS §4.2" },
+    { q: "A hazard scores 4 (likelihood) × 4 (severity) = 16. What happens?", o: ["Nothing – it is acceptable", "It is intolerable: the activity stops until the risk is reduced", "Monitor it for a year", "The duty staff decide"], a: 1, e: "15–25 is intolerable.", r: "SMS §3.3" },
+    { q: "A towbarless tractor is arriving. What must happen before it is used?", o: ["Nothing – it is just a new tug", "A risk assessment is approved and operators are trained first", "Use it and report any problems", "Ask the supplier to drive it"], a: 1, e: "Significant change needs a risk assessment first (management of change).", r: "SMS §3.4" },
+    { q: "When may you approach an arriving aircraft?", o: ["As soon as it stops", "When the engines are stopped, the anti-collision light is off and it is chocked", "When the crew waves", "When the propellers slow down"], a: 1, e: "All three conditions must be met.", r: "SMS §3.2" },
+    { q: "Who can give the Emergency Stop signal?", o: ["Only the marshaller", "Only management", "Anyone", "Only the crew"], a: 2, e: "Anyone who sees danger can stop the operation.", r: "SMS §3.2" },
+  ]
+},
+{
+  id: "h1", code: "H&S", title: "Health and Safety", part: "Health and Safety Policy GH-HS-001",
+  summary: "The law and who is who, PPE, safe lifting, equipment and vehicles, aircraft hazards, winter, working alone, fatigue and reporting injuries.",
+  lesson: [
+    { h: "The law and who is who", html: "<ul><li>We follow the Icelandic Act No. 46/1980 on Working Environment, Health and Safety in Workplaces.</li><li>The Health & Safety Officer (the Chief Operating Officer) manages health and safety day to day.</li><li>Staff elect a <b>safety representative</b>. You can raise any concern with them or your manager at any time, without penalty.</li><li>Serious accidents are notified to Vinnueftirlitið as the law requires.</li></ul>" },
+    { h: "PPE", key: true, html: "<ul><li>Airside at all times: hi-vis, hearing protection and safety footwear.</li><li>Gloves, cold-weather clothing and ice grips are provided for winter and for tasks that need them.</li><li>PPE is free. Ask for a replacement when it is worn or damaged.</li></ul>" },
+    { h: "Lifting baggage", html: "<ul><li>Use carts and loading aids wherever you can.</li><li>Heavy or awkward items – skis, golf bags, large cases – are lifted by two people.</li><li>Small baggage holds mean awkward postures: share and rotate the work on busy days.</li></ul>" },
+    { h: "Equipment, vehicles and aircraft", html: "<ul><li>Only operate GSE and drive airside if you are trained and authorised. Do the pre-use check and log levels in Equipment Info.</li><li>A safety defect takes the equipment out of service until it is repaired.</li><li>Keep clear of propellers, jet blast and intakes. Never climb onto an aircraft – clearing snow is part of the de-icing service.</li><li>Driving between stations: check road conditions on umferdin.is.</li></ul>" },
+    { h: "Winter, fuel and lavatory servicing", html: "<ul><li>Get icy areas sanded or cleared before working there, and take warm-up breaks in severe cold.</li><li>Keep ignition sources away from fuelling, and follow the spill procedure.</li><li>Lavatory servicing: gloves and eye protection, then wash your hands.</li></ul>" },
+    { h: "Working alone, fatigue and injuries", html: "<ul><li>Working alone, for example a night arrival: tell the duty manager when you start and finish, and carry a charged phone. Two-person tasks are never done alone.</li><li>Rosters give at least 11 hours’ rest in every 24. If you are too tired to work safely, tell the duty manager – you will not be penalised.</li><li>Report any accident, injury or near-miss to the duty manager <b>immediately</b>, and on the portal within 24 hours at the latest.</li></ul>" },
+  ],
+  quiz: [
+    { q: "Which PPE is mandatory airside at all times?", o: ["Hi-vis only", "Hi-vis, hearing protection and safety footwear", "Gloves and a hat", "None – it depends on the weather"], a: 1, e: "All three, at all times airside.", r: "H&S §5.1" },
+    { q: "Who pays for your PPE?", o: ["You do", "It is provided free by the company", "Half each", "The airport"], a: 1, e: "PPE is free and replaced when worn or damaged.", r: "H&S §5.1" },
+    { q: "How do you lift a heavy golf bag into the hold?", o: ["Alone, quickly", "With two people, using carts and aids where possible", "Ask the passenger to do it", "Throw it in"], a: 1, e: "Heavy or awkward items are lifted by two people.", r: "H&S §5.2" },
+    { q: "You find a safety defect on a GPU. What do you do?", o: ["Use it carefully", "Take it out of service and log it in Equipment Info", "Tell someone next week", "Fix it yourself"], a: 1, e: "A safety defect takes the equipment out of service.", r: "H&S §5.3" },
+    { q: "There is snow on the wing of a parked aircraft. May you climb up to clear it?", o: ["Yes, with care", "No – never climb onto an aircraft", "Yes, if the crew asks", "Only with a ladder"], a: 1, e: "Clearing aircraft surfaces is part of the de-icing service.", r: "H&S §5.5" },
+    { q: "What PPE do you wear for lavatory servicing?", o: ["None", "Gloves and eye protection, then wash your hands", "Only a mask", "Only gloves"], a: 1, e: "Lavatory waste is a biological hazard.", r: "H&S §5.7" },
+    { q: "You are handling a night arrival alone. What must you do?", o: ["Nothing special", "Tell the duty manager when you start and finish, and carry a charged phone", "Wait for a colleague to arrive", "Leave the GPU running"], a: 1, e: "Working alone needs a start and finish check-in.", r: "H&S §5.8" },
+    { q: "At least how much rest must rosters give you in every 24 hours?", o: ["8 hours", "11 hours", "6 hours", "There is no rule"], a: 1, e: "Icelandic law requires at least 11 hours’ rest in every 24 hours.", r: "H&S §5.9" },
+    { q: "You twist your ankle on icy stairs. When do you report it?", o: ["Only if you need a doctor", "Tell the duty manager immediately, and report on the portal within 24 hours", "At the end of the month", "Never – it was minor"], a: 1, e: "Report immediately, and on the portal within 24 hours at the latest.", r: "H&S §6" },
+    { q: "Who do staff elect to represent them on health and safety?", o: ["The Accountable Manager", "A safety representative", "The duty manager", "The airport"], a: 1, e: "Act No. 46/1980 requires a safety representative at 10 or more staff.", r: "H&S §3.3" },
+  ]
+},
+{
+  id: "sec1", code: "SEC", title: "Security for Staff", part: "Security Programme GH-SEC-001 (staff summary)",
+  summary: "Our part in airport security: airport ID, escorting passengers, crew and visitors, baggage control, aircraft and vehicles, suspicious items and reporting.",
+  lesson: [
+    { h: "Our part in airport security", html: "<ul><li>We work inside each airport’s security restricted areas and under its security programme.</li><li>The airport does the screening. Our part is to escort people airside, control the baggage we handle, keep aircraft, vehicles and GSE secure, and report anything suspicious.</li><li>The full Security Programme is restricted to management. This module covers what applies to you.</li></ul>" },
+    { h: "Your airport ID", key: true, html: "<ul><li>Display your ID at all times inside security restricted areas.</li><li>Only go to the areas your role needs.</li><li>Lost, stolen or damaged ID: report it to the airport operator and your manager <b>immediately</b> so it can be deactivated.</li><li>Return your ID when you leave the company.</li></ul>" },
+    { h: "Escorting", html: "<ul><li>Passengers, crew and visitors are escorted airside <b>at all times</b>, between their aircraft and the terminal, FBO or CIQ point, by a safe route.</li><li>Only the passengers and crew of that flight go to the aircraft.</li><li>Keep the doors of the VIP Lounge and staff areas that lead airside closed and secured. Visitors are recorded.</li></ul>" },
+    { h: "Baggage and supplies", html: "<ul><li>Only load bags the crew or passengers of that flight identify as theirs.</li><li>Never leave baggage unattended airside. Unidentified or suspicious items are not loaded and are reported.</li><li>Prohibited articles, dangerous goods and firearms are referred to the aircraft’s crew. We do not accept cargo or mail.</li><li>Catering and supplies are checked against the order and not left unattended airside.</li></ul>" },
+    { h: "Aircraft, vehicles and equipment", html: "<ul><li>Keep handled aircraft under observation while on duty, and report any sign of tampering to the crew and airport security.</li><li>Drive airside only with a valid permit and vehicle pass. Never leave a vehicle unattended with the keys accessible, and secure unattended GSE.</li><li>Hangar access, such as Hangar 3 at BIRK, is limited to authorised people.</li></ul>" },
+    { h: "Suspicious items and reporting", html: "<ul><li>Do not touch a suspicious item. Move people away and keep the area clear.</li><li>Call 112, airport security or Border Police, and tell the duty manager.</li><li>Record it on the portal as a <b>Security occurrence</b> report – only management and you can see it.</li></ul>" },
+  ],
+  quiz: [
+    { q: "Where must you display your airport ID?", o: ["Only at the gate", "At all times inside security restricted areas", "Only when asked", "Only at BIKF"], a: 1, e: "Always display it airside.", r: "SEC §6.1" },
+    { q: "You lose your airport ID. What do you do?", o: ["Wait a few days in case it turns up", "Report it to the airport operator and your manager immediately", "Borrow a colleague’s", "Nothing until your next shift"], a: 1, e: "It must be deactivated straight away.", r: "SEC §4.2" },
+    { q: "A passenger wants to walk to their aircraft alone. What do you do?", o: ["Let them – they know the way", "Escort them at all times airside", "Point the way", "Ask the crew to collect them"], a: 1, e: "Passengers, crew and visitors are escorted at all times airside.", r: "SEC §6.1" },
+    { q: "A bag on the ramp has no owner from your flight. What do you do?", o: ["Load it anyway", "Do not load it, and report it to the Safety & Security Manager and airport security", "Put it in the VIP Lounge", "Ask the next flight"], a: 1, e: "Unidentified items are never loaded.", r: "SEC §6.3" },
+    { q: "A passenger has a firearm in their luggage. What do you do?", o: ["Load it as normal", "Refer it to the aircraft’s crew and follow airport procedures", "Hide it in the hold", "Refuse the passenger"], a: 1, e: "Prohibited articles, dangerous goods and firearms are referred to the crew.", r: "SEC §6.3" },
+    { q: "A customer asks you to send a parcel on the aircraft as cargo. What do you say?", o: ["Yes, put it in the hold", "We do not accept cargo or mail – refer it to the operator", "Only if it is small", "Yes, if they pay"], a: 1, e: "Iceland Aero Agents does not accept cargo or mail.", r: "SEC §6.3" },
+    { q: "You leave a vehicle airside for a few minutes. What about the keys?", o: ["Leave them in so the next person can use it", "Never leave keys accessible in an unattended vehicle", "Put them on the seat", "Give them to a passenger"], a: 1, e: "Vehicles are never left unattended with keys accessible.", r: "SEC §6.5" },
+    { q: "The VIP Lounge door to the airside is propped open. What do you do?", o: ["Leave it – it is convenient", "Close and secure it", "Ask a passenger to watch it", "Report it next week"], a: 1, e: "Doors leading airside are kept closed and secured.", r: "SEC §6.1" },
+    { q: "You see a suspicious unattended item. What is your first action?", o: ["Open it to check", "Do not touch it – move people away and keep the area clear", "Carry it to the office", "Kick it out of the way"], a: 1, e: "Then call 112, airport security or Border Police, and the duty manager.", r: "SEC §7.1" },
+    { q: "Who can see a Security occurrence report on the portal?", o: ["All staff", "Only management and the person who reported it", "Only the airport", "Everyone at that station"], a: 1, e: "Security reports are private.", r: "SEC §7" },
+  ]
+},
+{
+  id: "dp1", code: "DP", title: "Data Protection", part: "Data Protection Policy (staff summary)",
+  summary: "The personal data we handle, the rules for using and keeping it, health and special-assistance data, requests from individuals, and data breaches.",
+  lesson: [
+    { h: "The data we handle", html: "<ul><li>Passengers, crew, clients and colleagues: names, contact details, passport numbers, dates of birth, nationalities, flight details and sometimes health information for special assistance.</li><li>We follow the GDPR and the Icelandic Data Protection Act No. 90/2018. Mostly we handle this data on behalf of our clients.</li><li>The Data Protection Lead (Hjalti) is your contact for anything to do with personal data.</li></ul>" },
+    { h: "Everyday rules", key: true, html: "<ul><li>Use personal data only for the service it was given for, and only look at what your role needs.</li><li>Keep it in our systems: Notion and Google Workspace. Never copy passport numbers, dates of birth or health information into personal email, personal notes or chat messages.</li><li>Never share your login.</li><li>Do not enter passenger or crew travel document details into the IAA Staff Portal. In reports, describe people by their role.</li></ul>" },
+    { h: "How long we keep it", html: "<ul><li>Operational passenger, crew and special-assistance data is deleted or anonymised <b>60 days</b> after the flight it relates to.</li><li>Longer periods apply only where the law or a client contract requires (for example accounting records).</li></ul>" },
+    { h: "Health and special-assistance data", html: "<ul><li>Health information – for example reduced mobility or a medical condition relevant to travel – is special category data.</li><li>Only staff trained for it may handle it, access to it is logged, and it is used only to deliver the assistance.</li><li>It is never shared with anyone else unless strictly necessary for the service (for example the airport or the next carrier).</li></ul>" },
+    { h: "Requests from individuals", html: "<ul><li>If anyone asks what data we hold about them, or asks for it to be changed or deleted, do not answer it yourself.</li><li>Pass the request to the Data Protection Lead straight away.</li></ul>" },
+    { h: "Data breaches", html: "<ul><li>Examples: an email sent to the wrong person, a lost phone or laptop, someone seeing data they should not.</li><li>Tell the Data Protection Lead and management <b>immediately</b>, and submit a <b>Data protection breach</b> report on the portal – without including the personal data itself.</li><li>Management decides whether Persónuvernd must be notified, within 72 hours where required.</li></ul>" },
+  ],
+  quiz: [
+    { q: "Where may you keep a passenger’s passport number?", o: ["In your personal email", "In a WhatsApp message", "Only in our systems: Notion and Google Workspace", "In your phone notes"], a: 2, e: "Personal data stays in our systems.", r: "DP Policy §6, §9" },
+    { q: "How long do we keep operational passenger and crew data after the flight?", o: ["60 days, then it is deleted or anonymised", "Forever", "1 year", "Until the passenger asks"], a: 0, e: "The default is 60 days after the flight.", r: "DP Policy §8" },
+    { q: "Who may handle health or special-assistance information?", o: ["Anyone on shift", "Only staff trained to handle it", "Only the crew", "Nobody"], a: 1, e: "Special category data needs extra training.", r: "DP Policy §7" },
+    { q: "A passenger emails asking for all the data we hold about them. What do you do?", o: ["Send them everything", "Pass the request to the Data Protection Lead straight away", "Ignore it", "Delete their data"], a: 1, e: "Requests go to the Data Protection Lead.", r: "DP Policy" },
+    { q: "You email a passenger list to the wrong client by mistake. What do you do?", o: ["Hope nobody notices", "Tell the Data Protection Lead and management immediately, and submit a Data protection breach report", "Wait a week", "Delete your sent email and say nothing"], a: 1, e: "Report a suspected breach immediately.", r: "DP Policy §12" },
+    { q: "What should a Data protection breach report contain?", o: ["A copy of the personal data involved", "What happened – but not the personal data itself", "Nothing – just the date", "The passengers’ passport numbers"], a: 1, e: "Describe the breach without copying the data.", r: "DP Policy §12" },
+    { q: "Within how long must Persónuvernd be notified of a breach, where required?", o: ["72 hours", "30 days", "1 year", "Never"], a: 0, e: "Management notifies within 72 hours where required.", r: "DP Policy §12" },
+    { q: "May you share your Notion or Google login with a colleague who forgot theirs?", o: ["Yes, if they are on shift", "No – never share your login", "Yes, for one day", "Only with management"], a: 1, e: "Logins are personal.", r: "DP Policy §9" },
+    { q: "Writing an internal report about a flight, how do you refer to passengers?", o: ["By full name and passport number", "By their role (e.g. ‘a passenger’), without travel document details", "By date of birth", "By seat number and passport number"], a: 1, e: "Travel document details never go into the portal.", r: "DP Policy §6" },
+    { q: "Which law protects personal data in Iceland, alongside the GDPR?", o: ["Act No. 46/1980", "Act No. 90/2018", "Act No. 145/1994", "There is none"], a: 1, e: "The Icelandic Data Protection Act No. 90/2018.", r: "DP Policy" },
   ]
 },
 {

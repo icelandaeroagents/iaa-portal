@@ -1139,3 +1139,5 @@ td .chip + .chip { margin-left: 0.3rem; }
 .cell-due { display: inline-block; font-weight: 700; color: var(--danger); }
 .sub.is-soon { color: #b45309; font-weight: 600; }
 .transcript-prev-h { font-size: 1.1rem; margin: 1.4rem 0 0.5rem; }
+.practical-form { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 0.6rem; }
+.practical-form h3 { margin: 0; font-size: 1rem; }

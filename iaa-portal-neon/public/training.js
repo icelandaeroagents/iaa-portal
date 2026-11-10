@@ -33,6 +33,9 @@
         const c = cycleFor(atts, certs, m);
         if (c.status === "due" || c.status === "soon") out.push({ name: p.full_name || p.email, module: m, due: c.due, overdue: c.status === "due" });
       });
+      practicalState((data.practical || []).filter((r) => r.profile_id === p.id)).forEach(function (s) {
+        if (s.status === "due" || s.status === "soon") out.push({ name: p.full_name || p.email, module: { code: "Practical", title: s.skill }, due: s.due, overdue: s.status === "due" });
+      });
     });
     return out.sort((a, b) => a.due.localeCompare(b.due));
   }
@@ -59,25 +62,27 @@
   // ------------------------------------------------------------------
   async function loadMine(ctx) {
     const me = ctx.state.profile.id;
-    const [a, s] = await Promise.all([
+    const [a, s, pr] = await Promise.all([
       ctx.db.from("training_attempts").select("*").eq("profile_id", me).order("attempted_at"),
-      ctx.db.from("training_signoffs").select("*").eq("profile_id", me).is("revoked_at", null)
+      ctx.db.from("training_signoffs").select("*").eq("profile_id", me).is("revoked_at", null),
+      ctx.db.from("practical_signoffs").select("*").eq("profile_id", me).order("assessed_on")
     ]);
     if (a.error) throw a.error;
     if (s.error) throw s.error;
-    return { attempts: a.data || [], certs: s.data || [] };
+    return { attempts: a.data || [], certs: s.data || [], practical: pr.error ? [] : pr.data || [] };
   }
 
   async function loadAll(ctx) {
-    const [a, s, p] = await Promise.all([
+    const [a, s, p, pr] = await Promise.all([
       ctx.db.from("training_attempts").select("*").order("attempted_at"),
       ctx.db.from("training_signoffs").select("*").is("revoked_at", null),
-      ctx.db.from("profiles").select("id, email, full_name, job_title, station_codes, role, active").order("full_name", { nullsFirst: false })
+      ctx.db.from("profiles").select("id, email, full_name, job_title, station_codes, role, active").order("full_name", { nullsFirst: false }),
+      ctx.db.from("practical_signoffs").select("*").order("assessed_on")
     ]);
     if (a.error) throw a.error;
     if (s.error) throw s.error;
     if (p.error) throw p.error;
-    return { attempts: a.data || [], certs: s.data || [], people: p.data || [] };
+    return { attempts: a.data || [], certs: s.data || [], people: p.data || [], practical: pr.error ? [] : pr.data || [] };
   }
 
   function bestFor(atts, modId) {
@@ -134,6 +139,29 @@
     return h("span", { class: "chip chip-cert" }, (c.cert ? "Certified " : "Current ") + until);
   }
   const isCurrent = (c) => c.status === "current" || c.status === "soon";
+
+  // Practical sign-offs: the newest assessment of each skill counts and is
+  // renewed every year. Older assessments are kept as history.
+  function practicalState(list) {
+    const bySkill = {};
+    list.slice().sort((x, y) => String(x.assessed_on).localeCompare(String(y.assessed_on)) || x.id - y.id)
+      .forEach((r) => { (bySkill[r.skill] = bySkill[r.skill] || []).push(r); });
+    return Object.keys(bySkill).sort().map(function (skill) {
+      const rows = bySkill[skill];
+      const latest = rows[rows.length - 1];
+      const due = latest.result === "competent" ? T.dueDate(latest.assessed_on, { renewal: T.practicalRenewal || { months: 12 } }) : null;
+      const daysLeft = due ? Math.round((Date.parse(due) - Date.parse(todayIso())) / DAY) : null;
+      const status = latest.result !== "competent" ? "not_yet" : daysLeft <= 0 ? "due" : daysLeft <= 30 ? "soon" : "current";
+      return { skill: skill, latest: latest, due: due, status: status, previous: rows.slice(0, -1).reverse() };
+    });
+  }
+  function practicalChip(ctx, p) {
+    const { h } = ctx;
+    if (p.status === "not_yet") return h("span", { class: "chip chip-fail" }, "Not yet competent");
+    if (p.status === "due") return h("span", { class: "chip chip-sev-high" }, "Due since " + shortDate(p.due));
+    if (p.status === "soon") return h("span", { class: "chip chip-status-new" }, "Due soon – until " + shortDate(p.due));
+    return h("span", { class: "chip chip-cert" }, "Competent until " + shortDate(p.due));
+  }
 
   // ------------------------------------------------------------------
   // Shared pieces
@@ -200,7 +228,7 @@
     const { h, fill, pageHead } = ctx;
     fill(main, pageHead("Training", "Operations Officer SOP Manual v" + T.manual + ". Pass mark " + PASS * 100 + "%."), tabs(ctx, "mine"), h("p", { class: "empty" }, "Loading your training record…"));
 
-    const { attempts, certs } = await loadMine(ctx);
+    const { attempts, certs, practical } = await loadMine(ctx);
     const myCodes = ctx.state.profile.station_codes || [];
     const mine = MODULES.filter((m) => appliesTo(m, myCodes));
     const others = MODULES.filter((m) => !appliesTo(m, myCodes));
@@ -277,6 +305,18 @@
         noStationNote,
         h("div", { class: "row" }, h("a", { class: "btn btn-quiet", href: "#/training/record" }, "View my training record"))
       ),
+      practical.length
+        ? h("section", { class: "panel", "aria-labelledby": "prac-h" },
+            h("h2", { id: "prac-h" }, "Practical sign-offs"),
+            h("p", { class: "fineprint" }, "Practical assessments signed off by management. Each is renewed every year."),
+            h("div", { class: "table-wrap" }, h("table", null,
+              h("thead", null, h("tr", null, h("th", null, "Skill"), h("th", null, "Assessed"), h("th", null, "By"), h("th", null, "Status"))),
+              h("tbody", null, practicalState(practical).map((p) => h("tr", null,
+                h("td", null, h("b", null, p.skill)),
+                h("td", null, shortDate(p.latest.assessed_on)),
+                h("td", null, p.latest.assessor_name || "–"),
+                h("td", null, practicalChip(ctx, p))))))))
+        : null,
       previousPanel,
       othersPanel,
       h("p", { class: "fineprint" }, "Each module summarises the manual. The manual itself remains the reference: if anything here differs from a newer instruction, follow the newer one and tell management.")
@@ -614,10 +654,10 @@
     if (!key || !canSeeOthers) key = ownKey;
     fill(main, h("p", { class: "empty" }, "Loading training record…"));
 
-    let person, atts, certs;
+    let person, atts, certs, practical = [], profileId = null;
     if (key === ownKey) {
       const mine = await loadMine(ctx);
-      atts = mine.attempts; certs = mine.certs;
+      atts = mine.attempts; certs = mine.certs; practical = mine.practical; profileId = state.profile.id;
       person = { name: state.profile.full_name || state.profile.email, job: state.profile.job_title || "", stations: state.profile.station_codes || [] };
     } else {
       const data = await loadAll(ctx);
@@ -626,6 +666,7 @@
       const match = (row) => (isProfile ? row.profile_id === id : (!row.profile_id && row.name_key === id));
       atts = data.attempts.filter(match);
       certs = data.certs.filter(match);
+      if (isProfile) { practical = data.practical.filter((r) => r.profile_id === id); profileId = id; }
       const p = isProfile ? data.people.find((x) => x.id === id) : null;
       const first = atts[0] || certs[0] || {};
       if (!p && !first.learner_name) {
@@ -659,13 +700,61 @@
     const passed = required.filter((r) => r.result === "Pass").length;
     const certified = required.filter((r) => r.cert).length;
     const previousRows = [].concat.apply([], rows.map((r) => r.previous)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    const rec = { person: person, rows: rows, previous: previousRows, passed: passed, certified: certified, total: required.length, issued: new Date().toISOString() };
+    const pstate = practicalState(practical);
+    const rec = { person: person, rows: rows, previous: previousRows, practical: pstate, passed: passed, certified: certified, total: required.length, issued: new Date().toISOString() };
+
+    // Practical sign-offs: shown to everyone who can see this record; recorded by management for others.
+    const canRecord = state.profile.role === "management" && profileId && profileId !== state.profile.id;
+    let practicalForm = null;
+    if (canRecord) {
+      const skill = h("select", { id: "pr-skill" }, (T.practical || []).map((t) => h("option", { value: t }, t)).concat([h("option", { value: "__other" }, "Other…")]));
+      const other = h("input", { id: "pr-other", type: "text", placeholder: "Name of the skill", hidden: true });
+      skill.addEventListener("change", function () { other.hidden = skill.value !== "__other"; });
+      const date = h("input", { id: "pr-date", type: "date", value: todayIso(), max: todayIso() });
+      const result = h("select", { id: "pr-result" }, h("option", { value: "competent" }, "Competent"), h("option", { value: "not_yet" }, "Not yet competent – more training needed"));
+      const notes = h("input", { id: "pr-notes", type: "text", placeholder: "Optional, e.g. assessed on a G650 at BIKF" });
+      const pmsg = h("p", { class: "status", role: "status" });
+      practicalForm = h("form", { class: "practical-form", onsubmit: async function (e) {
+        e.preventDefault();
+        const name = skill.value === "__other" ? other.value.trim() : skill.value;
+        if (!name) { ctx.setStatus(pmsg, "Name the skill.", true); return; }
+        const { error } = await ctx.db.from("practical_signoffs").insert({ profile_id: profileId, skill: name, assessed_on: date.value, result: result.value, notes: notes.value.trim() || null, station: (person.stations || []).join(", ") || null });
+        if (error) { ctx.setStatus(pmsg, error.message, true); return; }
+        await ctx.logEvent("practical_signed_off", { profile_id: profileId, skill: name, result: result.value, assessed_on: date.value });
+        notice = { text: `${name}: ${result.value === "competent" ? "signed off as competent" : "recorded as not yet competent"}.` };
+        showTranscript(main, ctx, key);
+      } },
+        h("h3", null, "Record a practical sign-off"),
+        h("div", { class: "form-grid" },
+          h("div", { class: "field" }, h("label", { for: "pr-skill" }, "Skill"), skill, other),
+          h("div", { class: "field" }, h("label", { for: "pr-date" }, "Assessed on"), date),
+          h("div", { class: "field" }, h("label", { for: "pr-result" }, "Result"), result)),
+        h("div", { class: "field field-wide" }, h("label", { for: "pr-notes" }, "Notes"), notes),
+        h("div", { class: "row" }, h("button", { class: "btn", type: "submit" }, "Sign off")),
+        pmsg);
+    }
+    const practicalSection = pstate.length || practicalForm
+      ? h("div", null,
+          h("h2", { class: "transcript-prev-h" }, "Practical assessments"),
+          pstate.length
+            ? h("div", { class: "table-wrap" }, h("table", null,
+                h("thead", null, h("tr", null, h("th", null, "Skill"), h("th", null, "Assessed"), h("th", null, "Signed off by"), h("th", null, "Status"))),
+                h("tbody", null, pstate.map((p) => h("tr", null,
+                  h("td", null, h("b", null, p.skill), p.latest.notes ? h("span", { class: "sub" }, p.latest.notes) : null,
+                    p.previous.length ? h("span", { class: "sub" }, "Earlier: " + p.previous.map((x) => shortDate(x.assessed_on) + (x.result === "competent" ? "" : " (not yet competent)")).join(", ")) : null),
+                  h("td", null, shortDate(p.latest.assessed_on)),
+                  h("td", null, p.latest.assessor_name || "–", p.latest.assessor_title ? h("span", { class: "sub" }, p.latest.assessor_title) : null),
+                  h("td", null, practicalChip(ctx, p)))))))
+            : h("p", { class: "fineprint" }, "No practical assessments recorded yet. Record only the skills this person needs for their work."),
+          practicalForm)
+      : null;
 
     const msg = h("p", { class: "status", role: "status" });
     const back = key === ownKey ? "#/training" : "#/training/records";
     fill(
       main,
       h("a", { class: "back-link", href: back }, "Back"),
+      noticeBox(ctx),
       h("div", { class: "row" }, h("button", { class: "btn", type: "button", onclick: function () { transcriptPdf(rec, msg, ctx); } }, "Download PDF")),
       msg,
       h(
@@ -688,6 +777,7 @@
               h("td", null, h("span", { class: "chip " + (r.result === "Pass" ? "chip-pass" : r.result === "Fail" || r.result === "Due" ? "chip-sev-high" : "chip-none") }, r.result)),
               h("td", null, r.date ? fmtDate(r.date) : "–", r.until ? h("span", { class: "sub" }, "valid until " + r.until) : null),
               h("td", null, r.cert ? [h("span", { class: "mono" }, r.cert), h("span", { class: "sub" }, "Signed off by " + r.signer + ", " + fmtDate(r.signed))] : r.result === "Pass" ? h("span", { class: "sub" }, "Awaiting sign-off") : "–")))))),
+        practicalSection,
         previousRows.length
           ? h("div", null,
               h("h2", { class: "transcript-prev-h" }, "Previous completions"),
@@ -771,6 +861,20 @@
         y += rowH;
         doc.setDrawColor(210, 225, 221); doc.setLineWidth(0.2); doc.line(L - 2, y - 4, R + 2, y - 4);
       });
+      if ((rec.practical || []).length) {
+        y += 4;
+        if (y + 20 > H - 28) { doc.addPage(); frame(); y = 22; }
+        txt("PRACTICAL ASSESSMENTS", L, y, 10, "bold", navy); y += 6;
+        rec.practical.forEach(function (p) {
+          if (y + 9 > H - 28) { doc.addPage(); frame(); y = 22; }
+          txt(p.skill, L, y, 8.5, "bold", navy);
+          txt("Assessed " + fmtDate(p.latest.assessed_on), L + 92, y, 8, "normal", navy);
+          const st = p.status === "not_yet" ? "Not yet competent" : p.status === "due" ? "Due since " + shortDate(p.due) : "Competent until " + shortDate(p.due);
+          txt(st, L + 132, y, 8, "bold", p.status === "current" || p.status === "soon" ? teal : red);
+          txt("Signed off by " + (p.latest.assessor_name || "–"), L + 92, y + 3.6, 7, "normal", grey);
+          y += 9;
+        });
+      }
       if ((rec.previous || []).length) {
         y += 4;
         if (y + 20 > H - 28) { doc.addPage(); frame(); y = 22; }
