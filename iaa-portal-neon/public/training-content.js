@@ -620,3 +620,22 @@ window.TRAINING.renewalText = function (module) {
   const rule = (module && module.renewal) || window.TRAINING.renewal;
   return rule.everyYearOn ? "Retaken every year before 1 October" : "Retaken every " + rule.months + " months";
 };
+
+// Competencies each module targets (Regulation (EU) 2025/20, ORGH.TRG.105). Shown on training records.
+window.TRAINING.competencies = {
+  "m1": "Applies the standard ramp procedures and each station’s local rules, keeps the CIQ sequence, coordinates a safe turnaround and sends Border Police notifications on time.",
+  "m2": "Inspects and operates lavatory and water units, GPU, air stairs and tugs safely, follows the no-touch rule, and gives and recognises standard marshalling signals.",
+  "m3": "Creates and verifies accurate flight records in Notion, checks automation output before relying on it, and keeps the Services Log complete.",
+  "m4": "Applies client contract terms to invoicing in Regla accurately, and handles client data in line with the Data Protection Policy.",
+  "m5": "Meets response-time standards, communicates professionally and discreetly with clients and VIPs, escalates complaints, and gives complete handovers.",
+  "m6": "Coordinates de-icing, fuel and AOG support with providers, reports occurrences through both channels, and takes the correct first actions and staff role in an emergency.",
+  "s1": "Reports occurrences and hazards correctly, including confidentially or anonymously, applies Just Culture, recognises human factors, and takes part in risk management.",
+  "h1": "Works safely: PPE, lifting, aircraft and equipment hazards, fitness for duty, fire safety, cleaning products and environmental duties, and reports injuries.",
+  "sec1": "Uses the airport ID correctly, escorts passengers and crew, protects baggage and in-flight supplies, and recognises and reports security threats.",
+  "dp1": "Handles personal data lawfully and securely, applies retention rules, recognises special-category data, and reports data breaches at once.",
+  "q1": "Understands the quality system, audits and corrective action, carries out daily quality checks, uses controlled documents and reports deviations.",
+  "w1": "Requests and records de-icing correctly, works safely on ice and snow, and protects aircraft, vehicles and people in winter weather.",
+  "w2": "Applies the BIRK winter procedures: de-icing requests and charging, hangar use and the winter ramp.",
+  "w3": "Applies the BIKF winter procedures: de-icing requests, APOC for sanding, snow and stands, and pushback on contaminated surfaces.",
+  "w4": "Applies the BIAR winter procedures: de-icing requests, Type II fluid, snow clearing and hangar use."
+};

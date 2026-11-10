@@ -701,7 +701,12 @@
     const certified = required.filter((r) => r.cert).length;
     const previousRows = [].concat.apply([], rows.map((r) => r.previous)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
     const pstate = practicalState(practical);
-    const rec = { person: person, rows: rows, previous: previousRows, practical: pstate, passed: passed, certified: certified, total: required.length, issued: new Date().toISOString() };
+    // Training content and competencies (Regulation (EU) 2025/20, ORGH.TRG.105).
+    const content = rows.filter((r) => r.required || r.date).map((r) => {
+      const m = MODULES.find((x) => x.code === r.code) || {};
+      return { code: r.code, title: r.title, competencies: (T.competencies || {})[m.id] || m.summary || "", topics: (m.lesson || []).map((l) => l.h).join("; ") };
+    });
+    const rec = { person: person, rows: rows, previous: previousRows, practical: pstate, passed: passed, certified: certified, total: required.length, issued: new Date().toISOString(), content: content };
 
     // Practical sign-offs: shown to everyone who can see this record; recorded by management for others.
     const canRecord = state.profile.role === "management" && profileId && profileId !== state.profile.id;
@@ -787,6 +792,17 @@
                   h("td", null, h("b", null, r.code + " "), r.title),
                   h("td", null, fmtDate(r.date)),
                   h("td", null, h("span", { class: "mono" }, r.cert), h("span", { class: "sub" }, "Signed off by " + (r.signer || "–") + ", " + fmtDate(r.signed)))))))))
+          : null,
+        content.length
+          ? h("div", null,
+              h("h2", { class: "transcript-prev-h" }, "Training content and competencies"),
+              h("p", { class: "fineprint" }, "Provider: Iceland Aero Agents, IAA Staff Portal. Assessment: online test, pass mark 80%. A pass means the competencies listed were achieved."),
+              h("div", { class: "table-wrap" }, h("table", null,
+                h("thead", null, h("tr", null, h("th", null, "Module"), h("th", null, "Competencies targeted"), h("th", null, "Topics covered"))),
+                h("tbody", null, content.map((c) => h("tr", null,
+                  h("td", null, h("b", null, c.code + " "), c.title),
+                  h("td", null, c.competencies),
+                  h("td", null, h("span", { class: "sub" }, c.topics))))))))
           : null,
         h("p", { class: "fineprint" }, "Most modules are retaken every 6 months, the winter modules every year before 1 October and Quality Awareness every 36 months. Results are shown as pass or fail only. This record reflects the IAA Staff Portal on the date issued" + (person.legacy ? "; these are old records not yet linked to a portal account." : "."))
       )
@@ -888,7 +904,25 @@
           y += 9;
         });
       }
-      txt("Most modules are retaken every 6 months, winter modules every year before 1 October, Quality Awareness every 36 months. Results are pass or fail only. This record reflects the IAA Staff Portal on the date issued.", W / 2, H - 18, 7, "normal", grey, { align: "center" });
+      if ((rec.content || []).length) {
+        y += 4;
+        if (y + 24 > H - 28) { doc.addPage(); frame(); y = 22; }
+        txt("TRAINING CONTENT AND COMPETENCIES", L, y, 10, "bold", navy); y += 4.5;
+        txt("Provider: Iceland Aero Agents, IAA Staff Portal. Assessment: online test, pass mark 80%. A pass means the competencies listed were achieved.", L, y, 7, "normal", grey); y += 6;
+        rec.content.forEach(function (c) {
+          doc.setFontSize(7.5);
+          const comp = doc.splitTextToSize("Competencies: " + c.competencies, R - L - 4);
+          const top = doc.splitTextToSize("Topics: " + c.topics, R - L - 4);
+          const need = 4 + comp.length * 3.3 + top.length * 3.1 + 2.5;
+          if (y + need > H - 28) { doc.addPage(); frame(); y = 22; }
+          txt(c.code + "  " + c.title, L, y, 8.5, "bold", navy); y += 4;
+          txt(comp, L + 2, y, 7.5, "normal", navy); y += comp.length * 3.3;
+          txt(top, L + 2, y, 7, "normal", grey); y += top.length * 3.1 + 2.5;
+        });
+      }
+      doc.setFontSize(7);
+      const foot = doc.splitTextToSize("Most modules are retaken every 6 months, winter modules every year before 1 October, Quality Awareness every 36 months. Results are pass or fail only. This record reflects the IAA Staff Portal on the date issued.", W - 44);
+      txt(foot, W / 2, H - 20, 7, "normal", grey, { align: "center" });
       const safe = p.name.normalize("NFD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_");
       doc.save(`IAA_Training_Record_${safe}.pdf`);
     } catch (e) {
