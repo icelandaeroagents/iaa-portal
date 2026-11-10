@@ -1168,3 +1168,14 @@ td .chip + .chip { margin-left: 0.3rem; }
 .reporting-mode legend { font-weight: 600; margin-bottom: 0.4rem; }
 .choice-block { align-items: flex-start; }
 .choice-block > span { display: flex; flex-direction: column; gap: 0.1rem; }
+
+
+/* Equipment register (Management → Equipment) */
+.field .hint { display: block; font-size: 0.8rem; color: var(--muted, #5b6866); margin-top: 0.2rem; }
+.filters { margin-bottom: 0.5rem; }
+.fleet-table td .sub { display: block; }
+.log-form { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line, #d9e3e1); }
+details.panel > summary { cursor: pointer; font-weight: 600; }
+details.panel[open] > summary { margin-bottom: 0.5rem; }
+.unit-head { margin: 0.5rem 0 1rem; }
+.unit-head .unit-title { font-size: 1.5rem; margin: 0.15rem 0 0.4rem; }

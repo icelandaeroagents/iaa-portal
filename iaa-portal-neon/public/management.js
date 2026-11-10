@@ -89,12 +89,13 @@
     fill(main, pageHead("Management"), h("p", { class: "empty" }, "Loading…"));
     const actions = await load(ctx);
     const tabs = h("nav", { class: "tabs", "aria-label": "Management views" }, [
-      ["overview", "Overview"], ["calendar", "Calendar"], ["risks", "Risk register"], ["events", "When it happens"], ["training", "Training plan"], ["people", "Who holds what"]
-    ].map(([id, label]) => h("a", { href: "#/management", "aria-current": tab === id ? "page" : null, onclick: function (e) { e.preventDefault(); tab = id; adding = false; render(main, ctx); } }, label)));
+      ["overview", "Overview"], ["calendar", "Calendar"], ["risks", "Risk register"], ["equipment", "Equipment"], ["events", "When it happens"], ["training", "Training plan"], ["people", "Who holds what"]
+    ].map(([id, label]) => h("a", { href: "#/management", "aria-current": tab === id ? "page" : null, onclick: function (e) { e.preventDefault(); tab = id; adding = false; if (window.IAAFleet) window.IAAFleet.reset(); render(main, ctx); } }, label)));
     const n = notice; notice = null;
     const body = tab === "overview" ? await overview(ctx, main, actions)
       : tab === "calendar" ? calendarView(ctx, main, actions)
       : tab === "risks" ? await riskView(ctx, main)
+      : tab === "equipment" ? (window.IAAFleet ? await window.IAAFleet.view(ctx, main, function () { render(main, ctx); }) : h("p", { class: "empty" }, "The equipment register didn’t load. Reload the page."))
       : tab === "events" ? refTable(ctx, ["When", "What to do", "Owner", "Source"], EVENTS.map((e) => [e.when, e.what, e.owner, e.source]), "Not on a fixed date: do these whenever the trigger happens.")
       : tab === "training" ? refTable(ctx, ["Training", "Who needs it", "First required", "Renewed", "Recorded in", "Owner", "Source"], TRAINING_PLAN.map((t) => [t.training, t.who, t.first, t.renewed, t.recorded, t.owner, t.source]), "Portal modules renew every 6 months (Quality Awareness every 36), winter modules every October, with reminder emails. Practical sign-offs renew every year.")
       : refTable(ctx, ["Person", "Title", "Posts", "Deputises for"], PEOPLE.map((p) => [p.name, p.title, p.posts, p.deputy]), "From the Defined Management Structure (GH-MGT-001), revision 2.0.");
@@ -124,6 +125,8 @@
       ["Waiting for acceptance", risks.filter((r) => r.status === "assessed" && r.residual_score >= 6 && r.residual_score <= 12).length],
       ["Reviews overdue", risks.filter(reviewLate).length]
     ].filter((x) => x[1]);
+    let fleetItems = null;
+    try { if (window.IAAFleet) fleetItems = await window.IAAFleet.attention(ctx.db); } catch (e) { fleetItems = null; }
 
     return h("div", null,
       h("div", { class: "stat-grid" },
@@ -143,6 +146,12 @@
           ? h("ul", { class: "attention-list" }, riskItems.map((x) => h("li", null, h("a", { href: "#/management", onclick: function (e) { e.preventDefault(); tab = "risks"; render(main, ctx); } }, `${x[0]}: ${x[1]}`))))
           : h("p", { class: "fineprint" }, "All risks assessed and in date."),
         h("p", { class: "fineprint" }, `${risks.length} risks in the register.`)),
+      fleetItems === null ? null : h("section", { class: "panel" + (fleetItems.length ? " panel-attention" : "") },
+        h("h2", null, "Equipment and vehicles"),
+        fleetItems.length
+          ? h("ul", { class: "attention-list" }, fleetItems.map((t) => h("li", null, h("a", { href: "#/management", onclick: function (e) { e.preventDefault(); tab = "equipment"; render(main, ctx); } }, t))))
+          : h("p", { class: "fineprint" }, "All service, inspections and airport passes in date."),
+        h("div", { class: "row" }, h("a", { class: "btn btn-quiet btn-small", href: "#/management", onclick: function (e) { e.preventDefault(); tab = "equipment"; render(main, ctx); } }, "Equipment register"))),
       h("section", { class: "panel" },
         h("h2", null, "Training renewals"),
         renewals.length
