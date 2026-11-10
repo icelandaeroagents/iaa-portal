@@ -8,6 +8,10 @@
 window.TRAINING = {
   manual: "1.2",
   passMark: 0.8,
+  // How long a completed module stays valid before it must be retaken.
+  //   { months: 6 }        – due 6 months after the person passed it
+  //   { everyYearOn: 10 }  – due each 1 October (winter modules, retaken before each winter)
+  renewal: { months: 6 },
   modules: [
 {
   id: "m1", code: "P1", title: "Station Familiarisation", part: "Part 1 · Sections 1–6",
@@ -337,7 +341,7 @@ window.TRAINING = {
   ]
 },
 {
-  id: "w1", code: "W", title: "Winter Operations", part: "Part 6 · Sections 24–28",
+  id: "w1", renewal: { everyYearOn: 10 }, code: "W", title: "Winter Operations", part: "Part 6 · Sections 24–28",
   summary: "De-icing (email first), ramp safety on ice and snow, marshalling in the dark, vehicles stuck in snow, aircraft care in the cold and winter planning — all stations.",
   lesson: [
     { h: "De-icing: email first", key: true, html: "<ul><li>Email <b>every</b> de-icing request to Icelandair Jet Center, <b>jetcenter@icelandair.is</b>, for all stations. A call can follow to speed it up, but never replaces the email.</li><li><b>De-icing is only requested when the pilot asks for it.</b> Ask at the handling request, and if snow or frost is forecast ask the crew the evening before. Once the pilot requests it, email straight away: slots fill quickly.</li><li>Type II fluid is used at all stations: tell crews early so they can plan.</li><li>Record the completion time and fluid type in Notion.</li></ul>" },
@@ -368,7 +372,7 @@ window.TRAINING = {
   ]
 },
 {
-  id: "w2", code: "W-BIRK", title: "Winter at BIRK", part: "Part 6 · Sections 25, 26.4–26.5, 29.1",
+  id: "w2", renewal: { everyYearOn: 10 }, code: "W-BIRK", title: "Winter at BIRK", part: "Part 6 · Sections 25, 26.4–26.5, 29.1",
   stations: ["BIRK"],
   summary: "Requesting and charging de-icing at BIRK, Hangar 3, sanding and snow help from the Fire Department, and runway crossings.",
   lesson: [
@@ -391,7 +395,7 @@ window.TRAINING = {
   ]
 },
 {
-  id: "w3", code: "W-BIKF", title: "Winter at BIKF", part: "Part 6 · Sections 25, 26.4–26.5, 29.2",
+  id: "w3", renewal: { everyYearOn: 10 }, code: "W-BIKF", title: "Winter at BIKF", part: "Part 6 · Sections 25, 26.4–26.5, 29.2",
   stations: ["BIKF"],
   summary: "De-icing on stand at BIKF, APOC for sanding, snow and stuck vehicles, no hangar, and pushback on contaminated surfaces.",
   lesson: [
@@ -413,7 +417,7 @@ window.TRAINING = {
   ]
 },
 {
-  id: "w4", code: "W-BIAR", title: "Winter at BIAR", part: "Part 6 · Sections 25, 26.4–26.5, 29.3",
+  id: "w4", renewal: { everyYearOn: 10 }, code: "W-BIAR", title: "Winter at BIAR", part: "Part 6 · Sections 25, 26.4–26.5, 29.3",
   stations: ["BIAR"],
   summary: "De-icing via the Jet Center and the Icelandair duty manager, Isavia snow clearing, the BIAR tower phone, and hangar options for very small aircraft.",
   lesson: [
@@ -435,5 +439,30 @@ window.TRAINING = {
     { q: "After a windy night, what do you check on parked aircraft at BIAR?", o: ["Nothing", "Only that the cones and chocks are still there", "Cones, chocks, tie-downs and aircraft covers are in place and secure, and there is no FOD around the stand", "Only the cabin temperature"], a: 2, e: "Wind can move or loosen anything around a parked aircraft, and blow FOD onto the stand.", r: "26.3" },
   ]
 },
-]
+]};
+
+// The date a module completed on `completedIso` must be retaken (as YYYY-MM-DD).
+window.TRAINING.dueDate = function (completedIso, module) {
+  const rule = (module && module.renewal) || window.TRAINING.renewal;
+  const done = new Date(completedIso);
+  if (isNaN(done)) return null;
+  let due;
+  if (rule.everyYearOn) {
+    // Valid until the next 1st of that month. Completing it in the month
+    // before (e.g. September for October) counts for the coming winter.
+    const m = rule.everyYearOn - 1;
+    let y = done.getUTCFullYear();
+    if (done.getUTCMonth() >= m - 1) y += 1;
+    due = new Date(Date.UTC(y, m, 1));
+  } else {
+    due = new Date(Date.UTC(done.getUTCFullYear(), done.getUTCMonth() + rule.months, done.getUTCDate()));
+    if (due.getUTCDate() !== done.getUTCDate()) due = new Date(Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), 0)); // e.g. 31 Aug → 28/29 Feb
+  }
+  return due.toISOString().slice(0, 10);
+};
+
+// Plain words for a module's renewal rule.
+window.TRAINING.renewalText = function (module) {
+  const rule = (module && module.renewal) || window.TRAINING.renewal;
+  return rule.everyYearOn ? "Retaken every year before 1 October" : "Retaken every " + rule.months + " months";
 };

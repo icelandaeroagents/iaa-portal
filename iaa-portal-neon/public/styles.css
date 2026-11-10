@@ -1111,3 +1111,31 @@ td .chip + .chip { margin-left: 0.3rem; }
 .manual-body h2 { font-size: 1.12rem; }
 .manual-body table { font-size: 0.92rem; }
 .manual-body td, .manual-body th { padding: 0.35rem 0.5rem; }
+
+/* ---------- Management area ---------- */
+.nav-group { margin: 1.1rem 0 0.35rem; padding: 0 0.75rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nav-muted, rgba(255,255,255,0.55)); }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.15rem; }
+.stat-n { font-size: 1.8rem; font-weight: 800; line-height: 1; }
+.stat-label { color: var(--muted); font-size: 0.88rem; }
+.stat.is-bad .stat-n { color: var(--danger); }
+.stat.is-warn .stat-n { color: #b45309; }
+.mgmt-table td { vertical-align: top; }
+.mgmt-table td .sub { display: block; }
+.mgmt-table tr.is-late td { background: #fdecec; }
+.mgmt-table tr.is-close td { background: #fff7e0; }
+.mgmt-table tr.is-done td { color: var(--muted); }
+.mgmt-table input[type="text"] { min-width: 12rem; }
+.mgmt-table input.is-saved { border-color: var(--brand); }
+.is-error-text { color: var(--danger); }
+.nowrap { white-space: nowrap; }
+.row-end { align-items: flex-end; }
+@media (prefers-color-scheme: dark) {
+  .mgmt-table tr.is-late td { background: rgba(220, 38, 38, 0.16); }
+  .mgmt-table tr.is-close td { background: rgba(217, 119, 6, 0.16); }
+}
+
+/* Training renewals */
+.cell-due { display: inline-block; font-weight: 700; color: var(--danger); }
+.sub.is-soon { color: #b45309; font-weight: 600; }
+.transcript-prev-h { font-size: 1.1rem; margin: 1.4rem 0 0.5rem; }

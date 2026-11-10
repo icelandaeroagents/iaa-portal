@@ -112,10 +112,19 @@
       render: renderReports
     },
     {
+      id: "management",
+      title: "Management",
+      description: "The compliance calendar, what is overdue, and training renewals.",
+      roles: ["management"],
+      group: "management",
+      render: renderManagement
+    },
+    {
       id: "people",
       title: "People",
       description: "Give staff access and set their role and station.",
       roles: ["management"],
+      group: "management",
       render: renderPeople
     },
     {
@@ -123,6 +132,7 @@
       title: "Stations",
       description: "Add stations and choose which ones are active.",
       roles: ["management"],
+      group: "management",
       render: renderStations
     }
   ];
@@ -374,14 +384,22 @@
       h(
         "ul",
         null,
-        modules.map((m) =>
+        modules.filter((m) => !m.group).map((m) =>
           h(
             "li",
             null,
             h("a", { href: "#/" + m.id, "aria-current": m.id === activeModule.id ? "page" : null }, m.title)
           )
         )
-      )
+      ),
+      // Management's own group of pages, under a heading.
+      modules.some((m) => m.group === "management")
+        ? [
+            h("p", { class: "nav-group" }, "Management"),
+            h("ul", null, modules.filter((m) => m.group === "management").map((m) =>
+              h("li", null, h("a", { href: "#/" + m.id, "aria-current": m.id === activeModule.id ? "page" : null }, m.title))))
+          ]
+        : null
     );
 
     const topbar = h(
@@ -724,6 +742,11 @@
     return window.IAADocuments.renderEmergency(main, sectionCtx());
   }
 
+  async function renderManagement(main) {
+    if (!window.IAAManagement) return sectionMissing(main, "Management");
+    return window.IAAManagement.render(main, sectionCtx());
+  }
+
   async function renderManuals(main) {
     if (!window.IAAManuals) return sectionMissing(main, "Manuals");
     return window.IAAManuals.render(main, sectionCtx());
@@ -771,6 +794,10 @@
       if (req && req.urgent) items.push(["#/requests/service", `${req.urgent} urgent or vehicle defect ${req.urgent === 1 ? "request" : "requests"} open`]);
       else if (req && req.service) items.push(["#/requests/service", `${req.service} open stock, equipment or defect ${req.service === 1 ? "request" : "requests"}`]);
       if (exp) items.push(["#/passes", `${exp} ${exp === 1 ? "pass or certificate" : "passes or certificates"} expired or expiring within 30 days`]);
+      if (window.IAAManagement) {
+        const late = await window.IAAManagement.overdueCount(db);
+        if (late) items.push(["#/management", `${late} management ${late === 1 ? "action is" : "actions are"} overdue`]);
+      }
       if (rev && !rev.error) {
         const last = (rev.data || [])[0];
         if (!last || Date.now() - new Date(last.reviewed_at).getTime() > 90 * 86400000) {

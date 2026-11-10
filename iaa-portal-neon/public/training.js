@@ -20,7 +20,22 @@
   let notice = null;          // one-off message for the next page shown
   let recordsStation = "All"; // station filter on the Records page
 
-  window.IAATraining = { render: render };
+  window.IAATraining = { render: render, renewalsDue: renewalsDue };
+
+  // For the Management page: active people with modules due (or due within 30 days).
+  async function renewalsDue(ctx) {
+    const data = await loadAll(ctx);
+    const out = [];
+    data.people.filter((p) => p.active).forEach(function (p) {
+      const atts = data.attempts.filter((a) => a.profile_id === p.id);
+      const certs = data.certs.filter((c) => c.profile_id === p.id);
+      MODULES.filter((m) => appliesTo(m, p.station_codes || [])).forEach(function (m) {
+        const c = cycleFor(atts, certs, m);
+        if (c.status === "due" || c.status === "soon") out.push({ name: p.full_name || p.email, module: m, due: c.due, overdue: c.status === "due" });
+      });
+    });
+    return out.sort((a, b) => a.due.localeCompare(b.due));
+  }
 
   // ------------------------------------------------------------------
   // Entry point
@@ -77,6 +92,48 @@
       last: list.map((a) => a.attempted_at).sort().pop()
     };
   }
+
+  // ------------------------------------------------------------------
+  // Renewal cycles. Each module stays valid until T.dueDate(): 6 months after
+  // passing for P1–P5, and each 1 October for the winter modules. A pass after
+  // the latest certificate was signed is a new completion, which needs its own
+  // sign-off and certificate. Earlier certificates are "previous completions".
+  // ------------------------------------------------------------------
+  const DAY = 86400000;
+  function todayIso() { return new Date().toISOString().slice(0, 10); }
+  function cycleFor(atts, certs, m) {
+    const mine = atts.filter((a) => a.module === m.id);
+    const passes = mine.filter((a) => a.passed).map((a) => a.attempted_at).sort();
+    const cs = certs.filter((c) => c.module === m.id && !c.revoked_at)
+      .sort((x, y) => String(x.signed_at || x.passed_at).localeCompare(String(y.signed_at || y.passed_at)));
+    const lastCert = cs.length ? cs[cs.length - 1] : null;
+    const lastPass = passes.length ? passes[passes.length - 1] : null;
+    const certTime = lastCert ? String(lastCert.signed_at || lastCert.passed_at) : "";
+    const awaiting = !!(lastPass && (!lastCert || lastPass > certTime));
+    const completedAt = awaiting ? lastPass : lastCert ? lastCert.passed_at : lastPass;
+    const due = completedAt ? T.dueDate(completedAt, m) : null;
+    const daysLeft = due ? Math.round((Date.parse(due) - Date.parse(todayIso())) / DAY) : null;
+    const status = !completedAt ? (mine.length ? "failed" : "none") : daysLeft <= 0 ? "due" : daysLeft <= 30 ? "soon" : "current";
+    return {
+      status: status, due: due, daysLeft: daysLeft, completedAt: completedAt, awaiting: awaiting,
+      cert: awaiting ? null : lastCert,
+      previous: cs.filter((c) => c !== (awaiting ? null : lastCert)),
+      best: mine.length ? Math.max.apply(null, mine.map((a) => a.pct)) : null,
+      tries: mine.length
+    };
+  }
+  function shortDate(iso) { return new Date(iso + (iso.length === 10 ? "T12:00:00Z" : "")).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); }
+  function cycleChip(ctx, c) {
+    const { h } = ctx;
+    if (c.status === "none") return h("span", { class: "chip chip-none" }, "Not started");
+    if (c.status === "failed") return h("span", { class: "chip chip-fail" }, `Best ${c.best}%, retake`);
+    if (c.status === "due") return h("span", { class: "chip chip-sev-high" }, "Due – retake");
+    const until = "until " + shortDate(c.due);
+    if (c.awaiting) return h("span", { class: "chip chip-pass" }, "Passed, awaiting sign-off");
+    if (c.status === "soon") return h("span", { class: "chip chip-status-new" }, "Due soon – " + until);
+    return h("span", { class: "chip chip-cert" }, (c.cert ? "Certified " : "Current ") + until);
+  }
+  const isCurrent = (c) => c.status === "current" || c.status === "soon";
 
   // ------------------------------------------------------------------
   // Shared pieces
@@ -147,10 +204,12 @@
     const myCodes = ctx.state.profile.station_codes || [];
     const mine = MODULES.filter((m) => appliesTo(m, myCodes));
     const others = MODULES.filter((m) => !appliesTo(m, myCodes));
-    const done = mine.filter((m) => (bestFor(attempts, m.id) || {}).passedAt).length;
+    const cycles = {};
+    MODULES.forEach((m) => { cycles[m.id] = cycleFor(attempts, certs, m); });
+    const done = mine.filter((m) => isCurrent(cycles[m.id])).length;
+    const dueNow = mine.filter((m) => cycles[m.id].status === "due");
 
     function moduleItem(m) {
-      const cert = certs.find((c) => c.module === m.id);
       return h(
         "li",
         null,
@@ -159,7 +218,7 @@
           { href: "#/training/" + m.id },
           h("span", { class: "module-code" }, m.code),
           h("span", { class: "module-text" }, h("span", { class: "section-title" }, m.title), h("span", { class: "section-desc" }, m.summary)),
-          chip(ctx, bestFor(attempts, m.id), cert)
+          cycleChip(ctx, cycles[m.id])
         )
       );
     }
@@ -182,21 +241,25 @@
     const list = h(
       "ul",
       { class: "module-list" },
-      mine.map(function (m) {
-        const cert = certs.find((c) => c.module === m.id);
-        return h(
-          "li",
-          null,
-          h(
-            "a",
-            { href: "#/training/" + m.id },
-            h("span", { class: "module-code" }, m.code),
-            h("span", { class: "module-text" }, h("span", { class: "section-title" }, m.title), h("span", { class: "section-desc" }, m.summary)),
-            chip(ctx, bestFor(attempts, m.id), cert)
-          )
-        );
-      })
+      mine.map(moduleItem)
     );
+
+    // Earlier completions, kept separately from the current cycle.
+    const previous = [];
+    MODULES.forEach((m) => cycles[m.id].previous.forEach((c) => previous.push({ m: m, c: c })));
+    previous.sort((a, b) => String(b.c.passed_at).localeCompare(String(a.c.passed_at)));
+    const previousPanel = previous.length
+      ? h("section", { class: "panel", "aria-labelledby": "prev-h" },
+          h("h2", { id: "prev-h" }, "Previous completions"),
+          h("p", { class: "fineprint" }, "Earlier completions and their certificates, kept for your record. Only your current completions count as valid."),
+          h("div", { class: "table-wrap" }, h("table", null,
+            h("thead", null, h("tr", null, h("th", null, "Module"), h("th", null, "Completed"), h("th", null, "Certificate"), h("th", null, "Signed off by"))),
+            h("tbody", null, previous.map((x) => h("tr", null,
+              h("td", null, h("b", null, x.m.code + " "), x.m.title),
+              h("td", null, fmtDate(x.c.passed_at)),
+              h("td", null, h("a", { class: "mono", href: "#/training/cert/" + x.c.id }, x.c.cert_no)),
+              h("td", null, x.c.signer_name || "–")))))))
+      : null;
 
     fill(
       main,
@@ -207,11 +270,14 @@
         "section",
         { class: "panel", "aria-labelledby": "rec-h" },
         h("h2", { id: "rec-h" }, "Your training record"),
-        h("p", { class: "progress-line" }, h("span", null, `${done} of ${mine.length} passed, ${certs.length} certified`), progressBar(ctx, done / mine.length)),
+        h("p", { class: "progress-line" }, h("span", null, `${done} of ${mine.length} current`), progressBar(ctx, mine.length ? done / mine.length : 0)),
+        dueNow.length ? h("p", { class: "notice is-error" }, `${dueNow.length === 1 ? "1 module is" : dueNow.length + " modules are"} due for renewal: ${dueNow.map((m) => m.code).join(", ")}. Open each one and retake the quiz.`) : null,
+        h("p", { class: "fineprint" }, "Modules P1–P5 are retaken every 6 months and the winter modules every year before 1 October. You’ll get an email when one is due."),
         list,
         noStationNote,
         h("div", { class: "row" }, h("a", { class: "btn btn-quiet", href: "#/training/record" }, "View my training record"))
       ),
+      previousPanel,
       othersPanel,
       h("p", { class: "fineprint" }, "Each module summarises the manual. The manual itself remains the reference: if anything here differs from a newer instruction, follow the newer one and tell management.")
     );
@@ -223,7 +289,8 @@
     fill(main, h("p", { class: "empty" }, "Loading…"));
     const { attempts, certs } = await loadMine(ctx);
     const b = bestFor(attempts, m.id);
-    const cert = certs.find((c) => c.module === m.id);
+    const cyc = cycleFor(attempts, certs, m);
+    const cert = cyc.cert;
     const needed = Math.ceil(m.quiz.length * PASS);
 
     const sections = m.lesson.map(function (s) {
@@ -238,6 +305,12 @@
       h("a", { class: "back-link", href: "#/training" }, "All modules"),
       pageHead(m.title, m.part),
       h("p", { class: "lede" }, m.summary),
+      cyc.completedAt
+        ? h("p", { class: cyc.status === "due" ? "notice is-error" : "notice" },
+            cyc.status === "due"
+              ? `Your completion from ${fmtDate(cyc.completedAt)} has expired. Retake the quiz below to renew it.`
+              : `Completed ${fmtDate(cyc.completedAt)}. Valid until ${shortDate(cyc.due)} (${T.renewalText(m).toLowerCase()}).`)
+        : h("p", { class: "fineprint" }, T.renewalText(m) + "."),
       sections,
       h(
         "section",
@@ -567,25 +640,26 @@
     const rows = MODULES
       .filter((m) => appliesTo(m, person.stations) || atts.some((a) => a.module === m.id) || certs.some((c) => c.module === m.id))
       .map(function (m) {
-        const b = bestFor(atts, m.id);
-        const cert = certs.find((c) => c.module === m.id);
-        const passed = !!(cert || (b && b.passedAt));
+        const c = cycleFor(atts, certs, m);
         return {
           code: m.code,
           title: m.title,
           part: m.part,
           required: appliesTo(m, person.stations),
-          result: passed ? "Pass" : b ? "Fail" : "Not taken",
-          date: cert ? cert.passed_at : b && b.passedAt ? b.passedAt : null,
-          cert: cert ? cert.cert_no : null,
-          signer: cert ? cert.signer_name : null,
-          signed: cert ? cert.signed_at : null
+          result: isCurrent(c) ? "Pass" : c.status === "due" ? "Due" : c.status === "failed" ? "Fail" : "Not taken",
+          date: c.completedAt,
+          until: c.due && c.status !== "due" ? shortDate(c.due) : null,
+          cert: c.cert ? c.cert.cert_no : null,
+          signer: c.cert ? c.cert.signer_name : null,
+          signed: c.cert ? c.cert.signed_at : null,
+          previous: c.previous.map((p) => ({ code: m.code, title: m.title, date: p.passed_at, cert: p.cert_no, signer: p.signer_name, signed: p.signed_at }))
         };
       });
     const required = rows.filter((r) => r.required);
     const passed = required.filter((r) => r.result === "Pass").length;
     const certified = required.filter((r) => r.cert).length;
-    const rec = { person: person, rows: rows, passed: passed, certified: certified, total: required.length, issued: new Date().toISOString() };
+    const previousRows = [].concat.apply([], rows.map((r) => r.previous)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const rec = { person: person, rows: rows, previous: previousRows, passed: passed, certified: certified, total: required.length, issued: new Date().toISOString() };
 
     const msg = h("p", { class: "status", role: "status" });
     const back = key === ownKey ? "#/training" : "#/training/records";
@@ -611,10 +685,20 @@
             h("thead", null, h("tr", null, h("th", null, "Module"), h("th", null, "Result"), h("th", null, "Passed"), h("th", null, "Certificate"))),
             h("tbody", null, rows.map((r) => h("tr", null,
               h("td", null, h("b", null, r.code + " "), r.title, h("span", { class: "sub" }, r.part + (r.required ? "" : " · not required for this person"))),
-              h("td", null, h("span", { class: "chip " + (r.result === "Pass" ? "chip-pass" : r.result === "Fail" ? "chip-sev-high" : "chip-none") }, r.result)),
-              h("td", null, r.date ? fmtDate(r.date) : "–"),
+              h("td", null, h("span", { class: "chip " + (r.result === "Pass" ? "chip-pass" : r.result === "Fail" || r.result === "Due" ? "chip-sev-high" : "chip-none") }, r.result)),
+              h("td", null, r.date ? fmtDate(r.date) : "–", r.until ? h("span", { class: "sub" }, "valid until " + r.until) : null),
               h("td", null, r.cert ? [h("span", { class: "mono" }, r.cert), h("span", { class: "sub" }, "Signed off by " + r.signer + ", " + fmtDate(r.signed))] : r.result === "Pass" ? h("span", { class: "sub" }, "Awaiting sign-off") : "–")))))),
-        h("p", { class: "fineprint" }, "Results are shown as pass or fail only. This record reflects the IAA Staff Portal on the date issued" + (person.legacy ? "; these are old records not yet linked to a portal account." : "."))
+        previousRows.length
+          ? h("div", null,
+              h("h2", { class: "transcript-prev-h" }, "Previous completions"),
+              h("div", { class: "table-wrap" }, h("table", null,
+                h("thead", null, h("tr", null, h("th", null, "Module"), h("th", null, "Completed"), h("th", null, "Certificate"))),
+                h("tbody", null, previousRows.map((r) => h("tr", null,
+                  h("td", null, h("b", null, r.code + " "), r.title),
+                  h("td", null, fmtDate(r.date)),
+                  h("td", null, h("span", { class: "mono" }, r.cert), h("span", { class: "sub" }, "Signed off by " + (r.signer || "–") + ", " + fmtDate(r.signed)))))))))
+          : null,
+        h("p", { class: "fineprint" }, "Modules P1–P5 are retaken every 6 months and the winter modules every year before 1 October. Results are shown as pass or fail only. This record reflects the IAA Staff Portal on the date issued" + (person.legacy ? "; these are old records not yet linked to a portal account." : "."))
       )
     );
   }
@@ -669,13 +753,14 @@
           ? doc.setFont("helvetica", "normal").setFontSize(7).splitTextToSize("Signed off by " + r.signer + ", " + fmtDate(r.signed), certW)
           : [];
         const leftH = titleLines.length * 4.2 + partLines.length * 3.4;
-        const rightH = r.cert ? 4.2 + signLines.length * 3.2 : 4.2;
+        const rightH = Math.max(r.cert ? 4.2 + signLines.length * 3.2 : 4.2, r.until ? 4.2 + 2 * 3.2 : 0);
         const rowH = Math.max(11, Math.max(leftH, rightH) + 4);
         if (y + rowH > H - 28) { doc.addPage(); frame(); y = 22; head(); }
         txt(titleLines, cols[0], y, 9, "bold", navy);
         txt(partLines, cols[0], y + titleLines.length * 4.2, 7.5, "normal", grey);
-        txt(r.result, cols[1], y, 9, "bold", r.result === "Pass" ? teal : r.result === "Fail" ? red : grey);
+        txt(r.result, cols[1], y, 9, "bold", r.result === "Pass" ? teal : r.result === "Fail" || r.result === "Due" ? red : grey);
         txt(r.date ? fmtDate(r.date) : "–", cols[2], y, 9, "normal", navy);
+        if (r.until) txt(["valid until", r.until], cols[2], y + 4.2, 7, "normal", grey);
         if (r.cert) {
           doc.setFont("courier", "bold"); doc.setFontSize(7.5); doc.setTextColor.apply(doc, navy);
           doc.text(doc.splitTextToSize(r.cert, certW), cols[3], y);
@@ -686,7 +771,20 @@
         y += rowH;
         doc.setDrawColor(210, 225, 221); doc.setLineWidth(0.2); doc.line(L - 2, y - 4, R + 2, y - 4);
       });
-      txt("Results are shown as pass or fail only. This record reflects the IAA Staff Portal on the date issued.", W / 2, H - 18, 7.5, "normal", grey, { align: "center" });
+      if ((rec.previous || []).length) {
+        y += 4;
+        if (y + 20 > H - 28) { doc.addPage(); frame(); y = 22; }
+        txt("PREVIOUS COMPLETIONS", L, y, 10, "bold", navy); y += 6;
+        rec.previous.forEach(function (r) {
+          if (y + 9 > H - 28) { doc.addPage(); frame(); y = 22; }
+          txt(r.code + "  " + r.title, L, y, 8.5, "bold", navy);
+          txt("Completed " + fmtDate(r.date), L + 92, y, 8, "normal", navy);
+          doc.setFont("courier", "bold"); doc.setFontSize(7.5); doc.setTextColor.apply(doc, grey); doc.text(r.cert || "", L + 132, y);
+          txt("Signed off by " + (r.signer || "–") + ", " + fmtDate(r.signed), L + 92, y + 3.6, 7, "normal", grey);
+          y += 9;
+        });
+      }
+      txt("P1–P5 are retaken every 6 months, winter modules every year before 1 October. Results are pass or fail only. This record reflects the IAA Staff Portal on the date issued.", W / 2, H - 18, 7, "normal", grey, { align: "center" });
       const safe = p.name.normalize("NFD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_");
       doc.save(`IAA_Training_Record_${safe}.pdf`);
     } catch (e) {
@@ -755,8 +853,8 @@
       all.forEach((L) => {
         if (!L.profileId) return;
         MODULES.forEach((m) => {
-          const b = bestFor(L.atts, m.id);
-          if (b && b.passedAt && !L.certs.some((c) => c.module === m.id)) queue.push({ L: L, m: m, b: b });
+          const c = cycleFor(L.atts, L.certs, m);
+          if (c.awaiting) queue.push({ L: L, m: m, b: { best: c.best, passedAt: c.completedAt, renewal: !!c.previous.length || !!c.cert } });
         });
       });
     }
@@ -885,25 +983,21 @@
       : null;
 
     // ----- matrix of everyone
-    const head = h("tr", null, h("th", null, "Person"), MODULES.map((m) => h("th", { title: m.title }, m.code)), h("th", null, "Passed"), h("th", null, "Last activity"));
+    const head = h("tr", null, h("th", null, "Person"), MODULES.map((m) => h("th", { title: m.title }, m.code)), h("th", null, "Current"), h("th", null, "Last activity"));
     const rows = shown.map(function (L) {
       let n = 0;
       const required = MODULES.filter((m) => appliesTo(m, L.stations));
       const cells = MODULES.map(function (m) {
-        const b = bestFor(L.atts, m.id);
-        const cert = L.certs.find((c) => c.module === m.id);
+        const c = cycleFor(L.atts, L.certs, m);
         const needed = appliesTo(m, L.stations);
-        if (!needed && !b && !cert) return h("td", null, h("span", { class: "cell cell-none", title: "Not required: other station" }, "n/a"));
-        if (cert) {
-          if (needed) n += 1;
-          return h("td", null, h("a", { class: "cell cell-cert", href: "#/training/cert/" + cert.id }, "★ " + (b ? b.best : cert.pct) + "%"), h("span", { class: "sub" }, "Certified"));
-        }
-        if (!b) return h("td", null, h("span", { class: "cell cell-none" }, "–"));
-        if (b.passedAt) {
-          if (needed) n += 1;
-          return h("td", null, h("span", { class: "cell cell-pass" }, "✓ " + b.best + "%"), h("span", { class: "sub" }, "Awaiting sign-off"));
-        }
-        return h("td", null, h("span", { class: "cell cell-fail" }, b.best + "%"), h("span", { class: "sub" }, b.tries + (b.tries === 1 ? " try" : " tries")));
+        if (!needed && c.status === "none") return h("td", null, h("span", { class: "cell cell-none", title: "Not required: other station" }, "n/a"));
+        if (c.status === "none") return h("td", null, h("span", { class: "cell cell-none" }, "–"));
+        if (c.status === "failed") return h("td", null, h("span", { class: "cell cell-fail" }, c.best + "%"), h("span", { class: "sub" }, c.tries + (c.tries === 1 ? " try" : " tries")));
+        if (c.status === "due") return h("td", null, h("span", { class: "cell cell-due" }, "Due"), h("span", { class: "sub" }, "since " + shortDate(c.due)));
+        if (needed) n += 1;
+        const until = h("span", { class: "sub" + (c.status === "soon" ? " is-soon" : "") }, "until " + shortDate(c.due));
+        if (c.awaiting) return h("td", null, h("span", { class: "cell cell-pass" }, "✓ " + c.best + "%"), h("span", { class: "sub" }, "Awaiting sign-off"), until);
+        return h("td", null, h("a", { class: "cell cell-cert", href: "#/training/cert/" + c.cert.id }, "★ " + c.cert.pct + "%"), until);
       });
       return h(
         "tr",
@@ -915,7 +1009,7 @@
       );
     });
 
-    const fullyDone = shown.filter((L) => MODULES.filter((m) => appliesTo(m, L.stations)).every((m) => (bestFor(L.atts, m.id) || {}).passedAt)).length;
+    const fullyDone = shown.filter((L) => MODULES.filter((m) => appliesTo(m, L.stations)).every((m) => isCurrent(cycleFor(L.atts, L.certs, m)))).length;
 
     fill(
       main,
