@@ -1019,7 +1019,8 @@
         h("td", null, role),
         h("td", null, station.node),
         h("td", null, active),
-        h("td", null, save)
+        h("td", null, save,
+          window.IAAReminders && person.active && person.id !== state.profile.id ? window.IAAReminders.button(sectionCtx(), person) : null)
       );
     });
 

@@ -1179,3 +1179,15 @@ details.panel > summary { cursor: pointer; font-weight: 600; }
 details.panel[open] > summary { margin-bottom: 0.5rem; }
 .unit-head { margin: 0.5rem 0 1rem; }
 .unit-head .unit-title { font-size: 1.5rem; margin: 0.15rem 0 0.4rem; }
+
+/* Reminder dialog */
+dialog.modal { border: 0; border-radius: 10px; padding: 0; width: min(680px, calc(100vw - 2rem)); max-height: calc(100vh - 3rem); box-shadow: 0 12px 40px rgba(0,0,0,0.25); color: inherit; background: var(--card, #fff); }
+dialog.modal::backdrop { background: rgba(16, 24, 32, 0.45); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--line, #d9e3e1); position: sticky; top: 0; background: inherit; }
+.modal-head h2 { margin: 0; font-size: 1.2rem; }
+.modal-body { padding: 1rem 1.25rem 1.25rem; }
+.remind-list { max-height: 45vh; overflow: auto; border: 1px solid var(--line, #d9e3e1); border-radius: 6px; padding: 0.5rem 0.9rem; margin: 0.5rem 0 1rem; }
+.remind-section h3 { font-size: 1rem; margin: 0.6rem 0 0.25rem; }
+.remind-section ul { margin: 0 0 0.4rem; padding-left: 1.1rem; }
+.remind-section li { margin: 0.15rem 0; }
+td .btn-small { margin-top: 0.3rem; }

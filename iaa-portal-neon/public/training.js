@@ -651,6 +651,7 @@
     const { h, fill, state } = ctx;
     const canSeeOthers = state.profile.role === "management" || state.profile.role === "station_lead";
     const ownKey = "p:" + state.profile.id;
+    let remindP = null;
     if (!key || !canSeeOthers) key = ownKey;
     fill(main, h("p", { class: "empty" }, "Loading training record…"));
 
@@ -668,6 +669,7 @@
       certs = data.certs.filter(match);
       if (isProfile) { practical = data.practical.filter((r) => r.profile_id === id); profileId = id; }
       const p = isProfile ? data.people.find((x) => x.id === id) : null;
+      remindP = p;
       const first = atts[0] || certs[0] || {};
       if (!p && !first.learner_name) {
         notice = { text: "That training record isn’t available.", isError: true };
@@ -760,7 +762,9 @@
       main,
       h("a", { class: "back-link", href: back }, "Back"),
       noticeBox(ctx),
-      h("div", { class: "row" }, h("button", { class: "btn", type: "button", onclick: function () { transcriptPdf(rec, msg, ctx); } }, "Download PDF")),
+      h("div", { class: "row" }, h("button", { class: "btn", type: "button", onclick: function () { transcriptPdf(rec, msg, ctx); } }, "Download PDF"),
+        state.profile.role === "management" && window.IAAReminders && remindP && remindP.active && remindP.id !== state.profile.id
+          ? window.IAAReminders.button(ctx, remindP) : null),
       msg,
       h(
         "section",
@@ -1140,7 +1144,9 @@
       return h(
         "tr",
         null,
-        h("td", null, h("a", { href: "#/training/record/" + encodeURIComponent(L.key) }, L.name), h("span", { class: "sub" }, (L.station || "No station") + (L.profileId ? "" : " · old records, not linked"))),
+        h("td", null, h("a", { href: "#/training/record/" + encodeURIComponent(L.key) }, L.name), h("span", { class: "sub" }, (L.station || "No station") + (L.profileId ? "" : " · old records, not linked")),
+          isManagement && window.IAAReminders && L.profileId && peopleById[L.profileId] && peopleById[L.profileId].active && L.profileId !== state.profile.id
+            ? window.IAAReminders.button(ctx, peopleById[L.profileId], { label: "Remind" }) : null),
         cells,
         h("td", null, `${n}/${required.length}`),
         h("td", { class: "sub-cell" }, L.last ? fmtDate(L.last) : "Not started")
@@ -1158,7 +1164,8 @@
         "div",
         { class: "row" },
         h("div", { class: "field" }, h("label", { for: "records-station" }, "Station"), filter),
-        exportBtn
+        exportBtn,
+        isManagement && window.IAAReminders ? window.IAAReminders.bulkButton(ctx) : null
       ),
       h("p", { class: "fineprint" }, `${shown.length} people, ${fullyDone} with all their required modules passed.`),
       queuePanel,
