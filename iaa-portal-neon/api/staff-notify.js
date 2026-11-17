@@ -9,8 +9,10 @@
    – invitations: the invited person gets the portal link and how to sign in
    – training renewals: when a module is due (P1–P5 6 months after passing,
      winter modules each 1 October), the person gets one email listing it
+   – reminders from management: one email listing everything the person
+     has outstanding (training, policies, passes, practical sign-offs)
 
-   POST /api/staff-notify  { "kind": "leave" | "service", "id": 12 }
+   POST /api/staff-notify  { "kind": "leave" | "service" | "remind", "id": 12 }
                            { "kind": "invite", "email": "name@gmail.com" }
    GET  /api/staff-notify  – Vercel every 10 minutes: sends anything missed
                              and any expiry reminders that are due
@@ -72,9 +74,10 @@ module.exports = async function handler(req, res) {
         return send(res, 200, { results: [await inviteEmail(email)] });
       }
       const id = parseInt(body.id, 10);
-      if (!id || ["leave", "service"].indexOf(body.kind) === -1) return send(res, 400, { error: "kind and id needed" });
+      if (!id || ["leave", "service", "remind"].indexOf(body.kind) === -1) return send(res, 400, { error: "kind and id needed" });
       const results = body.kind === "leave"
         ? [await leaveRequestEmail(id), await leaveDecisionEmail(id)]
+        : body.kind === "remind" ? [await reminderEmail(id)]
         : [await serviceEmail(id)];
       return send(res, 200, { results: results });
     }
@@ -95,6 +98,7 @@ module.exports = async function handler(req, res) {
             and created_at < now() - interval '1 minute'
           order by id limit 20`);
       for (const r of service.rows) results.push(await serviceEmail(r.id));
+      results.push.apply(results, await pendingReminders());
       results.push.apply(results, await expiryReminders());
       results.push.apply(results, await trainingReminders());
       const invites = await db().query(
@@ -360,10 +364,82 @@ async function inviteEmail(email) {
 }
 
 // ----------------------------------------------------------------------
+// Reminders from management: one email per person, listing everything they
+// have outstanding. Built with the same rules as the preview (outstanding.js).
+function outstandingLib() {
+  const file = path.join(process.cwd(), "public", "outstanding.js");
+  const sandbox = { window: {} };
+  vm.runInNewContext(fs.readFileSync(file, "utf8"), sandbox);
+  return sandbox.window.IAAOutstanding;
+}
+
+async function reminderEmail(id) {
+  // Claim it, so the button and the sweep never send the same reminder twice.
+  const claim = await db().query("update public.staff_reminders set status = 'sending' where id = $1 and status = 'pending' returning *", [id]);
+  if (!claim.rows.length) return { kind: "remind", id: id, status: "skipped – already handled" };
+  const r = claim.rows[0];
+  try {
+    const T = trainingContent(), O = outstandingLib();
+    const pr = await db().query("select id, email, full_name, station_codes, active from public.profiles where id = $1", [r.profile_id]);
+    const p = pr.rows[0];
+    if (!p || !p.active) throw new Error("No active portal account");
+    const [atts, certs, pols, reads, creds, prac, sender] = await Promise.all([
+      db().query("select module, attempted_at from public.training_attempts where profile_id = $1 and passed", [p.id]),
+      db().query("select module, passed_at, signed_at from public.training_signoffs where profile_id = $1 and revoked_at is null", [p.id]),
+      db().query("select id, title, version, requires_ack from public.documents where kind = 'policy' order by sort_order, title"),
+      db().query("select document_id, version from public.document_reads where profile_id = $1", [p.id]),
+      db().query("select kind, label, expires_on::text as expires_on from public.credentials where profile_id = $1", [p.id]),
+      db().query("select skill, assessed_on::text as assessed_on, result from public.practical_signoffs where profile_id = $1", [p.id]),
+      db().query("select email, full_name from public.profiles where id = $1", [r.created_by])
+    ]);
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Atlantic/Reykjavik" });
+    const items = O.compute({ T: T, stations: p.station_codes || [], attempts: atts.rows, certs: certs.rows, policies: pols.rows,
+      reads: reads.rows, credentials: creds.rows, practical: prac.rows, today: today });
+    if (!items.count) {
+      await db().query("update public.staff_reminders set status = 'nothing', items = $2, sent_at = now() where id = $1", [id, JSON.stringify(items)]);
+      return { kind: "remind", id: id, email: p.email, status: "nothing outstanding – not sent" };
+    }
+    const first = String(p.full_name || "").trim().split(/\s+/)[0];
+    const by = sender.rows[0] || {};
+    await mail({
+      to: [p.email],
+      replyTo: by.email || undefined,
+      subject: `Reminder: ${items.count} ${items.count === 1 ? "thing" : "things"} to complete in the IAA Staff Portal`,
+      kicker: "Reminder from management",
+      title: `${first ? "Hi " + first + ", you" : "You"} have ${items.count} ${items.count === 1 ? "thing" : "things"} to complete`,
+      intro: r.message ? { from: r.created_by_name || by.full_name || "Management", text: r.message } : null,
+      sections: O.SECTIONS.filter((x) => items[x[0]].length).map((x) => ({ heading: x[1], rows: items[x[0]], link: x[2] && portal() ? portal() + x[2] : null })),
+      note: "Please complete these as soon as you can. If something is wrong or already done, reply to this email.",
+      link: portal() + "/", linkLabel: "Open the staff portal"
+    });
+    await db().query("update public.staff_reminders set status = 'sent', items = $2, sent_at = now(), error = null where id = $1", [id, JSON.stringify(items)]);
+    return { kind: "remind", id: id, email: p.email, count: items.count, status: "sent" };
+  } catch (err) {
+    await db().query("update public.staff_reminders set status = 'failed', error = $2 where id = $1", [id, msg(err)]);
+    return { kind: "remind", id: id, status: "failed", error: msg(err) };
+  }
+}
+
+// Sweep: send any reminder the button did not (for example if the page was closed).
+async function pendingReminders() {
+  const t = await db().query("select to_regclass('public.staff_reminders') is not null as ok");
+  if (!t.rows[0].ok) return [];
+  await db().query("update public.staff_reminders set status = 'pending' where status = 'sending' and created_at < now() - interval '15 minutes'");
+  const rows = await db().query("select id from public.staff_reminders where status = 'pending' and created_at < now() - interval '1 minute' order by id limit 30");
+  const out = [];
+  for (const r of rows.rows) out.push(await reminderEmail(r.id));
+  return out;
+}
+
+// ----------------------------------------------------------------------
 async function mail(o) {
   const rows = (o.rows || []).filter((r) => r[1] !== null && r[1] !== undefined && String(r[1]).trim() !== "");
   const steps = o.steps || [];
-  const text = rows.map((r) => r[0] + ": " + r[1]).join("\n") +
+  const sections = o.sections || [];
+  const text = (o.intro ? "Message from " + o.intro.from + ":\n" + o.intro.text + "\n\n" : "") +
+    sections.map((sec) => sec.heading.toUpperCase() + "\n" + sec.rows.map((r) => "- " + r[0] + ": " + r[1]).join("\n") + (sec.link ? "\n" + sec.link : "")).join("\n\n") +
+    (sections.length && rows.length ? "\n\n" : "") +
+    rows.map((r) => r[0] + ": " + r[1]).join("\n") +
     (steps.length ? "\n\nHow to sign in:\n" + steps.map((t, i) => (i + 1) + ". " + t).join("\n") : "") +
     (o.note ? "\n\n" + o.note : "") + (portal() && o.link ? "\n\n" + o.linkLabel + ": " + o.link : "");
   const html = '<div style="font-family:Arial,Helvetica,sans-serif;color:#1a222f;max-width:620px">' +
@@ -371,6 +447,14 @@ async function mail(o) {
     '<div style="font-size:13px;color:#a9ddd5">IAA Staff Portal · ' + esc(o.kicker) + "</div>" +
     '<div style="font-size:20px;font-weight:bold;margin-top:4px">' + esc(o.title) + "</div></div>" +
     '<div style="border:1px solid #c9e0db;border-top:0;padding:16px 20px;border-radius:0 0 8px 8px">' +
+    (o.intro ? '<div style="background:#eef6f4;border-left:4px solid #07766d;padding:10px 14px;margin:0 0 14px;font-size:14px">' +
+      '<div style="color:#4f6470;font-size:12px;margin-bottom:4px">Message from ' + esc(o.intro.from) + '</div>' +
+      '<div style="white-space:pre-wrap">' + esc(o.intro.text) + '</div></div>' : "") +
+    sections.map((sec) => '<p style="font-size:15px;font-weight:bold;margin:14px 0 4px">' + esc(sec.heading) + "</p>" +
+      '<table style="width:100%;border-collapse:collapse">' + sec.rows.map((r) =>
+        '<tr><td style="padding:5px 0;vertical-align:top;width:50%;font-size:14px;border-top:1px solid #e3eeeb">' + esc(r[0]) +
+        '</td><td style="padding:5px 0;vertical-align:top;font-size:14px;color:#4f6470;border-top:1px solid #e3eeeb">' + esc(r[1]) + "</td></tr>").join("") + "</table>" +
+      (sec.link ? '<p style="margin:4px 0 0;font-size:13px"><a href="' + esc(sec.link) + '" style="color:#07766d">Open in the portal</a></p>' : "")).join("") +
     '<table style="width:100%;border-collapse:collapse">' + rows.map((r) =>
       '<tr><td style="padding:6px 0;vertical-align:top;width:34%;color:#4f6470;font-size:14px">' + esc(r[0]) +
       '</td><td style="padding:6px 0;font-size:14px;white-space:pre-wrap">' + esc(r[1]) + "</td></tr>").join("") + "</table>" +
