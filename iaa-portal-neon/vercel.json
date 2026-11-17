@@ -49,7 +49,7 @@
   ],
   "functions": {
     "api/staff-notify.js": {
-      "includeFiles": "public/training-content.js"
+      "includeFiles": "public/{training-content,outstanding}.js"
     }
   }
 }
