@@ -9,12 +9,32 @@
 
   const P = window.IAARosterParse;
   let homeOffset = 0;          // days from today shown on Home
-  let pickedSheet = 0;         // tab on the Roster page
+  let pickedSheet = null;      // tab on the Roster page (null = the one with today, else the newest)
   let pickedBlock = null;      // half-month block on the Roster page
   let prepared = null;         // file being uploaded
   let notice = null;
 
+  // ------------------------------------------------------------------
+  // Shift rotation 5-5-4, Green / Orange. Blocks of 5, 5 and 4 days with the
+  // colours alternating, repeating every 28 days:
+  //   Green 5 · Orange 5 · Green 4 · Orange 5 · Green 5 · Orange 4
+  // The cycle starts on 28 November 2026 (1 December is day 4 of Green 5).
+  // ------------------------------------------------------------------
+  const ROTATION_START = "2026-11-28";
+  const ROTATION = [["green", 5], ["orange", 5], ["green", 4], ["orange", 5], ["green", 5], ["orange", 4]];
+  function rotation(isoDate) {
+    const ms = Date.UTC(+isoDate.slice(0, 4), +isoDate.slice(5, 7) - 1, +isoDate.slice(8, 10)) - Date.UTC(2026, 10, 28);
+    let day = Math.round(ms / 86400000) % 28; if (day < 0) day += 28;
+    for (const [colour, len] of ROTATION) { if (day < len) return colour; day -= len; }
+    return null;
+  }
+  const ROTATION_LABEL = { green: "Green", orange: "Orange" };
+  function rotationLegend(h) {
+    return h("p", { class: "rot-legend" }, h("span", { class: "rot-dot rot-green" }), "Green shift ", h("span", { class: "rot-dot rot-orange" }), "Orange shift (5-5-4)");
+  }
+
   window.IAARoster = { render: render, homePanel: homePanel };
+  window.IAARotation = { colour: rotation, label: ROTATION_LABEL, legend: rotationLegend, start: ROTATION_START };
 
   // ------------------------------------------------------------------
   function iso(d) {
@@ -117,7 +137,8 @@
     const mine = nameMatcher(ctx.state.profile);
     const label = homeOffset === 0 ? "Today" : homeOffset === 1 ? "Tomorrow" : homeOffset === -1 ? "Yesterday" : niceDate(date, { weekday: "long" });
 
-    const sheetsOut = (r.sheets || []).map(function (s) {
+    const lastOf = (s) => (s.blocks || []).reduce((m, b) => { const d = b.dates[b.dates.length - 1] || ""; return d > m ? d : m; }, "");
+    const sheetsOut = (r.sheets || []).slice().sort((a, b) => lastOf(b).localeCompare(lastOf(a))).map(function (s) {
       const entries = P.day(s.blocks || [], date);
       return h("div", { class: "roster-day-sheet" },
         h("h3", null, s.label || s.name),
@@ -142,7 +163,8 @@
       h("div", { class: "briefing-latest-head" },
         h("div", null,
           h("p", { class: "briefing-kicker" }, "Roster"),
-          h("h2", { id: "roster-h" }, `${label} · ${niceDate(date, { day: "numeric", month: "long" })}`)),
+          h("h2", { id: "roster-h" }, `${label} · ${niceDate(date, { day: "numeric", month: "long" })}`,
+            rotation(date) ? h("span", { class: "rot-chip rot-" + rotation(date) }, ROTATION_LABEL[rotation(date)] + " shift") : null)),
         h("div", { class: "row row-tight" },
           h("button", { class: "btn btn-quiet btn-small", type: "button", "aria-label": "Previous day", onclick: function () { homeOffset -= 1; rerender(); } }, "‹"),
           homeOffset !== 0 ? h("button", { class: "btn btn-quiet btn-small", type: "button", onclick: function () { homeOffset = 0; rerender(); } }, "Today") : null,
@@ -187,9 +209,15 @@
     if (!r || !(r.sheets || []).length) { fill(main, head, noticeBox(ctx)); return; }
 
     const sheets = r.sheets;
-    if (pickedSheet >= sheets.length) pickedSheet = 0;
-    const sheet = sheets[pickedSheet];
     const today = iso(new Date());
+    // Tabs newest first: by the latest date in each tab.
+    const lastDate = (s) => (s.blocks || []).reduce((m, b) => { const d = b.dates[b.dates.length - 1] || ""; return d > m ? d : m; }, "");
+    const tabOrder = sheets.map((s, i) => i).sort((a, b) => lastDate(sheets[b]).localeCompare(lastDate(sheets[a])));
+    if (pickedSheet === null || pickedSheet >= sheets.length) {
+      const withToday = sheets.findIndex((s) => (s.blocks || []).some((b) => b.dates.indexOf(today) !== -1));
+      pickedSheet = withToday !== -1 ? withToday : tabOrder[0];
+    }
+    const sheet = sheets[pickedSheet];
     const blocks = sheet.blocks || [];
     const newestFirst = blocks.map((b, i) => i).sort((a, b) => String(blocks[b].dates[0]).localeCompare(String(blocks[a].dates[0])));
     if (pickedBlock === null || pickedBlock >= blocks.length) {
@@ -200,8 +228,8 @@
     const mine = nameMatcher(state.profile);
 
     const tabs = sheets.length > 1
-      ? h("nav", { class: "tabs", "aria-label": "Roster tabs" }, sheets.map((s, i) =>
-          h("a", { href: "#/roster", "aria-current": i === pickedSheet ? "page" : null, onclick: function (e) { e.preventDefault(); pickedSheet = i; pickedBlock = null; showRoster(main, ctx); } }, s.label || s.name)))
+      ? h("nav", { class: "tabs", "aria-label": "Roster tabs" }, tabOrder.map((i) => { const s = sheets[i];
+          return h("a", { href: "#/roster", "aria-current": i === pickedSheet ? "page" : null, onclick: function (e) { e.preventDefault(); pickedSheet = i; pickedBlock = null; showRoster(main, ctx); } }, s.label || s.name); }))
       : null;
 
     const blockPicker = h("select", { id: "roster-block", onchange: function (e) { pickedBlock = parseInt(e.target.value, 10); showRoster(main, ctx); } },
@@ -231,7 +259,7 @@
       ? h("div", { class: "table-wrap roster-wrap" },
           h("table", { class: "roster-grid" },
             h("thead", null, h("tr", null, h("th", null, ""), block.dates.map((d) =>
-              h("th", { class: d === today ? "is-today" : null },
+              h("th", { class: ((d === today ? "is-today " : "") + (rotation(d) ? "rot-" + rotation(d) : "")).trim() || null, title: rotation(d) ? ROTATION_LABEL[rotation(d)] + " shift" : null },
                 h("span", { class: "sub" }, niceDate(d, { weekday: "short" })), niceDate(d, { day: "numeric" }))))),
             h("tbody", null, block.rows.map((row) =>
               h("tr", null, h("th", { scope: "row" }, row.label || "Notes"),
@@ -246,6 +274,7 @@
       h("div", { class: "row" }, h("div", { class: "field" }, h("label", { for: "roster-block" }, "Period"), blockPicker), r.file_name ? download : null),
       dlStatus,
       h("section", { class: "panel" }, table,
+        rotationLegend(h),
         h("p", { class: "fineprint" }, "Today is highlighted in teal; your own shifts are in bold. Crossed-out names are treated as cancelled.")));
   }
 

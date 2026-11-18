@@ -268,7 +268,8 @@
       days.map(function (d) {
         const box = h("input", { type: "checkbox", checked: sel.days.has(d), "aria-label": d, onchange: (e) => { e.target.checked ? sel.days.add(d) : sel.days.delete(d); } });
         dayBoxes[d] = box;
-        return h("label", { class: "re-cal-day" + (weekday(d) >= 5 ? " is-weekend" : "") + (d === iso(new Date()) ? " is-today" : "") }, box, h("span", null, String(dayNum(d))));
+        const rc = window.IAARotation ? window.IAARotation.colour(d) : null;
+        return h("label", { class: "re-cal-day" + (rc ? " rot-" + rc : "") + (d === iso(new Date()) ? " is-today" : ""), title: rc ? window.IAARotation.label[rc] + " shift" : null }, box, h("span", null, String(dayNum(d))));
       }));
     const setDays = (fn) => { days.forEach((d) => { const on = fn(d); dayBoxes[d].checked = on; on ? sel.days.add(d) : sel.days.delete(d); }); };
     const noteIn = h("input", { id: "re-note", type: "text", maxlength: 60, value: sel.note, placeholder: "Optional, e.g. until 1600", oninput: (e) => { sel.note = e.target.value; } });
@@ -316,8 +317,11 @@
           h("button", { class: "btn btn-quiet btn-small", type: "button", onclick: () => setDays(() => true) }, "All"),
           h("button", { class: "btn btn-quiet btn-small", type: "button", onclick: () => setDays((d) => weekday(d) < 5) }, "Weekdays"),
           h("button", { class: "btn btn-quiet btn-small", type: "button", onclick: () => setDays((d) => weekday(d) >= 5) }, "Weekends"),
+          window.IAARotation ? h("button", { class: "btn btn-quiet btn-small rot-btn rot-green", type: "button", onclick: () => setDays((d) => window.IAARotation.colour(d) === "green") }, "Green days") : null,
+          window.IAARotation ? h("button", { class: "btn btn-quiet btn-small rot-btn rot-orange", type: "button", onclick: () => setDays((d) => window.IAARotation.colour(d) === "orange") }, "Orange days") : null,
           h("button", { class: "btn btn-quiet btn-small", type: "button", onclick: () => setDays(() => false) }, "Clear")),
-        cal),
+        cal,
+        window.IAARotation ? window.IAARotation.legend(h) : null),
       h("div", { class: "row" }, addBtn, removeBtn),
       aStatus);
 
@@ -348,7 +352,7 @@
     // --- grid
     const order = dutyOrder(entries);
     const grid = (dates) => h("div", { class: "table-wrap roster-wrap" }, h("table", { class: "roster-grid re-grid" },
-      h("thead", null, h("tr", null, h("th", null, ""), dates.map((d) => h("th", { class: (d === iso(new Date()) ? "is-today " : "") + (weekday(d) >= 5 ? "is-weekend" : "") },
+      h("thead", null, h("tr", null, h("th", null, ""), dates.map((d) => h("th", { class: (d === iso(new Date()) ? "is-today " : "") + (window.IAARotation && window.IAARotation.colour(d) ? "rot-" + window.IAARotation.colour(d) : "") },
         h("span", { class: "sub" }, WEEKDAYS[weekday(d)]), String(dayNum(d)))))),
       h("tbody", null, order.map(function (duty) {
         const req = DUTIES.some((x) => x.key === duty && x.required);
