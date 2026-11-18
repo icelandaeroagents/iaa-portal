@@ -1,5 +1,6 @@
 /* Iceland Aero Agents – Staff Portal
-   Roster: management uploads the roster Excel file (e.g. Vaktir IAA.xlsx);
+   Roster: management builds the roster in the portal (roster-edit.js) or
+   uploads the roster Excel file (e.g. Vaktir IAA.xlsx);
    Home shows who is on for a day, and the Roster page shows the full
    half-month grid. Reading the file: roster-parse.js + SheetJS (vendor). */
 
@@ -166,6 +167,7 @@
   // ------------------------------------------------------------------
   async function render(main, ctx) {
     if (/^#\/roster\/upload/.test(location.hash) && ctx.state.profile.role === "management") return showUpload(main, ctx);
+    if (/^#\/roster\/edit/.test(location.hash) && ctx.state.profile.role === "management" && window.IAARosterEdit) return window.IAARosterEdit.render(main, ctx);
     return showRoster(main, ctx);
   }
 
@@ -177,8 +179,10 @@
 
     const head = h("div", { class: "page-head page-head-row" },
       h("div", null, h("h1", null, "Roster"),
-        h("p", null, r ? `From ${r.file_name || "the roster file"}, uploaded ${new Date(r.uploaded_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}.` : "No roster has been uploaded yet.")),
-      isManagement ? h("a", { class: "btn", href: "#/roster/upload" }, r ? "Upload new roster" : "Upload roster") : null);
+        h("p", null, r ? (r.file_name ? `From ${r.file_name}, uploaded` : "Published in the portal") + (r.uploaded_at && !isNaN(new Date(r.uploaded_at)) ? " " + new Date(r.uploaded_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "") + "." : "No roster has been published yet.")),
+      isManagement ? h("div", { class: "row row-tight" },
+        window.IAARosterEdit ? h("a", { class: "btn", href: "#/roster/edit" }, "Edit roster") : null,
+        h("a", { class: "btn btn-quiet", href: "#/roster/upload" }, "Upload Excel roster")) : null);
 
     if (!r || !(r.sheets || []).length) { fill(main, head, noticeBox(ctx)); return; }
 
@@ -187,9 +191,10 @@
     const sheet = sheets[pickedSheet];
     const today = iso(new Date());
     const blocks = sheet.blocks || [];
+    const newestFirst = blocks.map((b, i) => i).sort((a, b) => String(blocks[b].dates[0]).localeCompare(String(blocks[a].dates[0])));
     if (pickedBlock === null || pickedBlock >= blocks.length) {
-      pickedBlock = Math.max(0, blocks.findIndex((b) => b.dates.indexOf(today) !== -1));
-      if (pickedBlock === -1) pickedBlock = 0;
+      const withToday = blocks.findIndex((b) => b.dates.indexOf(today) !== -1);
+      pickedBlock = withToday !== -1 ? withToday : (newestFirst.length ? newestFirst[0] : 0);
     }
     const block = blocks[pickedBlock];
     const mine = nameMatcher(state.profile);
@@ -200,8 +205,8 @@
       : null;
 
     const blockPicker = h("select", { id: "roster-block", onchange: function (e) { pickedBlock = parseInt(e.target.value, 10); showRoster(main, ctx); } },
-      blocks.map((b, i) => h("option", { value: String(i), selected: i === pickedBlock },
-        `${niceDate(b.dates[0], { day: "numeric", month: "short" })} – ${niceDate(b.dates[b.dates.length - 1], { day: "numeric", month: "short", year: "numeric" })}`)));
+      newestFirst.map((i) => { const b = blocks[i]; return h("option", { value: String(i), selected: i === pickedBlock },
+        `${niceDate(b.dates[0], { day: "numeric", month: "short" })} – ${niceDate(b.dates[b.dates.length - 1], { day: "numeric", month: "short", year: "numeric" })}`); }));
 
     const dlStatus = h("p", { class: "status", role: "status" });
     const download = h("button", {
@@ -238,7 +243,7 @@
       : h("p", { class: "empty" }, "This tab has no dated roster.");
 
     fill(main, head, noticeBox(ctx), tabs,
-      h("div", { class: "row" }, h("div", { class: "field" }, h("label", { for: "roster-block" }, "Period"), blockPicker), download),
+      h("div", { class: "row" }, h("div", { class: "field" }, h("label", { for: "roster-block" }, "Period"), blockPicker), r.file_name ? download : null),
       dlStatus,
       h("section", { class: "panel" }, table,
         h("p", { class: "fineprint" }, "Today is highlighted in teal; your own shifts are in bold. Crossed-out names are treated as cancelled.")));
