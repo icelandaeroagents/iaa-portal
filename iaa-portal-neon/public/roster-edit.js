@@ -1,7 +1,8 @@
 /* Iceland Aero Agents – Staff Portal
    Roster editor (management): build the roster in the portal.
    – Pick a person, tick one or more duties and as many days as needed, Add.
-   – Shifts 0700-1900, 0800-2000, 0800-1500, 1100-2300, plus BIKF Resp,
+   – Shifts 0700-1900, 0800-1500, 0800-1800, 0800-2000, 1100-2300,
+     1700-2300, plus BIKF Resp,
      BIAR Resp and Management on duty (these three are needed every day).
    – Changes are a draft. "Publish changes" writes what staff see, in the
      same form as an uploaded Excel roster, so Home and the Roster page
@@ -12,9 +13,11 @@
 
   const DUTIES = [
     { key: "0700-1900", group: "Shifts" },
-    { key: "0800-2000", group: "Shifts" },
     { key: "0800-1500", group: "Shifts" },
+    { key: "0800-1800", group: "Shifts" },
+    { key: "0800-2000", group: "Shifts" },
     { key: "1100-2300", group: "Shifts" },
+    { key: "1700-2300", group: "Shifts" },
     { key: "BIKF Resp", group: "Responsible", required: true },
     { key: "BIAR Resp", group: "Responsible", required: true },
     { key: "Management on duty", group: "Responsible", required: true }
@@ -310,8 +313,8 @@
         h("div", { class: "field" }, h("label", { for: "re-person" }, "Person"), personSel),
         h("div", { class: "field" }, h("label", { for: "re-note" }, "Note"), noteIn)),
       h("fieldset", { class: "re-duties" }, h("legend", null, "Shifts and duties"),
-        h("div", { class: "re-duty-group" }, h("span", { class: "sub" }, "Shifts"), dutyBoxes.slice(0, 4)),
-        h("div", { class: "re-duty-group" }, h("span", { class: "sub" }, "Responsible"), dutyBoxes.slice(4))),
+        h("div", { class: "re-duty-group" }, h("span", { class: "sub" }, "Shifts"), dutyBoxes.filter((b, i) => DUTIES[i].group === "Shifts")),
+        h("div", { class: "re-duty-group" }, h("span", { class: "sub" }, "Responsible"), dutyBoxes.filter((b, i) => DUTIES[i].group !== "Shifts"))),
       h("fieldset", { class: "re-days" }, h("legend", null, `Days in ${monthName(month)}`),
         h("div", { class: "row row-tight" },
           h("button", { class: "btn btn-quiet btn-small", type: "button", onclick: () => setDays(() => true) }, "All"),
