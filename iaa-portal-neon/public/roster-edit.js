@@ -1,8 +1,8 @@
 /* Iceland Aero Agents – Staff Portal
    Roster editor (management): build the roster in the portal.
    – Pick a person, tick one or more duties and as many days as needed, Add.
-   – Shifts 0700-1900, 0800-1500, 0800-1800, 0800-2000, 1100-2300,
-     1700-2300, plus BIKF Resp,
+   – Shifts 0630-1830, 0700-1500, 0700-1900, 0800-1500, 0800-1800,
+     0800-2000, 1100-2300, 1700-2300, plus BIKF Resp,
      BIAR Resp and Management on duty (these three are needed every day).
    – Changes are a draft. "Publish changes" writes what staff see, in the
      same form as an uploaded Excel roster, so Home and the Roster page
@@ -12,6 +12,8 @@
   "use strict";
 
   const DUTIES = [
+    { key: "0630-1830", group: "Shifts" },
+    { key: "0700-1500", group: "Shifts" },
     { key: "0700-1900", group: "Shifts" },
     { key: "0800-1500", group: "Shifts" },
     { key: "0800-1800", group: "Shifts" },
@@ -71,10 +73,16 @@
   // ------------------------------------------------------------------
   // Publishing: the roster staff see, in the uploaded-roster format
   // ------------------------------------------------------------------
+  // Shifts in order of start time (then end time), then any other rows,
+  // then BIKF Resp, BIAR Resp and Management on duty at the bottom.
+  const LAST = ["BIKF Resp", "BIAR Resp", "Management on duty"];
+  function isShift(k) { return /^\d{4}-\d{4}$/.test(k); }
   function dutyOrder(entries) {
-    const keys = DUTIES.map((d) => d.key);
-    entries.forEach((e) => { if (keys.indexOf(e.duty) === -1) keys.push(e.duty); });
-    return keys;
+    const all = DUTIES.map((d) => d.key);
+    entries.forEach((e) => { if (all.indexOf(e.duty) === -1) all.push(e.duty); });
+    const shifts = all.filter(isShift).sort();
+    const other = all.filter((k) => !isShift(k) && LAST.indexOf(k) === -1).sort();
+    return shifts.concat(other, LAST);
   }
   function buildSheets(months, entries, names) {
     const order = dutyOrder(entries);
@@ -127,7 +135,8 @@
     if (shift) return shift.key;
     if (/bikf/.test(t)) return "BIKF Resp";
     if (/biar/.test(t)) return "BIAR Resp";
-    if (/manag|stjorn|duty manager/.test(t)) return "Management on duty";
+    if (/manag|stjorn|duty manager|go ?to ?boss/.test(t)) return "Management on duty";
+    if (digits.length === 8) return digits.slice(0, 4) + "-" + digits.slice(4);
     return label ? String(label).trim().slice(0, 40) : null;
   }
   function personMatcher(people) {
@@ -313,7 +322,7 @@
         h("div", { class: "field" }, h("label", { for: "re-person" }, "Person"), personSel),
         h("div", { class: "field" }, h("label", { for: "re-note" }, "Note"), noteIn)),
       h("fieldset", { class: "re-duties" }, h("legend", null, "Shifts and duties"),
-        h("div", { class: "re-duty-group" }, h("span", { class: "sub" }, "Shifts"), dutyBoxes.filter((b, i) => DUTIES[i].group === "Shifts")),
+        h("div", { class: "re-duty-group" }, h("span", { class: "sub" }, "Shifts"), DUTIES.map((d, i) => [d.key, dutyBoxes[i]]).filter((x) => isShift(x[0])).sort((a, b) => a[0].localeCompare(b[0])).map((x) => x[1])),
         h("div", { class: "re-duty-group" }, h("span", { class: "sub" }, "Responsible"), dutyBoxes.filter((b, i) => DUTIES[i].group !== "Shifts"))),
       h("fieldset", { class: "re-days" }, h("legend", null, `Days in ${monthName(month)}`),
         h("div", { class: "row row-tight" },
