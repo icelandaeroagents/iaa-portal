@@ -6,7 +6,7 @@
   "use strict";
 
   const W = 480, H = 640;           // every game draws on a 480 × 640 area, scaled to fit
-  const MAX_SCORE = 999;
+  const MAX_SCORE = 99999;
   const FONT = "Barlow, 'Segoe UI', sans-serif";
 
   let stopCurrent = null;            // stops the running game when the page changes
@@ -167,7 +167,7 @@
     { id: "flight", icon: "✈️", title: "Flight", blurb: "Fly through the gaps between the storm clouds and the mountains.", play: flightGame },
     { id: "crosswind", icon: "🌬️", title: "Crosswind Landing", blurb: "Five approaches to runway 13 at BIRK – the wind gets stronger each time.", play: crosswindGame },
     { id: "marshal", icon: "🦺", title: "Marshal Me In", blurb: "Give the right signals to park each jet on the stop line.", play: marshalGame },
-    { id: "apron", icon: "🅿️", title: "Apron Tetris", blurb: "Park every arriving jet nose-in on a busy apron until it’s full.", play: apronGame }
+    { id: "apron", icon: "🅿️", title: "Apron Tetris", blurb: "Jets keep arriving and leaving – park them nose-in before three divert to BIKF.", play: apronGame }
   ];
 
   async function render(main, ctx) {
@@ -550,33 +550,39 @@
   }
 
   // ==================================================================
-  // 4. Apron Tetris – park arriving jets nose-in on the taxi lanes
+  // 4. Apron Tetris – an endless, busy apron
+  //    Jets arrive on a timer and wait in holding (up to 3). Park each one
+  //    nose-in against a taxi lane. Parked jets leave when their stay runs
+  //    out. A fourth jet in holding diverts to BIKF – three diversions end it.
   // ==================================================================
   function apronGame(main, ctx, def) {
     const { h } = ctx;
     const COLS = 20, ROWS = 21, CELL = 24, TOP = 70;      // grid 20 × 21 cells of 5 m, starting 70 px down
     const LANES = [10, 20];                               // taxi lane rows
-    // Types: length and span in 5 m cells (odd spans keep the fuselage centred). Points by size.
+    const HOLD_MAX = 3, DIVERT_MAX = 3;
+    // Length and span in 5 m cells (odd spans keep the fuselage centred), points, how common, stay in seconds.
     const TYPES = [
-      { name: "Phenom 300", L: 3, S: 3, pts: 10, w: 3 },
-      { name: "Citation CJ3", L: 3, S: 3, pts: 10, w: 3 },
-      { name: "Challenger 350", L: 4, S: 5, pts: 15, w: 3 },
-      { name: "Falcon 7X", L: 5, S: 5, pts: 20, w: 2 },
-      { name: "Gulfstream G650", L: 6, S: 7, pts: 25, w: 2 },
-      { name: "Global 7500", L: 7, S: 7, pts: 30, w: 1 }
+      { name: "Phenom 300", L: 3, S: 3, pts: 10, w: 3, stay: [16, 26] },
+      { name: "Citation CJ3", L: 3, S: 3, pts: 10, w: 3, stay: [16, 26] },
+      { name: "Challenger 350", L: 4, S: 5, pts: 15, w: 3, stay: [20, 32] },
+      { name: "Falcon 7X", L: 5, S: 5, pts: 20, w: 2, stay: [24, 38] },
+      { name: "Gulfstream G650", L: 6, S: 7, pts: 25, w: 2, stay: [28, 44] },
+      { name: "Global 7500", L: 7, S: 7, pts: 30, w: 1, stay: [32, 50] }
     ];
-    const cv = makeCanvas(h, "Apron Tetris. Click or tap a spot next to a taxi lane to park the jet.");
+    const cv = makeCanvas(h, "Apron Tetris. Click or tap a spot next to a taxi lane to park the first jet in holding.");
     const { canvas, g } = cv;
     const flip = h("button", { class: "btn btn-quiet game-pad", type: "button" }, "↕ Face the other lane");
     const { board, status } = shell(main, ctx, def,
-      "Park every arriving jet nose-in against a yellow taxi lane, so it can taxi out. Click or tap where you want it – it snaps to the nearest lane – and fit wings and tails together. When the next jet won’t fit anywhere, the apron is full.",
+      "Jets keep arriving. Park each one nose-in against a yellow taxi lane – click or tap, it snaps to the nearest lane. Parked jets leave when their timer runs out. Up to three can hold; a fourth diverts to BIKF, and three diversions end your shift. +5 for parking tight against another jet, +10 for clearing a queue.",
       canvas, h("div", { class: "game-pads" }, flip));
     cv.size(); window.addEventListener("resize", cv.size);
 
-    let grid, parkedList, queue, score, mode = "ready", hover = null, t = 0, msgAt = 0;
+    let grid, parked, holding, score, diverted, mode = "ready", hover = null, t = 0, msgAt = 0, nextIn = 0, arrivals = 0, flash = null;
+    let flipped = false;
     function pick() { const tot = TYPES.reduce((a, b) => a + b.w, 0); let r = Math.random() * tot; for (const ty of TYPES) { if ((r -= ty.w) < 0) return ty; } return TYPES[0]; }
     function reg() { const L = "ABCDEFGHIJKLMNOPRSTUVY"; return "TF-" + Array.from({ length: 3 }, () => L[Math.floor(Math.random() * L.length)]).join(""); }
-    // Cells of a jet with its nose at (0,0), nose pointing up (dir −1) or down (dir +1).
+    // Arrivals speed up from one every 6 s to one every 3 s (after about 50 jets).
+    const interval = () => Math.max(3, 6 - arrivals * 0.06);
     function shape(ty, dir) {
       const c = (ty.S - 1) / 2, cells = [], wingRow = Math.max(1, Math.floor(ty.L * 0.4));
       for (let r = 0; r < ty.L; r++) cells.push([0, r]);
@@ -585,14 +591,12 @@
       if (ty.S >= 5) { cells.push([-1, ty.L - 1]); cells.push([1, ty.L - 1]); }
       return cells.map(([dx, r]) => [dx, dir < 0 ? r : -r]);
     }
-    // Stand positions: nose row next to a lane – (row, dir). Nose up sits below a lane, nose down above it.
     const EDGES = [{ row: 9, dir: 1 }, { row: 11, dir: -1 }, { row: 19, dir: 1 }];
     function cellsAt(ty, col, edge) { return shape(ty, edge.dir).map(([dx, dr]) => [col + dx, edge.row + dr]); }
     function fits(cells) { return cells.every(([c, r]) => c >= 0 && c < COLS && r >= 0 && r < ROWS && LANES.indexOf(r) === -1 && !grid[r][c]); }
-    function anyFit(ty) { return EDGES.some((e) => { for (let c = 0; c < COLS; c++) if (fits(cellsAt(ty, c, e))) return true; return false; }); }
-    function start() {
-      grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
-      parkedList = []; queue = [pick(), pick(), pick()]; score = 0; mode = "play"; ctx.setStatus(status, "");
+    function tight(cells, id) {
+      return cells.some(([c, r]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dc, dr]) => {
+        const cc = c + dc, rr = r + dr; return rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && grid[rr][cc] && grid[rr][cc] !== id; }));
     }
     function nearestEdge(p) {
       const row = (p.y - TOP) / CELL;
@@ -601,19 +605,40 @@
       if (flipped && best.row === 11) best = EDGES[2]; else if (flipped && best.row === 19) best = EDGES[1];
       return best;
     }
-    let flipped = false;
     flip.addEventListener("click", () => { flipped = !flipped; });
+    function start() {
+      grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+      parked = []; holding = [pick()]; score = 0; diverted = 0; arrivals = 1; nextIn = interval(); flash = null;
+      mode = "play"; ctx.setStatus(status, "");
+    }
+    function arrive() {
+      arrivals++;
+      holding.push(pick());
+      if (holding.length > HOLD_MAX) {
+        const gone = holding.pop(); diverted++;
+        flash = { text: `${gone.name} diverted to BIKF (${diverted}/${DIVERT_MAX})`, at: t, bad: true };
+        if (diverted >= DIVERT_MAX) { mode = "over"; msgAt = t; finish(ctx, def, board, status, score); }
+      }
+    }
+    let nextId = 1;
     function place(p) {
       if (mode === "ready") { start(); return; }
       if (mode === "over") { if (t - msgAt > 0.8) mode = "ready"; return; }
-      const ty = queue[0], col = Math.floor(p.x / CELL), edge = nearestEdge(p), cells = cellsAt(ty, col, edge);
-      if (!fits(cells)) { ctx.setStatus(status, `The ${ty.name} doesn’t fit there.`, true); return; }
-      const id = parkedList.length + 1;
+      if (!holding.length) return;
+      const ty = holding[0], col = Math.floor(p.x / CELL), edge = nearestEdge(p), cells = cellsAt(ty, col, edge);
+      if (!fits(cells)) { flash = { text: `The ${ty.name} doesn’t fit there`, at: t, bad: true }; return; }
+      const id = nextId++, waiting = holding.length;
+      const isTight = tight(cells, id);
       cells.forEach(([c, r]) => { grid[r][c] = id; });
-      parkedList.push({ ty, col, edge, reg: reg() });
-      score += ty.pts; queue.shift(); queue.push(pick()); flipped = false;
-      ctx.setStatus(status, `${ty.name} parked (+${ty.pts}).`);
-      if (!anyFit(queue[0])) { mode = "over"; msgAt = t; finish(ctx, def, board, status, score); }
+      const stay = ty.stay[0] + Math.random() * (ty.stay[1] - ty.stay[0]);
+      parked.push({ id, ty, col, edge, cells, reg: reg(), left: stay, stay, leaving: 0 });
+      holding.shift(); flipped = false;
+      let gain = ty.pts, extra = [];
+      if (isTight) { gain += 5; extra.push("tight +5"); }
+      if (waiting >= 2 && holding.length === 0) { gain += 10; extra.push("queue cleared +10"); }
+      score += gain;
+      flash = { text: `${ty.name} parked +${gain}` + (extra.length ? ` (${extra.join(", ")})` : ""), at: t, bad: false };
+      if (!holding.length) nextIn = Math.min(nextIn, 1.2);   // nothing waiting: the next one comes soon
     }
     canvas.addEventListener("pointermove", (e) => { hover = cv.point(e); });
     canvas.addEventListener("pointerleave", () => { hover = null; });
@@ -623,11 +648,11 @@
       if (e.code === "Space" && mode !== "play") { place({ x: W / 2, y: H / 2 }); return true; }
     });
 
-    function jetCells(ty, col, edge, ghost, ok, regText) {
-      // draw the aircraft over its cells as a smooth top-down silhouette
+    function jetShape(ty, col, edge, ghost, ok, alpha) {
       const cx = col * CELL + CELL / 2, ny = TOP + edge.row * CELL + CELL / 2, len = ty.L * CELL, span = ty.S * CELL;
-      g.save(); g.translate(cx, ny + (edge.dir < 0 ? len / 2 - CELL / 2 : -(len / 2 - CELL / 2))); if (edge.dir > 0) g.rotate(Math.PI);
-      g.globalAlpha = ghost ? 0.6 : 1;
+      const midY = ny + (edge.dir < 0 ? len / 2 - CELL / 2 : -(len / 2 - CELL / 2));
+      g.save(); g.translate(cx, midY); if (edge.dir > 0) g.rotate(Math.PI);
+      g.globalAlpha = ghost ? 0.6 : (alpha == null ? 1 : alpha);
       const body = ghost ? (ok ? "#c9f2ea" : "#f6c1bc") : "#f4f7f9", wing = ghost ? (ok ? "#9fdcd2" : "#eaa29b") : "#dce3e8";
       const wr = -len / 2 + Math.max(1, Math.floor(ty.L * 0.4)) * CELL;
       g.fillStyle = wing;
@@ -637,19 +662,30 @@
       g.fillStyle = body; g.beginPath(); g.ellipse(0, 0, CELL * 0.32, len / 2 - 1, 0, 0, Math.PI * 2); g.fill();
       if (!ghost) { g.fillStyle = "#088f83"; g.fillRect(-1.5, len / 2 - CELL * 0.8, 3, CELL * 0.7); g.fillStyle = "#1a222f"; g.fillRect(-3, -len / 2 + 6, 6, 3); }
       g.restore();
-      if (regText && !ghost) { g.fillStyle = "#1a222f"; g.font = `600 9px ${FONT}`; g.textAlign = "center"; g.fillText(regText, cx, ny + (edge.dir < 0 ? len - CELL * 0.2 : -len + CELL * 1.2)); }
+      return { cx, midY };
+    }
+    // Stay timer on a parked jet: a ring that empties, amber in the last 5 seconds.
+    function timer(cx, cy, left, stay) {
+      const r = 11, soon = left <= 5;
+      g.fillStyle = "rgba(26,34,47,0.85)"; g.beginPath(); g.arc(cx, cy, r + 2, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = soon ? "#f2a33a" : "#5fd0c3"; g.lineWidth = 3;
+      g.beginPath(); g.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, left / stay)); g.stroke();
+      g.fillStyle = "#ffffff"; g.font = `700 10px ${FONT}`; g.textAlign = "center"; g.fillText(String(Math.ceil(left)), cx, cy + 3.5);
     }
     function draw() {
       g.fillStyle = "#263449"; g.fillRect(0, 0, W, H);
-      // FBO building and header
+      // header: score, diversions, next arrival
       g.fillStyle = "#31415a"; g.fillRect(0, 0, W, TOP - 8);
-      g.fillStyle = "#5fd0c3"; g.font = `700 18px ${FONT}`; g.textAlign = "left"; g.fillText("IAA FBO · apron", 14, 26);
-      g.fillStyle = "#ffffff"; g.font = `600 14px ${FONT}`;
-      g.fillText(mode === "play" ? `Now: ${queue[0].name} (+${queue[0].pts})` : "", 14, 50);
-      g.textAlign = "right"; g.fillStyle = "#a9ddd5"; g.font = `500 13px ${FONT}`;
-      g.fillText(mode === "play" ? `Next: ${queue[1].name}, ${queue[2].name}` : "", W - 14, 50);
-      g.fillStyle = "#ffffff"; g.font = `700 22px ${FONT}`; g.fillText(String(score || 0), W - 14, 28);
-      // apron concrete, lanes and stand lines
+      g.textAlign = "left"; g.fillStyle = "#5fd0c3"; g.font = `700 17px ${FONT}`; g.fillText("IAA FBO · apron", 14, 24);
+      g.textAlign = "right"; g.fillStyle = "#ffffff"; g.font = `700 22px ${FONT}`; g.fillText(String(score || 0), W - 14, 26);
+      if (mode === "play" || mode === "over") {
+        g.textAlign = "left"; g.font = `500 13px ${FONT}`; g.fillStyle = "#a9ddd5"; g.fillText("Next arrival", 14, 48);
+        g.fillStyle = "#1a222f"; g.fillRect(92, 39, 150, 10);
+        g.fillStyle = "#5fd0c3"; g.fillRect(92, 39, 150 * Math.max(0, 1 - nextIn / interval()), 10);
+        g.textAlign = "right"; g.fillStyle = "#ffffff"; g.font = `600 13px ${FONT}`; g.fillText("Diverted", W - 76, 48);
+        for (let i = 0; i < DIVERT_MAX; i++) { g.fillStyle = i < diverted ? "#e5484d" : "#3a4b66"; g.beginPath(); g.arc(W - 60 + i * 18, 44, 6, 0, Math.PI * 2); g.fill(); }
+      }
+      // apron, lanes
       g.fillStyle = "#9aa3ab"; g.fillRect(0, TOP, W, ROWS * CELL);
       g.strokeStyle = "rgba(255,255,255,0.18)"; g.lineWidth = 1;
       for (let r = 0; r <= ROWS; r++) { g.beginPath(); g.moveTo(0, TOP + r * CELL); g.lineTo(W, TOP + r * CELL); g.stroke(); }
@@ -658,18 +694,55 @@
         g.fillStyle = "#3a4048"; g.fillRect(0, TOP + r * CELL, W, CELL);
         g.fillStyle = "#f2c200"; for (let x = 0; x < W; x += 28) g.fillRect(x, TOP + r * CELL + CELL / 2 - 1.5, 16, 3);
       });
-      // parked jets
-      if (parkedList) parkedList.forEach((p) => jetCells(p.ty, p.col, p.edge, false, true, p.reg));
-      // ghost of the next jet under the pointer
-      if (mode === "play" && hover && hover.y > TOP) {
-        const ty = queue[0], col = Math.floor(hover.x / CELL), edge = nearestEdge(hover), cells = cellsAt(ty, col, edge), ok = fits(cells);
-        jetCells(ty, col, edge, true, ok);
+      // parked jets with their stay timers (departing jets fade out)
+      if (parked) parked.forEach((p) => {
+        const pos = jetShape(p.ty, p.col, p.edge, false, true, p.leaving ? Math.max(0, 1 - p.leaving / 0.8) : 1);
+        if (!p.leaving) {
+          timer(pos.cx, pos.midY, p.left, p.stay);
+          g.fillStyle = "#1a222f"; g.font = `600 9px ${FONT}`; g.textAlign = "center";
+          g.fillText(p.reg, pos.cx, p.edge.dir < 0 ? pos.midY + p.ty.L * CELL / 2 + 2 : pos.midY - p.ty.L * CELL / 2 + 8);
+        }
+      });
+      // ghost of the first jet in holding under the pointer
+      if (mode === "play" && hover && hover.y > TOP && hover.y < TOP + ROWS * CELL && holding.length) {
+        const ty = holding[0], col = Math.floor(hover.x / CELL), edge = nearestEdge(hover);
+        jetShape(ty, col, edge, true, fits(cellsAt(ty, col, edge)));
       }
-      if (mode === "ready") overlay(g, "Apron Tetris", ["Park each jet nose-in against a taxi lane", "Click or tap where it should go", "Tap or press Space to open the apron"]);
-      if (mode === "over") overlay(g, "Apron full!", [`The ${queue[0].name} has to divert to BIKF`, `${parkedList.length} jets parked · ${score} points`, "Tap or press Space to play again"]);
+      // holding queue along the bottom
+      const by = TOP + ROWS * CELL + 8;
+      g.textAlign = "left"; g.fillStyle = "#a9ddd5"; g.font = `600 13px ${FONT}`; g.fillText("Holding", 14, by + 20);
+      for (let i = 0; i < HOLD_MAX; i++) {
+        const x = 76 + i * 134, ty = holding && holding[i];
+        g.fillStyle = i === 0 && ty ? "#088f83" : "#31415a"; g.fillRect(x, by + 4, 126, 26);
+        g.fillStyle = ty ? "#ffffff" : "#6b7c92"; g.font = `${i === 0 ? 700 : 500} 12px ${FONT}`;
+        g.fillText(ty ? `${i === 0 ? "▶ " : ""}${ty.name}` : "—", x + 8, by + 21);
+      }
+      if (flash && t - flash.at < 2.2) {
+        g.globalAlpha = Math.min(1, 2.2 - (t - flash.at));
+        g.fillStyle = flash.bad ? "rgba(229,72,77,0.92)" : "rgba(8,143,131,0.92)";
+        g.font = `600 14px ${FONT}`; const tw = g.measureText(flash.text).width + 24;
+        g.fillRect(W / 2 - tw / 2, TOP + 10 * CELL - 4, tw, 32);
+        g.fillStyle = "#ffffff"; g.textAlign = "center"; g.fillText(flash.text, W / 2, TOP + 10 * CELL + 17);
+        g.globalAlpha = 1;
+      }
+      if (mode === "ready") overlay(g, "Apron Tetris", ["Jets keep arriving – park them nose-in", "Parked jets leave when their timer runs out", "3 diversions to BIKF end your shift", "Tap or press Space to open the apron"]);
+      if (mode === "over") overlay(g, "Shift over!", [`Three jets diverted to BIKF`, `${nextId - 1} jets parked · ${score} points`, "Tap or press Space to play again"]);
     }
 
-    stopCurrent = startLoop(canvas, function (dt) { t += dt; draw(); }, () => { unkeys(); window.removeEventListener("resize", cv.size); });
+    stopCurrent = startLoop(canvas, function (dt) {
+      t += dt;
+      if (mode === "play") {
+        nextIn -= dt;
+        if (nextIn <= 0) { arrive(); nextIn = interval(); }
+        parked.forEach((p) => {
+          if (p.leaving) { p.leaving += dt; return; }
+          p.left -= dt;
+          if (p.left <= 0) { p.leaving = 0.001; p.cells.forEach(([c, r]) => { if (grid[r][c] === p.id) grid[r][c] = null; }); }
+        });
+        parked = parked.filter((p) => !p.leaving || p.leaving < 0.8);
+      }
+      draw();
+    }, () => { unkeys(); window.removeEventListener("resize", cv.size); });
   }
 
   window.IAAGame = { render: render };
