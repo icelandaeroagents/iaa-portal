@@ -11,8 +11,13 @@
      winter modules each 1 October), the person gets one email listing it
    – reminders from management: one email listing everything the person
      has outstanding (training, policies, passes, practical sign-offs)
+   – new briefings: one email to everyone with a link to read and confirm
+     (only briefings dated within the last 10 days, each emailed once)
+   – contracts: the owner is emailed 60 and 30 days before the date notice
+     must be given (or the contract ends), and before the date notice of each
+     annual price review must reach the carrier
 
-   POST /api/staff-notify  { "kind": "leave" | "service" | "remind", "id": 12 }
+   POST /api/staff-notify  { "kind": "leave" | "service" | "remind" | "briefing", "id": 12 }
                            { "kind": "invite", "email": "name@gmail.com" }
    GET  /api/staff-notify  – Vercel every 10 minutes: sends anything missed
                              and any expiry reminders that are due
@@ -74,10 +79,11 @@ module.exports = async function handler(req, res) {
         return send(res, 200, { results: [await inviteEmail(email)] });
       }
       const id = parseInt(body.id, 10);
-      if (!id || ["leave", "service", "remind"].indexOf(body.kind) === -1) return send(res, 400, { error: "kind and id needed" });
+      if (!id || ["leave", "service", "remind", "briefing"].indexOf(body.kind) === -1) return send(res, 400, { error: "kind and id needed" });
       const results = body.kind === "leave"
         ? [await leaveRequestEmail(id), await leaveDecisionEmail(id)]
         : body.kind === "remind" ? [await reminderEmail(id)]
+        : body.kind === "briefing" ? [await briefingEmail(id)]
         : [await serviceEmail(id)];
       return send(res, 200, { results: results });
     }
@@ -99,6 +105,9 @@ module.exports = async function handler(req, res) {
           order by id limit 20`);
       for (const r of service.rows) results.push(await serviceEmail(r.id));
       results.push.apply(results, await pendingReminders());
+      results.push.apply(results, await pendingBriefings());
+      results.push.apply(results, await contractReminders());
+      results.push.apply(results, await priceReviewReminders());
       results.push.apply(results, await expiryReminders());
       results.push.apply(results, await trainingReminders());
       const invites = await db().query(
@@ -432,12 +441,173 @@ async function pendingReminders() {
 }
 
 // ----------------------------------------------------------------------
+// New briefings: one email to everyone with an active portal account.
+// Each briefing is emailed once. Only briefings dated within the last
+// 10 days are emailed, so uploading back issues sends nothing.
+async function briefingEmail(id) {
+  const t = await db().query("select to_regclass('public.briefings') is not null and exists (select 1 from information_schema.columns where table_name = 'briefings' and column_name = 'emailed_at') as ok");
+  if (!t.rows[0].ok) return { kind: "briefing", id: id, status: "skipped – database update 34 not run" };
+  const claim = await db().query(
+    "update public.briefings set emailed_at = now(), email_note = null where id = $1 and emailed_at is null " +
+    "returning id, issue_no, issue_date::text as issue_date, title, sections", [id]);
+  if (!claim.rows.length) return { kind: "briefing", id: id, status: "skipped – already emailed" };
+  const b = claim.rows[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Atlantic/Reykjavik" });
+  const tenAgo = new Date(Date.parse(today + "T12:00:00Z") - 10 * 86400000).toISOString().slice(0, 10);
+  if (b.issue_date < tenAgo) {
+    await db().query("update public.briefings set email_note = 'Older than 10 days – not emailed' where id = $1", [id]);
+    return { kind: "briefing", id: id, issue: b.issue_no, status: "not emailed – older than 10 days" };
+  }
+  try {
+    const people = await db().query("select email from public.profiles where active and email is not null and email <> ''");
+    const emails = Array.from(new Set(people.rows.map((p) => String(p.email).trim().toLowerCase()).filter(Boolean)));
+    if (!emails.length) throw new Error("No active staff to email");
+    const link = portal() + "/#/briefings/" + b.issue_no;
+    const sections = (b.sections || []).filter(Boolean);
+    const from = process.env.SMTP_FROM || process.env.SMTP_USER || "no-reply@iaa.is";
+    const fromAddr = (String(from).match(/<([^>]+)>/) || [null, from])[1];
+    // Everyone as blind copies, in groups, so nobody sees the whole list.
+    for (let i = 0; i < emails.length; i += 45) {
+      await mail({
+        to: [fromAddr], bcc: emails.slice(i, i + 45),
+        subject: `New briefing: #${b.issue_no} ${b.title || "IAA Briefing"}`,
+        kicker: "Briefing #" + b.issue_no + " · " + new Date(b.issue_date + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }),
+        title: b.title || "IAA Briefing",
+        sections: sections.length ? [{ heading: "In this issue", rows: sections.slice(0, 12).map((x) => [x, ""]) }] : [],
+        note: "Please read it in the staff portal, then select “I’ve read this briefing” at the end so management knows you have seen it.",
+        link: link, linkLabel: "Read and confirm"
+      });
+    }
+    await db().query("update public.briefings set email_note = $2 where id = $1", [id, "Emailed to " + emails.length + " people"]);
+    return { kind: "briefing", id: id, issue: b.issue_no, status: "sent", to: emails.length };
+  } catch (err) {
+    // Let the 10-minute sweep try again.
+    await db().query("update public.briefings set emailed_at = null, email_note = $2 where id = $1", [id, "Failed: " + msg(err)]);
+    return { kind: "briefing", id: id, status: "failed", error: msg(err) };
+  }
+}
+
+async function pendingBriefings() {
+  const t = await db().query("select exists (select 1 from information_schema.columns where table_name = 'briefings' and column_name = 'emailed_at') as ok");
+  if (!t.rows[0].ok) return [];
+  const rows = await db().query("select id from public.briefings where emailed_at is null and published_at < now() - interval '2 minutes' order by issue_no limit 5");
+  const out = [];
+  for (const r of rows.rows) out.push(await briefingEmail(r.id));
+  return out;
+}
+
+// Contracts: the owner (or all management, if there is no owner) is emailed
+// 60 and 30 days before the date notice must be given – the end date less the
+// notice period – and once if that date has already passed.
+async function contractReminders() {
+  const t = await db().query("select to_regclass('public.contracts') is not null as ok");
+  if (!t.rows[0].ok) return [];
+  const rows = await db().query(
+    "select c.*, c.end_date::text as end_txt, (c.end_date - coalesce(c.notice_days, 0))::text as act_txt, " +
+    "(c.end_date - coalesce(c.notice_days, 0)) - (now() at time zone 'Atlantic/Reykjavik')::date as days_left, " +
+    "p.email as owner_email, p.full_name as owner_name " +
+    "from public.contracts c left join public.profiles p on p.id = c.owner_id and p.active " +
+    "where c.status = 'active' and c.end_date is not null and c.end_date > (now() at time zone 'Atlantic/Reykjavik')::date - 60 " +
+    "and ((c.reminded_30_at is null and (c.end_date - coalesce(c.notice_days, 0)) - (now() at time zone 'Atlantic/Reykjavik')::date <= 30) " +
+    "  or (c.reminded_60_at is null and (c.end_date - coalesce(c.notice_days, 0)) - (now() at time zone 'Atlantic/Reykjavik')::date <= 60))");
+  if (!rows.rows.length) return [];
+  const mgmt = await db().query("select email from public.profiles where role = 'management' and active");
+  const out = [];
+  const nice = (d) => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  for (const c of rows.rows) {
+    const days = Number(c.days_left);
+    const which = days <= 30 ? "30" : "60";
+    const to = c.owner_email ? [c.owner_email] : mgmt.rows.map((r) => r.email);
+    if (!to.length) continue;
+    const what = c.auto_renews ? "renews automatically unless notice is given" : c.kind === "licence" ? "expires – apply for renewal" : "ends";
+    const when = days < 0 ? `was due ${nice(c.act_txt)}` : days === 0 ? "is due today" : `is due by ${nice(c.act_txt)} (${days} ${days === 1 ? "day" : "days"})`;
+    try {
+      await mail({
+        to: to,
+        subject: `Contract: action ${days < 0 ? "overdue" : "due"} – ${c.title || c.counterparty}`,
+        kicker: "Contracts tracker",
+        title: `${c.title || c.counterparty}: action ${when}`,
+        rows: [
+          ["Counterparty", c.counterparty],
+          ["What happens", `${c.auto_renews ? "Renews" : "Ends"} on ${nice(c.end_txt)}` + (c.notice_days ? `, notice period ${c.notice_days} days` : "")],
+          ["Action", what.charAt(0).toUpperCase() + what.slice(1)],
+          c.reference ? ["Reference", c.reference] : null,
+          c.notes ? ["Notes", c.notes] : null
+        ].filter(Boolean),
+        note: "Update the contract in Management → Contracts once it is renewed, ended or replaced – a new end date restarts these reminders.",
+        link: portal() + "/#/management", linkLabel: "Open the contracts tracker"
+      });
+      if (which === "30") await db().query("update public.contracts set reminded_30_at = now(), reminded_60_at = coalesce(reminded_60_at, now()) where id = $1", [c.id]);
+      else await db().query("update public.contracts set reminded_60_at = now() where id = $1", [c.id]);
+      out.push({ kind: "contract", id: c.id, to: to, mark: which, status: "sent" });
+    } catch (err) { out.push({ kind: "contract", id: c.id, status: "failed", error: msg(err) }); }
+  }
+  return out;
+}
+
+// Annual price reviews: on the anniversary of the start date, prices may be
+// adjusted if the carrier is told review_notice_days before. The owner is
+// reminded 60 and 30 days before that notice date, once per anniversary.
+function nextAnniversary(start, todayIso) {
+  const m = start.slice(5, 7), d = start.slice(8, 10);
+  const at = (y) => { const dt = new Date(`${y}-${m}-${d}T12:00:00Z`); return isNaN(dt) || dt.getUTCDate() !== +d ? `${y}-${m}-28` : `${y}-${m}-${d}`; };
+  let y = +todayIso.slice(0, 4), a = at(y);
+  if (a < todayIso) a = at(++y);
+  while (a <= start) a = at(++y);
+  return a;
+}
+async function priceReviewReminders() {
+  const t = await db().query("select exists (select 1 from information_schema.columns where table_name = 'contracts' and column_name = 'annual_review') as ok");
+  if (!t.rows[0].ok) return [];
+  const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: "Atlantic/Reykjavik" });
+  const rows = await db().query(
+    "select c.id, c.counterparty, c.title, c.start_date::text as start_txt, c.review_notice_days, c.review_done_for::text as done_for, " +
+    "c.review_reminded_60_for::text as r60, c.review_reminded_30_for::text as r30, c.notes, p.email as owner_email " +
+    "from public.contracts c left join public.profiles p on p.id = c.owner_id and p.active " +
+    "where c.status = 'active' and c.annual_review and c.start_date is not null");
+  if (!rows.rows.length) return [];
+  const mgmt = await db().query("select email from public.profiles where role = 'management' and active");
+  const nice = (d) => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const out = [];
+  for (const c of rows.rows) {
+    const ann = nextAnniversary(c.start_txt, todayIso);
+    if (c.done_for === ann) continue;
+    const by = new Date(Date.parse(ann + "T12:00:00Z") - (c.review_notice_days || 0) * 86400000).toISOString().slice(0, 10);
+    const days = Math.round((Date.parse(by + "T12:00:00Z") - Date.parse(todayIso + "T12:00:00Z")) / 86400000);
+    const which = days <= 30 ? (c.r30 === ann ? null : "30") : days <= 60 ? (c.r60 === ann ? null : "60") : null;
+    if (!which) continue;
+    const to = c.owner_email ? [c.owner_email] : mgmt.rows.map((r) => r.email);
+    if (!to.length) continue;
+    try {
+      await mail({
+        to: to,
+        subject: `Price review: ${c.counterparty} – ${days < 0 ? "notice date passed" : "send notice by " + nice(by)}`,
+        kicker: "Contracts tracker · annual price review",
+        title: `${c.counterparty}: price review on ${nice(ann)}`,
+        rows: [
+          ["Agreement", c.title || "–"],
+          ["Anniversary of the start date", nice(ann)],
+          ["Notice to the carrier needed by", nice(by) + (c.review_notice_days ? ` (${c.review_notice_days} days before)` : "")],
+          c.notes ? ["Notes", c.notes] : null
+        ].filter(Boolean),
+        note: "Decide whether to adjust prices (for example by the Icelandic price or wage index), send written notice to the carrier in time, update the rates in Regla, then mark the review done in Management → Contracts.",
+        link: portal() + "/#/management", linkLabel: "Open the contracts tracker"
+      });
+      if (which === "30") await db().query("update public.contracts set review_reminded_30_for = $2, review_reminded_60_for = coalesce(review_reminded_60_for, $2) where id = $1", [c.id, ann]);
+      else await db().query("update public.contracts set review_reminded_60_for = $2 where id = $1", [c.id, ann]);
+      out.push({ kind: "price_review", id: c.id, anniversary: ann, mark: which, status: "sent" });
+    } catch (err) { out.push({ kind: "price_review", id: c.id, status: "failed", error: msg(err) }); }
+  }
+  return out;
+}
+
+// ----------------------------------------------------------------------
 async function mail(o) {
   const rows = (o.rows || []).filter((r) => r[1] !== null && r[1] !== undefined && String(r[1]).trim() !== "");
   const steps = o.steps || [];
   const sections = o.sections || [];
   const text = (o.intro ? "Message from " + o.intro.from + ":\n" + o.intro.text + "\n\n" : "") +
-    sections.map((sec) => sec.heading.toUpperCase() + "\n" + sec.rows.map((r) => "- " + r[0] + ": " + r[1]).join("\n") + (sec.link ? "\n" + sec.link : "")).join("\n\n") +
+    sections.map((sec) => sec.heading.toUpperCase() + "\n" + sec.rows.map((r) => "- " + r[0] + (r[1] ? ": " + r[1] : "")).join("\n") + (sec.link ? "\n" + sec.link : "")).join("\n\n") +
     (sections.length && rows.length ? "\n\n" : "") +
     rows.map((r) => r[0] + ": " + r[1]).join("\n") +
     (steps.length ? "\n\nHow to sign in:\n" + steps.map((t, i) => (i + 1) + ". " + t).join("\n") : "") +
@@ -451,9 +621,10 @@ async function mail(o) {
       '<div style="color:#4f6470;font-size:12px;margin-bottom:4px">Message from ' + esc(o.intro.from) + '</div>' +
       '<div style="white-space:pre-wrap">' + esc(o.intro.text) + '</div></div>' : "") +
     sections.map((sec) => '<p style="font-size:15px;font-weight:bold;margin:14px 0 4px">' + esc(sec.heading) + "</p>" +
-      '<table style="width:100%;border-collapse:collapse">' + sec.rows.map((r) =>
-        '<tr><td style="padding:5px 0;vertical-align:top;width:50%;font-size:14px;border-top:1px solid #e3eeeb">' + esc(r[0]) +
-        '</td><td style="padding:5px 0;vertical-align:top;font-size:14px;color:#4f6470;border-top:1px solid #e3eeeb">' + esc(r[1]) + "</td></tr>").join("") + "</table>" +
+      '<table style="width:100%;border-collapse:collapse">' + sec.rows.map((r) => r[1]
+        ? '<tr><td style="padding:5px 0;vertical-align:top;width:50%;font-size:14px;border-top:1px solid #e3eeeb">' + esc(r[0]) +
+          '</td><td style="padding:5px 0;vertical-align:top;font-size:14px;color:#4f6470;border-top:1px solid #e3eeeb">' + esc(r[1]) + "</td></tr>"
+        : '<tr><td colspan="2" style="padding:5px 0;vertical-align:top;font-size:14px;border-top:1px solid #e3eeeb">' + esc(r[0]) + "</td></tr>").join("") + "</table>" +
       (sec.link ? '<p style="margin:4px 0 0;font-size:13px"><a href="' + esc(sec.link) + '" style="color:#07766d">Open in the portal</a></p>' : "")).join("") +
     '<table style="width:100%;border-collapse:collapse">' + rows.map((r) =>
       '<tr><td style="padding:6px 0;vertical-align:top;width:34%;color:#4f6470;font-size:14px">' + esc(r[0]) +
@@ -465,7 +636,7 @@ async function mail(o) {
     "</div></div>";
   await smtp().sendMail({
     from: process.env.SMTP_FROM || process.env.SMTP_USER || "IAA Staff Portal <no-reply@iaa.is>",
-    to: o.to, cc: o.cc && o.cc.length ? o.cc : undefined, replyTo: o.replyTo || undefined,
+    to: o.to, cc: o.cc && o.cc.length ? o.cc : undefined, bcc: o.bcc && o.bcc.length ? o.bcc : undefined, replyTo: o.replyTo || undefined,
     subject: o.subject, text: text, html: html
   });
 }
