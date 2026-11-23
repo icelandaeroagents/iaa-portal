@@ -223,7 +223,7 @@
     });
     const firstDayCol = Math.min.apply(null, Object.keys(cols).map(Number));
     const match = personMatcher(people);
-    const rows = [], rowsUsed = {}, unmatched = {}, skipped = [];
+    const rows = [], rowsUsed = {}, unmatched = {}, skipped = [], multi = [];
     grid.forEach(function (r, i) {
       if (i === hi) return;
       const label = r.slice(0, firstDayCol).map((x) => x.trim()).filter(Boolean).join(" ");
@@ -233,7 +233,10 @@
       if (!duty || (!isShift(duty) && LAST.indexOf(duty) === -1)) { if (/[a-z]/i.test(label) && !/^(mon|tue|wed|thu|fri|sat|sun|m[aá]n|þri|mi[dð]|fim|f[oö]s|lau|sun)/i.test(label)) skipped.push(label); return; }
       rowsUsed[duty] = (rowsUsed[duty] || 0);
       Object.keys(cols).forEach(function (ci) {
-        splitNames(r[ci]).forEach(function (part) {
+        const parts = splitNames(r[ci]);
+        // One person per row per day: a cell with more than one name is not split.
+        if (parts.length > 1) { multi.push(`${duty} on ${dayNum(cols[ci])}: “${String(r[ci]).trim()}”`); return; }
+        parts.forEach(function (part) {
           const mm = part.match(/^(.*?)\s*(?:\((.*)\)|(-?\s*\d{3,4}.*))?$/);
           const who = (mm ? mm[1] : part).trim(), note = mm ? (mm[2] || mm[3] || "").trim() : "";
           if (!who) return;
@@ -246,7 +249,7 @@
     });
     const seen = {}; const uniq = rows.filter((x) => { const k = x.work_date + "|" + x.duty + "|" + x.profile_id; if (seen[k]) return false; seen[k] = 1; return true; });
     const dates = Object.values(cols).sort();
-    return { rows: uniq, dates: dates, duties: Object.keys(rowsUsed), rowsUsed: rowsUsed, unmatched: unmatched, skipped: skipped };
+    return { rows: uniq, dates: dates, duties: Object.keys(rowsUsed), rowsUsed: rowsUsed, unmatched: unmatched, skipped: skipped, multi: multi };
   }
 
   function pastePanel(ctx, people, names, rerender) {
@@ -255,7 +258,7 @@
     const replace = h("input", { type: "checkbox", id: "re-paste-replace", checked: true });
     const preview = h("div", { class: "re-paste-preview" });
     const st = h("p", { class: "status", role: "status" });
-    const go = h("button", { class: "btn", type: "button", disabled: true }, "Add to roster");
+    const go = h("button", { class: "btn", type: "button", disabled: true }, "Paste into roster");
     let parsed = null;
     const fmtD = (d) => `${dayNum(d)} ${new Date(d + "T12:00:00").toLocaleDateString("en-GB", { month: "short" })}`;
     const draw = function () {
@@ -265,14 +268,17 @@
       if (!parsed) return;
       if (parsed.error) { preview.append(h("p", { class: "notice is-error" }, parsed.error)); return; }
       const um = Object.keys(parsed.unmatched);
-      preview.append(
+      [
         h("p", null, h("b", null, `${parsed.rows.length} ${parsed.rows.length === 1 ? "entry" : "entries"}`),
           ` for ${parsed.dates.length} ${parsed.dates.length === 1 ? "day" : "days"} (${fmtD(parsed.dates[0])} – ${fmtD(parsed.dates[parsed.dates.length - 1])}).`),
         h("ul", { class: "re-paste-rows" }, dutyOrder(parsed.duties.map((d) => ({ duty: d }))).filter((d) => parsed.rowsUsed[d] !== undefined)
           .map((d) => h("li", null, h("b", null, d), ` – ${parsed.rowsUsed[d]}`))),
         um.length ? h("p", { class: "notice" }, "Not matched to a person, so left out: ", um.join(", "),
           ". Set their roster name on the People page (e.g. “Beggi”), then paste again – or add them by hand.") : null,
-        parsed.skipped.length ? h("p", { class: "fineprint" }, "Rows not recognised as a shift or duty, left out: " + parsed.skipped.join(", ") + ".") : null);
+        parsed.multi.length ? h("div", { class: "notice is-error" }, h("b", null, "Check in Excel – more than one name in a cell, so left out:"),
+          h("ul", { class: "re-paste-rows" }, parsed.multi.map((x) => h("li", null, x)))) : null,
+        parsed.skipped.length ? h("p", { class: "fineprint" }, "Rows not recognised as a shift or duty, left out: " + parsed.skipped.join(", ") + ".") : null
+      ].filter(Boolean).forEach((el) => preview.append(el));
     };
     area.addEventListener("input", draw);
     go.addEventListener("click", async function () {
@@ -291,7 +297,7 @@
           added += (res.data || []).length;
         }
         if (ctx.logEvent) await ctx.logEvent("roster_pasted", { days: parsed.dates.length, entries: added });
-        notice = { local: true, paste: true, text: `Pasted ${added} ${added === 1 ? "entry" : "entries"} for ${parsed.dates.length} days.` + (Object.keys(parsed.unmatched).length ? ` Left out (not matched): ${Object.keys(parsed.unmatched).join(", ")}.` : "") + " Publish when you’re ready." };
+        notice = { local: true, paste: true, text: `Pasted ${added} ${added === 1 ? "entry" : "entries"} for ${parsed.dates.length} days.` + (Object.keys(parsed.unmatched).length ? ` Left out (not matched): ${Object.keys(parsed.unmatched).join(", ")}.` : "") + (parsed.multi.length ? ` Left out (more than one name in a cell): ${parsed.multi.length}.` : "") + " Publish when you’re ready." };
         rerender();
       } catch (e) { go.disabled = false; setStatus(st, e.message, true); }
     });
@@ -415,13 +421,21 @@
       const msg = check(); if (msg) { setStatus(aStatus, msg, true); return; }
       const rows = [];
       Array.from(sel.days).sort().forEach((d) => sel.duties.forEach((duty) => rows.push({ work_date: d, duty: duty, profile_id: sel.person, note: sel.note.trim() || null })));
+      // One person per row per day: anyone else already there is replaced.
+      const others = entries.filter((e) => sel.days.has(e.work_date) && sel.duties.has(e.duty) && e.profile_id !== sel.person);
+      if (others.length) {
+        const list = others.slice(0, 6).map((e) => `${names[e.profile_id] || "?"} (${e.duty}, ${dayNum(e.work_date)})`).join(", ") + (others.length > 6 ? ` and ${others.length - 6} more` : "");
+        if (!confirm(`Only one person per row per day. Replace ${list} with ${names[sel.person]}?`)) return;
+        const del = await db.from("roster_entries").delete().in("id", others.map((e) => e.id)).select("id");
+        if (del.error) { setStatus(aStatus, del.error.message, true); return; }
+      }
       addBtn.disabled = true;
       const res = await db.from("roster_entries").upsert(rows, { onConflict: "work_date,duty,profile_id", ignoreDuplicates: true }).select("id");
       addBtn.disabled = false;
       if (res.error) { setStatus(aStatus, res.error.message, true); return; }
       const added = (res.data || []).length;
       const who = names[sel.person] || "";
-      notice = { local: true, text: `Added ${who} to ${added} ${added === 1 ? "shift" : "shifts"}` + (rows.length > added ? ` (${rows.length - added} already on the roster).` : ".") + (visible ? " Publish when you’re ready." : "") };
+      notice = { local: true, text: `Added ${who} to ${added} ${added === 1 ? "shift" : "shifts"}` + (others.length ? `, replacing ${others.length}` : "") + (rows.length > added ? ` (${rows.length - added} already on the roster).` : ".") + (visible ? " Publish when you’re ready." : "") };
       sel.days.clear();
       rerender();
     });
@@ -456,11 +470,15 @@
       aStatus);
 
     // --- coverage
+    const doubled = [];
+    dutyOrder(entries).forEach((duty) => days.forEach((day) => { const n2 = entries.filter((e) => e.work_date === day && e.duty === duty).length; if (n2 > 1) doubled.push(`${duty} on ${dayNum(day)}`); }));
     const missing = DUTIES.filter((d) => d.required).map((d) => [d.key, days.filter((day) => !entries.some((e) => e.work_date === day && e.duty === d.key))]).filter((x) => x[1].length);
-    const coverage = h("section", { class: "panel" + (missing.length ? " panel-attention" : "") },
+    const coverage = h("section", { class: "panel" + (missing.length || doubled.length ? " panel-attention" : "") },
       h("h2", null, "Cover"),
-      missing.length
-        ? h("ul", { class: "attention-list" }, missing.map(([k, ds]) => h("li", null, h("b", null, k), ` missing on ${ds.length === days.length ? "every day" : ds.map(dayNum).join(", ")}`)))
+      missing.length || doubled.length
+        ? h("ul", { class: "attention-list" },
+            missing.map(([k, ds]) => h("li", null, h("b", null, k), ` missing on ${ds.length === days.length ? "every day" : ds.map(dayNum).join(", ")}`)),
+            doubled.length ? h("li", null, h("b", null, "More than one person in a cell: "), doubled.join(", "), " – remove one with ×") : null)
         : h("p", { class: "fineprint" }, "BIKF Resp, BIAR Resp and Management on duty are assigned every day this month."));
 
     // --- copy from the published roster
@@ -490,7 +508,7 @@
         return h("tr", null, h("th", { scope: "row" }, duty), dates.map(function (d) {
           const here = entries.filter((e) => e.work_date === d && e.duty === duty)
             .sort((a, b) => String(names[a.profile_id]).localeCompare(String(names[b.profile_id])));
-          return h("td", { class: !here.length && req ? "is-missing" : null },
+          return h("td", { class: !here.length && req ? "is-missing" : here.length > 1 ? "is-doubled" : null, title: here.length > 1 ? "More than one person – remove one" : null },
             here.length ? here.map((e) => h("span", { class: "re-chip" }, (names[e.profile_id] || "?") + (e.note ? " (" + e.note + ")" : ""),
               h("button", { type: "button", class: "re-x", "aria-label": `Remove ${names[e.profile_id]} from ${duty} on ${d}`, onclick: async function () {
                 this.disabled = true;

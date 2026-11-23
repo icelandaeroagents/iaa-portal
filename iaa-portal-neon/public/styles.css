@@ -1241,3 +1241,4 @@ td .btn-small { margin-top: 0.3rem; }
 }
 .re-paste textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; white-space: pre; }
 .re-paste-rows { margin: 0.25rem 0 0.5rem; padding-left: 1.1rem; columns: 2; font-size: 0.9rem; }
+.re-grid td.is-doubled { background: var(--notice-bg); box-shadow: inset 0 0 0 2px var(--notice-line); }
