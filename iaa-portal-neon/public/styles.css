@@ -1239,3 +1239,5 @@ td .btn-small { margin-top: 0.3rem; }
   .re-grid td.is-missing { background: rgba(220, 38, 38, 0.18); color: #fca5a5; }
   .re-cal-day:has(input:checked) { background: #17403c; }
 }
+.re-paste textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; white-space: pre; }
+.re-paste-rows { margin: 0.25rem 0 0.5rem; padding-left: 1.1rem; columns: 2; font-size: 0.9rem; }

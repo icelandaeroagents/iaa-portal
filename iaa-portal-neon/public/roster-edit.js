@@ -29,6 +29,8 @@
   let month = null;            // "YYYY-MM-01"
   let sel = { person: "", duties: new Set(), days: new Set(), note: "" };
   let notice = null;
+  let keepScroll = null;
+  let pasteOpen = false;       // keep the paste panel open after pasting       // page and grid scroll positions to restore after a change
 
   // ------------------------------------------------------------------
   // Dates and names
@@ -194,13 +196,125 @@
   }
 
   // ------------------------------------------------------------------
+  // Paste from Excel: a block of cells copied from the roster spreadsheet
+  // (tab-separated). It needs the row with the day numbers and the shift
+  // labels in the first column. Names are matched to people as when copying.
+  // ------------------------------------------------------------------
+  function splitNames(cell) {
+    return String(cell || "").split(/\s*(?:[,\/&+]|\bog\b|\band\b)\s*/i).map((x) => x.trim()).filter(Boolean);
+  }
+  function parsePaste(text, m, people) {
+    const lines = String(text || "").replace(/\r/g, "").split("\n").filter((l) => l.trim() !== "");
+    const grid = lines.map((l) => l.split("\t"));
+    if (!grid.length) return { error: "Nothing pasted yet." };
+    // The header row: the row with the most cells that are day numbers (1–31).
+    const dayOf = (c) => { const t = String(c).trim(); const mm = t.match(/^(\d{1,2})(?:[.\/]\d{1,2}(?:[.\/]\d{2,4})?)?\.?$/); const n = mm ? +mm[1] : NaN; return n >= 1 && n <= 31 ? n : null; };
+    let hi = -1, best = 0;
+    grid.forEach((r, i) => { const n = r.filter((c) => dayOf(c) !== null).length; if (n > best) { best = n; hi = i; } });
+    if (best < 2) return { error: "Include the row with the day numbers (1, 2, 3 …) when you copy from Excel." };
+    // Columns → dates in this month (rolling into the next month if the numbers wrap round).
+    const cols = {}; let monthStart = m, prev = 0;
+    grid[hi].forEach((c, i) => {
+      const n = dayOf(c); if (n === null) return;
+      if (n < prev) monthStart = shiftMonth(monthStart, 1);
+      prev = n;
+      const d = monthStart.slice(0, 8) + pad(n);
+      if (daysIn(monthStart).indexOf(d) !== -1) cols[i] = d;
+    });
+    const firstDayCol = Math.min.apply(null, Object.keys(cols).map(Number));
+    const match = personMatcher(people);
+    const rows = [], rowsUsed = {}, unmatched = {}, skipped = [];
+    grid.forEach(function (r, i) {
+      if (i === hi) return;
+      const label = r.slice(0, firstDayCol).map((x) => x.trim()).filter(Boolean).join(" ");
+      if (!label) return;
+      if (r.slice(firstDayCol).every((c) => !String(c).trim())) return;
+      const duty = dutyFromLabel(label);
+      if (!duty || (!isShift(duty) && LAST.indexOf(duty) === -1)) { if (/[a-z]/i.test(label) && !/^(mon|tue|wed|thu|fri|sat|sun|m[aá]n|þri|mi[dð]|fim|f[oö]s|lau|sun)/i.test(label)) skipped.push(label); return; }
+      rowsUsed[duty] = (rowsUsed[duty] || 0);
+      Object.keys(cols).forEach(function (ci) {
+        splitNames(r[ci]).forEach(function (part) {
+          const mm = part.match(/^(.*?)\s*(?:\((.*)\)|(-?\s*\d{3,4}.*))?$/);
+          const who = (mm ? mm[1] : part).trim(), note = mm ? (mm[2] || mm[3] || "").trim() : "";
+          if (!who) return;
+          const pid = match(who);
+          if (!pid) { unmatched[who] = (unmatched[who] || 0) + 1; return; }
+          rows.push({ work_date: cols[ci], duty: duty, profile_id: pid, note: note ? note.slice(0, 60) : null });
+          rowsUsed[duty] += 1;
+        });
+      });
+    });
+    const seen = {}; const uniq = rows.filter((x) => { const k = x.work_date + "|" + x.duty + "|" + x.profile_id; if (seen[k]) return false; seen[k] = 1; return true; });
+    const dates = Object.values(cols).sort();
+    return { rows: uniq, dates: dates, duties: Object.keys(rowsUsed), rowsUsed: rowsUsed, unmatched: unmatched, skipped: skipped };
+  }
+
+  function pastePanel(ctx, people, names, rerender) {
+    const { h, db, setStatus } = ctx;
+    const area = h("textarea", { id: "re-paste", rows: 6, placeholder: "Copy the block from Excel – including the row with the day numbers and the shift names on the left – and paste it here." });
+    const replace = h("input", { type: "checkbox", id: "re-paste-replace", checked: true });
+    const preview = h("div", { class: "re-paste-preview" });
+    const st = h("p", { class: "status", role: "status" });
+    const go = h("button", { class: "btn", type: "button", disabled: true }, "Add to roster");
+    let parsed = null;
+    const fmtD = (d) => `${dayNum(d)} ${new Date(d + "T12:00:00").toLocaleDateString("en-GB", { month: "short" })}`;
+    const draw = function () {
+      parsed = area.value.trim() ? parsePaste(area.value, month, people) : null;
+      preview.replaceChildren();
+      go.disabled = !parsed || !!parsed.error || !parsed.rows.length;
+      if (!parsed) return;
+      if (parsed.error) { preview.append(h("p", { class: "notice is-error" }, parsed.error)); return; }
+      const um = Object.keys(parsed.unmatched);
+      preview.append(
+        h("p", null, h("b", null, `${parsed.rows.length} ${parsed.rows.length === 1 ? "entry" : "entries"}`),
+          ` for ${parsed.dates.length} ${parsed.dates.length === 1 ? "day" : "days"} (${fmtD(parsed.dates[0])} – ${fmtD(parsed.dates[parsed.dates.length - 1])}).`),
+        h("ul", { class: "re-paste-rows" }, dutyOrder(parsed.duties.map((d) => ({ duty: d }))).filter((d) => parsed.rowsUsed[d] !== undefined)
+          .map((d) => h("li", null, h("b", null, d), ` – ${parsed.rowsUsed[d]}`))),
+        um.length ? h("p", { class: "notice" }, "Not matched to a person, so left out: ", um.join(", "),
+          ". Set their roster name on the People page (e.g. “Beggi”), then paste again – or add them by hand.") : null,
+        parsed.skipped.length ? h("p", { class: "fineprint" }, "Rows not recognised as a shift or duty, left out: " + parsed.skipped.join(", ") + ".") : null);
+    };
+    area.addEventListener("input", draw);
+    go.addEventListener("click", async function () {
+      if (!parsed || parsed.error) return;
+      if (replace.checked && !confirm(`Replace what is in the editor for these ${parsed.dates.length} days in the pasted rows (${parsed.duties.join(", ")})?`)) return;
+      go.disabled = true; setStatus(st, "Saving…");
+      try {
+        if (replace.checked) {
+          const del = await db.from("roster_entries").delete().in("work_date", parsed.dates).in("duty", parsed.duties).select("id");
+          if (del.error) throw new Error(del.error.message);
+        }
+        let added = 0;
+        for (let i = 0; i < parsed.rows.length; i += 200) {
+          const res = await db.from("roster_entries").upsert(parsed.rows.slice(i, i + 200), { onConflict: "work_date,duty,profile_id", ignoreDuplicates: true }).select("id");
+          if (res.error) throw new Error(res.error.message);
+          added += (res.data || []).length;
+        }
+        if (ctx.logEvent) await ctx.logEvent("roster_pasted", { days: parsed.dates.length, entries: added });
+        notice = { local: true, paste: true, text: `Pasted ${added} ${added === 1 ? "entry" : "entries"} for ${parsed.dates.length} days.` + (Object.keys(parsed.unmatched).length ? ` Left out (not matched): ${Object.keys(parsed.unmatched).join(", ")}.` : "") + " Publish when you’re ready." };
+        rerender();
+      } catch (e) { go.disabled = false; setStatus(st, e.message, true); }
+    });
+    return h("details", { class: "panel re-paste", open: pasteOpen, ontoggle: function () { pasteOpen = this.open; } },
+      h("summary", null, "Paste from Excel"),
+      h("p", { class: "fineprint" }, `Pastes into ${monthName(month)}. Copy a block of the Excel roster – any number of days – with the row of day numbers at the top and the shift names (0700-1900, BIKF Resp, Go to Boss …) in the first column. Crossed-out names are not copied by Excel, so remove them there first.`),
+      area,
+      h("label", { class: "choice" }, replace, h("span", null, "Replace what is already in the editor for the pasted days and rows")),
+      preview,
+      h("div", { class: "row" }, go, h("button", { class: "btn btn-quiet", type: "button", onclick: () => { area.value = ""; draw(); } }, "Clear")),
+      st);
+  }
+
+  // ------------------------------------------------------------------
   // Page
   // ------------------------------------------------------------------
-  async function render(main, ctx) {
+  async function render(main, ctx, quiet) {
     const { h, fill, setStatus, db, state } = ctx;
     if (state.profile.role !== "management") { location.hash = "#/roster"; return; }
     if (!month) month = firstOfMonth(new Date());
-    fill(main, h("a", { class: "back-link", href: "#/roster" }, "Roster"), h("p", { class: "empty" }, "Loading the roster editor…"));
+    // Only show "Loading…" on first opening. After a change the old page stays
+    // in place until the new one is ready, so the page does not jump.
+    if (!quiet) fill(main, h("a", { class: "back-link", href: "#/roster" }, "Roster"), h("p", { class: "empty" }, "Loading the roster editor…"));
 
     const [pr, er, mr, pub] = await Promise.all([
       db.from("profiles").select("id, full_name, email, roster_names, station_codes, role, active").order("full_name"),
@@ -219,7 +333,11 @@
     const entries = er.data || [];
     const mrow = (mr.data || [])[0] || null;
     const days = daysIn(month);
-    const rerender = () => render(main, ctx);
+    const scroller = () => document.scrollingElement || document.documentElement;
+    const rerender = () => {
+      keepScroll = { y: scroller().scrollTop, x: Array.from(main.querySelectorAll(".roster-wrap")).map((w) => w.scrollLeft) };
+      return render(main, ctx, true);
+    };
     const n = notice; notice = null;
 
     // --- month navigation
@@ -303,7 +421,7 @@
       if (res.error) { setStatus(aStatus, res.error.message, true); return; }
       const added = (res.data || []).length;
       const who = names[sel.person] || "";
-      notice = { text: `Added ${who} to ${added} ${added === 1 ? "shift" : "shifts"}` + (rows.length > added ? ` (${rows.length - added} already on the roster).` : ".") + (visible ? " Publish when you’re ready." : "") };
+      notice = { local: true, text: `Added ${who} to ${added} ${added === 1 ? "shift" : "shifts"}` + (rows.length > added ? ` (${rows.length - added} already on the roster).` : ".") + (visible ? " Publish when you’re ready." : "") };
       sel.days.clear();
       rerender();
     });
@@ -313,7 +431,7 @@
       if (!confirm(`Remove ${names[sel.person]} from the ticked duties on ${sel.days.size} ${sel.days.size === 1 ? "day" : "days"}?`)) return;
       const res = await db.from("roster_entries").delete().eq("profile_id", sel.person).in("work_date", Array.from(sel.days)).in("duty", Array.from(sel.duties)).select("id");
       if (res.error) { setStatus(aStatus, res.error.message, true); return; }
-      notice = { text: `Removed ${(res.data || []).length} ${((res.data || []).length === 1) ? "entry" : "entries"} for ${names[sel.person]}.` };
+      notice = { local: true, text: `Removed ${(res.data || []).length} ${((res.data || []).length === 1) ? "entry" : "entries"} for ${names[sel.person]}.` };
       rerender();
     });
     const assign = h("section", { class: "panel" },
@@ -362,6 +480,7 @@
       : null;
 
     // --- grid
+    const gStatus = h("p", { class: "status", role: "status" });
     const order = dutyOrder(entries);
     const grid = (dates) => h("div", { class: "table-wrap roster-wrap" }, h("table", { class: "roster-grid re-grid" },
       h("thead", null, h("tr", null, h("th", null, ""), dates.map((d) => h("th", { class: (d === iso(new Date()) ? "is-today " : "") + (window.IAARotation && window.IAARotation.colour(d) ? "rot-" + window.IAARotation.colour(d) : "") },
@@ -374,8 +493,11 @@
           return h("td", { class: !here.length && req ? "is-missing" : null },
             here.length ? here.map((e) => h("span", { class: "re-chip" }, (names[e.profile_id] || "?") + (e.note ? " (" + e.note + ")" : ""),
               h("button", { type: "button", class: "re-x", "aria-label": `Remove ${names[e.profile_id]} from ${duty} on ${d}`, onclick: async function () {
+                this.disabled = true;
                 const { error } = await db.from("roster_entries").delete().eq("id", e.id);
-                notice = error ? { text: error.message, isError: true } : null; rerender();
+                notice = error ? { text: error.message, isError: true, grid: true, local: true }
+                  : { local: true, text: `Removed ${names[e.profile_id] || "?"} from ${duty} on ${dayNum(d)} ${monthName(month).split(" ")[0]}.`, grid: true };
+                rerender();
               } }, "×")))
               : req ? "–" : "");
         }));
@@ -386,11 +508,22 @@
       h("div", { class: "page-head page-head-row" },
         h("div", null, h("h1", null, "Edit roster"), h("p", null, "Place people on shifts and duties, then publish so staff see it.")),
         nav),
-      n ? h("p", { class: n.isError ? "notice is-error" : "notice" }, n.text) : null,
-      statusPanel, copyPanel, assign, coverage,
+      n && !n.local ? h("p", { class: n.isError ? "notice is-error" : "notice" }, n.text) : null,
+      statusPanel, copyPanel, pastePanel(ctx, allPeople, names, rerender), assign, coverage,
       h("section", { class: "panel" }, h("h2", null, monthName(month)),
+        gStatus,
         grid(days.slice(0, 15)), grid(days.slice(15)),
         h("p", { class: "fineprint" }, "Select × to remove someone. A red dash means nobody is assigned to a duty that is needed every day.")));
+    if (n) {
+      if (n.paste) { const ps = main.querySelector(".re-paste .status"); if (ps) setStatus(ps, n.text, !!n.isError); }
+      else setStatus(aStatus, n.text, !!n.isError);
+      if (n.grid) setStatus(gStatus, n.text, !!n.isError);
+    }
+    if (keepScroll) {
+      const k = keepScroll; keepScroll = null;
+      main.querySelectorAll(".roster-wrap").forEach((w, i) => { if (k.x[i] != null) w.scrollLeft = k.x[i]; });
+      scroller().scrollTop = k.y;
+    }
   }
 
   window.IAARosterEdit = { render: render, buildSheets: buildSheets, displayNames: displayNames, DUTIES: DUTIES };
