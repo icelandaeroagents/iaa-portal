@@ -804,6 +804,9 @@
       if (window.IAAFleet) {
         (await window.IAAFleet.attention(db)).forEach((t) => items.push(["#/management", t]));
       }
+      if (window.IAAContracts) {
+        (await window.IAAContracts.attention(db)).forEach((t) => items.push(["#/management", t]));
+      }
       if (rev && !rev.error) {
         const last = (rev.data || [])[0];
         if (!last || Date.now() - new Date(last.reviewed_at).getTime() > 90 * 86400000) {
