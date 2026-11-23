@@ -252,6 +252,78 @@
     return { rows: uniq, dates: dates, duties: Object.keys(rowsUsed), rowsUsed: rowsUsed, unmatched: unmatched, skipped: skipped, multi: multi };
   }
 
+  // Excel also puts an HTML table on the clipboard, which keeps merged cells,
+  // cell colours and crossed-out text. Read it the same way as an uploaded
+  // file (roster-parse.js): a name merged or coloured across several days
+  // counts for each of them, and crossed-out names are cancelled.
+  function excelHtmlToTsv(html) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const table = doc.querySelector("table");
+    if (!table) return null;
+    // Class styles from Excel's <style> block (.xl65 { background:#92D050; text-decoration:line-through }).
+    const css = {};
+    Array.from(doc.querySelectorAll("style")).forEach((st) => {
+      String(st.textContent).replace(/\.([\w-]+)\s*\{([^}]*)\}/g, (all, cls, body) => { css[cls] = (css[cls] || "") + ";" + body; return all; });
+    });
+    const styleOf = (el) => (el.getAttribute("class") || "").split(/\s+/).map((c) => css[c] || "").join(";") + ";" + (el.getAttribute("style") || "");
+    const bgOf = (st, el) => {
+      const m = st.match(/background(?:-color)?\s*:\s*([^;]+)/i);
+      const v = (m ? m[1] : el.getAttribute("bgcolor") || "").trim().toLowerCase().replace(/\s+/g, "");
+      return !v || /^(none|transparent|white|#fff|#ffffff|windowtext|auto|inherit)$/.test(v) ? null : v;
+    };
+    const struckOf = (st, el) => /line-through/i.test(st) || !!el.querySelector("s, strike, del, [style*='line-through']");
+    const grid = [], filled = [];
+    let r = 0;
+    Array.from(table.querySelectorAll("tr")).forEach((tr) => {
+      if (/display\s*:\s*none/i.test(tr.getAttribute("style") || "")) return;
+      grid[r] = grid[r] || [];
+      let c = 0;
+      Array.from(tr.children).forEach((td) => {
+        if (!/^t[dh]$/i.test(td.tagName)) return;
+        while (grid[r][c]) c++;
+        const st = styleOf(td);
+        const cell = { text: String(td.textContent || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim(), bg: bgOf(st, td), struck: struckOf(st, td) };
+        const cs = Math.max(1, +td.getAttribute("colspan") || 1), rs = Math.max(1, +td.getAttribute("rowspan") || 1);
+        for (let dr = 0; dr < rs; dr++) {
+          grid[r + dr] = grid[r + dr] || [];
+          for (let dc = 0; dc < cs; dc++) {
+            // 1. Merged cells: every cell of the merge gets the name.
+            grid[r + dr][c + dc] = { text: cell.text, bg: cell.bg, struck: cell.struck, merged: dr > 0 || dc > 0 };
+          }
+        }
+        c += cs;
+      });
+      r++;
+    });
+    let spans = 0, struck = 0;
+    const width = grid.reduce((m, row) => Math.max(m, (row || []).length), 0);
+    grid.forEach((row) => {
+      for (let i = 0; i < width; i++) if (!row[i]) row[i] = { text: "", bg: null, struck: false };
+      // 2. Coloured spans: a run of same-coloured cells with the name written once.
+      let c = 0;
+      while (c < width) {
+        const key = row[c].bg; let end = c;
+        if (key) while (end + 1 < width && row[end + 1].bg === key) end++;
+        if (key && end > c) {
+          const written = [];
+          for (let k = c; k <= end; k++) if (row[k].text && !row[k].merged) written.push(k);
+          if (written.length === 1) {
+            const src = row[written[0]];
+            for (let k = c; k <= end; k++) if (!row[k].text) { row[k] = { text: src.text, bg: key, struck: src.struck, merged: true }; spans++; }
+          }
+        }
+        c = end + 1;
+      }
+    });
+    // 3. Crossed-out names are cancelled.
+    const tsv = grid.map((row) => row.map((cell) => {
+      if (cell.struck && cell.text) { struck++; return ""; }
+      return cell.text.replace(/\t/g, " ");
+    }).join("\t")).join("\n");
+    const merged = grid.reduce((n, row) => n + row.filter((x) => x.merged && x.text).length, 0);
+    return { tsv: tsv, merged: merged, struck: struck };
+  }
+
   function pastePanel(ctx, people, names, rerender) {
     const { h, db, setStatus } = ctx;
     const area = h("textarea", { id: "re-paste", rows: 6, placeholder: "Copy the block from Excel – including the row with the day numbers and the shift names on the left – and paste it here." });
@@ -280,15 +352,30 @@
         parsed.skipped.length ? h("p", { class: "fineprint" }, "Rows not recognised as a shift or duty, left out: " + parsed.skipped.join(", ") + ".") : null
       ].filter(Boolean).forEach((el) => preview.append(el));
     };
-    area.addEventListener("input", draw);
+    const how = h("p", { class: "fineprint re-paste-how" });
+    area.addEventListener("input", function () { how.textContent = ""; draw(); });
+    area.addEventListener("paste", function (e) {
+      const html = e.clipboardData && e.clipboardData.getData("text/html");
+      if (!html || !/<table/i.test(html)) return;      // plain text: read as it is
+      const res = excelHtmlToTsv(html);
+      if (!res) return;
+      e.preventDefault();
+      area.value = res.tsv;
+      how.textContent = "Read from Excel with its formatting: " +
+        (res.merged ? `${res.merged} ${res.merged === 1 ? "cell" : "cells"} filled from merged or coloured spans` : "no merged or coloured spans") +
+        (res.struck ? `, ${res.struck} crossed-out ${res.struck === 1 ? "name" : "names"} left out as cancelled.` : ".");
+      draw();
+    });
     go.addEventListener("click", async function () {
       if (!parsed || parsed.error) return;
-      if (replace.checked && !confirm(`Replace what is in the editor for these ${parsed.dates.length} days in the pasted rows (${parsed.duties.join(", ")})?`)) return;
+      if (replace.checked && !confirm(`Clear everything on these ${parsed.dates.length} days (${fmtD(parsed.dates[0])} – ${fmtD(parsed.dates[parsed.dates.length - 1])}), in every row, and put the pasted roster in its place?`)) return;
       go.disabled = true; setStatus(st, "Saving…");
       try {
+        let cleared = 0;
         if (replace.checked) {
-          const del = await db.from("roster_entries").delete().in("work_date", parsed.dates).in("duty", parsed.duties).select("id");
+          const del = await db.from("roster_entries").delete().in("work_date", parsed.dates).select("id");
           if (del.error) throw new Error(del.error.message);
+          cleared = (del.data || []).length;
         }
         let added = 0;
         for (let i = 0; i < parsed.rows.length; i += 200) {
@@ -297,15 +384,15 @@
           added += (res.data || []).length;
         }
         if (ctx.logEvent) await ctx.logEvent("roster_pasted", { days: parsed.dates.length, entries: added });
-        notice = { local: true, paste: true, text: `Pasted ${added} ${added === 1 ? "entry" : "entries"} for ${parsed.dates.length} days.` + (Object.keys(parsed.unmatched).length ? ` Left out (not matched): ${Object.keys(parsed.unmatched).join(", ")}.` : "") + (parsed.multi.length ? ` Left out (more than one name in a cell): ${parsed.multi.length}.` : "") + " Publish when you’re ready." };
+        notice = { local: true, paste: true, text: (replace.checked ? `Cleared ${cleared} old ${cleared === 1 ? "entry" : "entries"}, then pasted ` : "Pasted ") + `${added} ${added === 1 ? "entry" : "entries"} for ${parsed.dates.length} days.` + (Object.keys(parsed.unmatched).length ? ` Left out (not matched): ${Object.keys(parsed.unmatched).join(", ")}.` : "") + (parsed.multi.length ? ` Left out (more than one name in a cell): ${parsed.multi.length}.` : "") + " Publish when you’re ready." };
         rerender();
       } catch (e) { go.disabled = false; setStatus(st, e.message, true); }
     });
     return h("details", { class: "panel re-paste", open: pasteOpen, ontoggle: function () { pasteOpen = this.open; } },
       h("summary", null, "Paste from Excel"),
-      h("p", { class: "fineprint" }, `Pastes into ${monthName(month)}. Copy a block of the Excel roster – any number of days – with the row of day numbers at the top and the shift names (0700-1900, BIKF Resp, Go to Boss …) in the first column. Crossed-out names are not copied by Excel, so remove them there first.`),
-      area,
-      h("label", { class: "choice" }, replace, h("span", null, "Replace what is already in the editor for the pasted days and rows")),
+      h("p", { class: "fineprint" }, `Pastes into ${monthName(month)}. Copy a block of the Excel roster – any number of days – with the row of day numbers at the top and the shift names (0700-1900, BIKF Resp, Go to Boss …) in the first column. It is read like an uploaded file: a name merged or coloured across several days counts for each of them, and crossed-out names are left out.`),
+      area, how,
+      h("label", { class: "choice" }, replace, h("span", null, "Clear the pasted days first (every row), then add the pasted roster")),
       preview,
       h("div", { class: "row" }, go, h("button", { class: "btn btn-quiet", type: "button", onclick: () => { area.value = ""; draw(); } }, "Clear")),
       st);
@@ -378,10 +465,20 @@
         rerender();
       } catch (e) { pubBtn.disabled = false; setStatus(pubStatus, e.message, true); }
     });
+    const clearBtn = h("button", { class: "btn btn-danger", type: "button", disabled: !entries.length }, `Clear ${monthName(month).split(" ")[0]}`);
+    clearBtn.addEventListener("click", async function () {
+      if (!confirm(`Remove all ${entries.length} entries in ${monthName(month)} from the editor?\n\nStaff keep seeing the last published roster until you publish again, so you can clear, paste or rebuild the month, check it, then publish.`)) return;
+      clearBtn.disabled = true; setStatus(pubStatus, "Clearing…");
+      const res = await db.from("roster_entries").delete().gte("work_date", month).lte("work_date", lastDay(month)).select("id");
+      if (res.error) { clearBtn.disabled = false; setStatus(pubStatus, res.error.message, true); return; }
+      if (ctx.logEvent) await ctx.logEvent("roster_month_cleared", { month: month, entries: (res.data || []).length });
+      notice = { text: `Cleared ${(res.data || []).length} entries from ${monthName(month)}. Staff still see the last published roster until you publish.` };
+      rerender();
+    });
     const statusPanel = h("section", { class: "panel roster-pub" + (changed && visible ? " panel-attention" : "") },
       h("div", { class: "row" },
         h("label", { class: "choice" }, visBox, h("span", null, h("b", null, "Visible to staff"), h("span", { class: "sub" }, "Untick while a month is still being planned."))),
-        pubBtn),
+        pubBtn, clearBtn),
       h("p", { class: "fineprint" },
         mrow && mrow.published_at ? `Last published ${when(mrow.published_at)} by ${mrow.published_by_name || "management"}. ` : "Not published yet. ",
         mrow && mrow.updated_at ? `Last changed ${when(mrow.updated_at)}${mrow.updated_by_name ? " by " + mrow.updated_by_name : ""}.` : ""),
