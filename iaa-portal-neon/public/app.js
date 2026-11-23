@@ -113,8 +113,8 @@
     },
     {
       id: "game",
-      title: "Flight game",
-      description: "A quick flying game for your break, with a staff leaderboard.",
+      title: "Games",
+      description: "Short aviation games for your break, with staff leaderboards.",
       roles: ALL_ROLES,
       render: renderGame
     },
@@ -770,7 +770,7 @@
   }
 
   async function renderGame(main) {
-    if (!window.IAAGame) return sectionMissing(main, "Flight game");
+    if (!window.IAAGame) return sectionMissing(main, "Games");
     return window.IAAGame.render(main, sectionCtx());
   }
 

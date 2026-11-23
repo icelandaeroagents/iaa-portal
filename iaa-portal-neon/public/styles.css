@@ -1255,3 +1255,15 @@ td .btn-small { margin-top: 0.3rem; }
 .game-board li.is-me { font-weight: 700; color: var(--brand-strong); }
 .game-score { font-family: var(--font-sign); font-weight: 700; }
 @media (max-width: 900px) { .game-layout { grid-template-columns: 1fr; } }
+
+/* Games hub and controls */
+.game-hub { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; }
+.game-card { flex-direction: row; align-items: center; gap: 1rem; text-decoration: none; color: var(--ink); }
+.game-card:hover { border-color: var(--brand); }
+.game-card-icon { font-size: 2rem; line-height: 1; }
+.game-card-text { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
+.game-card-best { font-size: 0.85rem; font-weight: 600; color: var(--brand-strong); }
+.game-pads { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; width: 100%; }
+.game-pads-5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.game-pad { touch-action: manipulation; user-select: none; -webkit-user-select: none; padding: 0.6rem 0.5rem; font-size: 0.9rem; }
+@media (max-width: 520px) { .game-pads-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
