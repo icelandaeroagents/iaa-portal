@@ -283,14 +283,12 @@
     area.addEventListener("input", draw);
     go.addEventListener("click", async function () {
       if (!parsed || parsed.error) return;
-      if (replace.checked && !confirm(`Clear everything on these ${parsed.dates.length} days (${fmtD(parsed.dates[0])} – ${fmtD(parsed.dates[parsed.dates.length - 1])}), in every row, and put the pasted roster in its place?`)) return;
+      if (replace.checked && !confirm(`Replace what is in the editor for these ${parsed.dates.length} days in the pasted rows (${parsed.duties.join(", ")})?`)) return;
       go.disabled = true; setStatus(st, "Saving…");
       try {
-        let cleared = 0;
         if (replace.checked) {
-          const del = await db.from("roster_entries").delete().in("work_date", parsed.dates).select("id");
+          const del = await db.from("roster_entries").delete().in("work_date", parsed.dates).in("duty", parsed.duties).select("id");
           if (del.error) throw new Error(del.error.message);
-          cleared = (del.data || []).length;
         }
         let added = 0;
         for (let i = 0; i < parsed.rows.length; i += 200) {
@@ -299,7 +297,7 @@
           added += (res.data || []).length;
         }
         if (ctx.logEvent) await ctx.logEvent("roster_pasted", { days: parsed.dates.length, entries: added });
-        notice = { local: true, paste: true, text: (replace.checked ? `Cleared ${cleared} old ${cleared === 1 ? "entry" : "entries"}, then pasted ` : "Pasted ") + `${added} ${added === 1 ? "entry" : "entries"} for ${parsed.dates.length} days.` + (Object.keys(parsed.unmatched).length ? ` Left out (not matched): ${Object.keys(parsed.unmatched).join(", ")}.` : "") + (parsed.multi.length ? ` Left out (more than one name in a cell): ${parsed.multi.length}.` : "") + " Publish when you’re ready." };
+        notice = { local: true, paste: true, text: `Pasted ${added} ${added === 1 ? "entry" : "entries"} for ${parsed.dates.length} days.` + (Object.keys(parsed.unmatched).length ? ` Left out (not matched): ${Object.keys(parsed.unmatched).join(", ")}.` : "") + (parsed.multi.length ? ` Left out (more than one name in a cell): ${parsed.multi.length}.` : "") + " Publish when you’re ready." };
         rerender();
       } catch (e) { go.disabled = false; setStatus(st, e.message, true); }
     });
@@ -307,7 +305,7 @@
       h("summary", null, "Paste from Excel"),
       h("p", { class: "fineprint" }, `Pastes into ${monthName(month)}. Copy a block of the Excel roster – any number of days – with the row of day numbers at the top and the shift names (0700-1900, BIKF Resp, Go to Boss …) in the first column. Crossed-out names are not copied by Excel, so remove them there first.`),
       area,
-      h("label", { class: "choice" }, replace, h("span", null, "Clear the pasted days first (every row), then add the pasted roster")),
+      h("label", { class: "choice" }, replace, h("span", null, "Replace what is already in the editor for the pasted days and rows")),
       preview,
       h("div", { class: "row" }, go, h("button", { class: "btn btn-quiet", type: "button", onclick: () => { area.value = ""; draw(); } }, "Clear")),
       st);
@@ -380,20 +378,10 @@
         rerender();
       } catch (e) { pubBtn.disabled = false; setStatus(pubStatus, e.message, true); }
     });
-    const clearBtn = h("button", { class: "btn btn-danger", type: "button", disabled: !entries.length }, `Clear ${monthName(month).split(" ")[0]}`);
-    clearBtn.addEventListener("click", async function () {
-      if (!confirm(`Remove all ${entries.length} entries in ${monthName(month)} from the editor?\n\nStaff keep seeing the last published roster until you publish again, so you can clear, paste or rebuild the month, check it, then publish.`)) return;
-      clearBtn.disabled = true; setStatus(pubStatus, "Clearing…");
-      const res = await db.from("roster_entries").delete().gte("work_date", month).lte("work_date", lastDay(month)).select("id");
-      if (res.error) { clearBtn.disabled = false; setStatus(pubStatus, res.error.message, true); return; }
-      if (ctx.logEvent) await ctx.logEvent("roster_month_cleared", { month: month, entries: (res.data || []).length });
-      notice = { text: `Cleared ${(res.data || []).length} entries from ${monthName(month)}. Staff still see the last published roster until you publish.` };
-      rerender();
-    });
     const statusPanel = h("section", { class: "panel roster-pub" + (changed && visible ? " panel-attention" : "") },
       h("div", { class: "row" },
         h("label", { class: "choice" }, visBox, h("span", null, h("b", null, "Visible to staff"), h("span", { class: "sub" }, "Untick while a month is still being planned."))),
-        pubBtn, clearBtn),
+        pubBtn),
       h("p", { class: "fineprint" },
         mrow && mrow.published_at ? `Last published ${when(mrow.published_at)} by ${mrow.published_by_name || "management"}. ` : "Not published yet. ",
         mrow && mrow.updated_at ? `Last changed ${when(mrow.updated_at)}${mrow.updated_by_name ? " by " + mrow.updated_by_name : ""}.` : ""),
