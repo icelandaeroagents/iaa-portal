@@ -112,6 +112,13 @@
       render: renderReports
     },
     {
+      id: "game",
+      title: "Flight game",
+      description: "A quick flying game for your break, with a staff leaderboard.",
+      roles: ALL_ROLES,
+      render: renderGame
+    },
+    {
       id: "management",
       title: "Management",
       description: "The compliance calendar, what is overdue, and training renewals.",
@@ -760,6 +767,11 @@
   async function renderEquipment(main) {
     if (!window.IAAEquipment) return sectionMissing(main, "Equipment Info");
     return window.IAAEquipment.render(main, sectionCtx());
+  }
+
+  async function renderGame(main) {
+    if (!window.IAAGame) return sectionMissing(main, "Flight game");
+    return window.IAAGame.render(main, sectionCtx());
   }
 
   async function renderRoster(main) {
