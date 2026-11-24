@@ -324,7 +324,7 @@ window.TRAINING = {
         <li>Provided by <b>Icelandair ehf</b> — we request, sequence and confirm it.</li>
         <li>Request early with registration, type, stand and time. Log it in Notion.</li>
         <li>De-ice as close to departure as possible: after boarding and catering, before pushback.</li>
-        <li>The flight crew set holdover time. If departure is delayed after de-icing, <b>tell the crew immediately</b>.</li>
+        <li>Holdover time is the <b>flight crew’s</b> decision. If departure is delayed after de-icing, they check their holdover time and decide whether to de-ice again. If they ask, <b>request it from Icelandair ehf straight away</b> and log the second de-icing in Notion.</li>
         <li>Confirm completion with Icelandair ehf and the crew before releasing; record fluid type and time.</li>
       </ul>` },
     { h: "Fuel", html: `
@@ -361,7 +361,7 @@ window.TRAINING = {
   ],
   quiz: [
     { q: "Who provides de-icing at IAA's stations?", o: ["IAA ramp staff", "Icelandair ehf", "Isavia", "The fuel supplier"], a: 1, e: "De-icing is a third-party service by Icelandair ehf. IAA coordinates, sequences and confirms.", r: "19" },
-    { q: "The departure is delayed 25 minutes after de-icing finished. What do you do?", o: ["Nothing — the crew will know", "Tell the crew immediately so they can check their holdover time", "Order a second de-icing yourself", "Record it in Notion only"], a: 1, e: "Delays erode holdover. Tell the crew straight away; they decide whether re-application is needed.", r: "19.2" },
+    { q: "The departure is delayed after de-icing, and the crew decide their holdover time has run out. They ask for de-icing again. What do you do?", o: ["Tell them it isn’t needed – it was done less than half an hour ago", "Request it from Icelandair ehf straight away and log the second de-icing in Notion", "Wait until the delay is over, then request it", "Do it yourself with the ground equipment"], a: 1, e: "Holdover is the crew’s decision. Our job is to request, sequence and confirm de-icing with the provider quickly, and log every application so it can be billed.", r: "19.2" },
     { q: "Who supplies Jet A-1 at BIKF?", o: ["Skeljungur", "EAK", "Icelandair", "Self-service pump"], a: 1, e: "EAK at BIKF; Skeljungur at BIRK; Icelandair fuel desk at BIAR.", r: "20" },
     { q: "A crew reports a technical fault that will stop departure. What is your first action?", o: ["Estimate the repair time for the client", "Contact Flugverk to arrange engineering", "Tow the aircraft to Apron 1 North", "Cancel the flight in Notion"], a: 1, e: "Flugverk is IAA's AOG partner and the technical authority on status and timeline.", r: "21.1" },
     { q: "A tug lightly touches a GPU. No visible damage. What must you report?", o: ["Nothing — no damage", "Report on the IAA Portal and through the airport authority's system", "Only the IAA Portal report", "Only tell the duty manager"], a: 1, e: "Any contact, even without visible damage, is reportable — through both channels.", r: "22.1" },
