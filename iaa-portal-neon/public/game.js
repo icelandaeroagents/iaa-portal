@@ -179,7 +179,9 @@
     { id: "phonetic", icon: "📻", title: "Phonetic Rush", blurb: "Registrations and callsigns in the phonetic alphabet – 60 seconds, as many as you can.", play: phoneticGame },
     { id: "world", icon: "🌍", title: "Where in the World?", blurb: "ICAO codes and the airports behind them – 60 seconds against the clock.", play: worldGame },
     { id: "word", icon: "🔤", title: "Daily Word", blurb: "Guess today’s five-letter aviation word in six tries. One go a day.", play: wordGame, daily: true },
-    { id: "riddle", icon: "🧩", title: "Daily Riddle", blurb: "One aviation riddle a day – one answer, one chance.", play: riddleGame, daily: true }
+    { id: "riddle", icon: "🧩", title: "Daily Riddle", blurb: "One aviation riddle a day – one answer, one chance.", play: riddleGame, daily: true },
+    { id: "airside", icon: "🚐", title: "Airside Driver", blurb: "Deliver around the apron: 30 km/h, stop at hold lines, give way to aircraft.", play: airsideGame },
+    { id: "pushback", icon: "🚜", title: "Pushback Pro", blurb: "Push five jets back onto the taxiway – line up, and mind the wingtips.", play: pushbackGame }
   ];
 
   async function render(main, ctx) {
@@ -1077,6 +1079,285 @@
       if (saved !== null && saved !== undefined) { answer(saved); return; }
       show(null);
     })();
+  }
+
+  // ==================================================================
+  // Shared: on-screen buttons that act while held (for steering)
+  // ==================================================================
+  function holdButton(h, label, onChange, cls) {
+    const b = h("button", { class: "btn btn-quiet game-pad" + (cls ? " " + cls : ""), type: "button" }, label);
+    const on = (e) => { e.preventDefault(); b.classList.add("is-held"); onChange(true); };
+    const off = (e) => { if (e) e.preventDefault(); b.classList.remove("is-held"); onChange(false); };
+    b.addEventListener("pointerdown", on); b.addEventListener("pointerup", off); b.addEventListener("pointerleave", off); b.addEventListener("pointercancel", off);
+    b.addEventListener("contextmenu", (e) => e.preventDefault());
+    return b;
+  }
+  function vanTop(g, x, y, ang, col) {
+    g.save(); g.translate(x, y); g.rotate(ang);
+    g.fillStyle = "rgba(0,0,0,0.25)"; g.fillRect(-7, -11, 16, 26);
+    g.fillStyle = col || "#f2c200"; g.fillRect(-8, -13, 16, 26);
+    g.fillStyle = "#1a222f"; g.fillRect(-6, -10, 12, 6);            // windscreen (front = up)
+    g.fillStyle = "#ff8a00"; g.fillRect(-2, -2, 4, 3);              // roof beacon
+    g.restore();
+  }
+
+  // ==================================================================
+  // 9. Airside Driver
+  // ==================================================================
+  function airsideGame(main, ctx, def) {
+    const { h } = ctx;
+    const KMH = 0.4, LIMIT = 30, MAXV = 125;                 // display km/h = px/s × 0.4
+    const ROADS = [[40, 90, 40, 510], [400, 90, 40, 510], [40, 90, 400, 40], [40, 560, 400, 40]];  // x, y, w, h
+    const TAXI = { y: 290, h: 60 };                         // the taxiway the road crosses
+    const HOLD = [{ y: 278 }, { y: 362 }];                  // hold lines either side of the taxiway
+    const BAYS = [
+      { name: "Stand 1", x: 82, y: 160, w: 34, h: 36 }, { name: "Stand 2", x: 82, y: 440, w: 34, h: 36 },
+      { name: "Stand 3", x: 210, y: 132, w: 40, h: 32 }, { name: "Stand 4", x: 364, y: 180, w: 34, h: 36 },
+      { name: "Stand 5", x: 364, y: 470, w: 34, h: 36 }, { name: "Stand 6", x: 250, y: 526, w: 40, h: 32 }
+    ];
+    const LOADS = ["the GPU", "potable water", "the catering", "the lav truck", "the crew’s bags", "the air stairs"];
+    const inRect = (x, y, r) => x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
+    const onRoad = (x, y) => ROADS.some((r) => inRect(x, y, r)) || BAYS.some((b) => inRect(x, y, [b.x, b.y, b.w, b.h]));
+    const inTaxi = (y) => y >= TAXI.y && y <= TAXI.y + TAXI.h;
+
+    const cv = makeCanvas(h, "Airside Driver. Arrow keys or the buttons to drive.");
+    const { canvas, g } = cv;
+    const ctl = { l: false, r: false, u: false, d: false };
+    const pads = h("div", { class: "game-pads game-pads-drive" },
+      holdButton(h, "◀", (v) => { ctl.l = v; }), holdButton(h, "▲ Go", (v) => { ctl.u = v; }), holdButton(h, "▼ Brake", (v) => { ctl.d = v; }), holdButton(h, "▶", (v) => { ctl.r = v; }));
+    const { board, status } = shell(main, ctx, def,
+      "Deliver to each stand and stop inside its box. Keep to the service road, under 30 km/h, and stop at the hold line before crossing the taxiway. Three violations end your shift – crossing in front of a taxiing aircraft ends it at once. Hold Brake after stopping to reverse.",
+      canvas, pads);
+    cv.size(); window.addEventListener("resize", cv.size);
+
+    let mode = "ready", t = 0, msgAt = 0, score = 0, strikes = 0, x, y, ang, v, last, task, taskLeft, overSpeed = 0, cool = 0, stoppedAtHold = false, wasInTaxi = false, planes = [], spawnIn = 2, flash = null, why = "", brakeHeld = 0;
+    function newTask() {
+      let b; do { b = pickOne(BAYS); } while (task && b === task.bay);
+      task = { bay: b, load: pickOne(LOADS) }; taskLeft = 32;
+    }
+    function start() { x = 60; y = 520; ang = 0; v = 0; last = { x, y }; score = 0; strikes = 0; planes = []; spawnIn = 2; overSpeed = 0; cool = 0; stoppedAtHold = false; wasInTaxi = false; task = null; newTask(); mode = "drive"; ctx.setStatus(status, ""); }
+    function violation(text) {
+      if (cool > 0) return;
+      strikes++; cool = 2.5; flash = { text: `${text} (${strikes}/3)`, at: t, bad: true };
+      if (strikes >= 3) end("Three violations – shift over");
+    }
+    function end(text) { mode = "over"; why = text; msgAt = t; v = 0; finish(ctx, def, board, status, score); }
+    const unkeys = keys(canvas,
+      (e) => { const k = { ArrowLeft: "l", ArrowRight: "r", ArrowUp: "u", ArrowDown: "d" }[e.code];
+        if (k) { ctl[k] = true; return true; }
+        if (e.code === "Space" || e.code === "Enter") { if (mode === "ready" || (mode === "over" && t - msgAt > 0.8)) start(); return true; } },
+      (e) => { const k = { ArrowLeft: "l", ArrowRight: "r", ArrowUp: "u", ArrowDown: "d" }[e.code]; if (k) { ctl[k] = false; return true; } });
+    canvas.addEventListener("pointerdown", (e) => { e.preventDefault(); canvas.focus(); if (mode === "ready" || (mode === "over" && t - msgAt > 0.8)) start(); });
+
+    function drawMap() {
+      g.fillStyle = "#9aa3ab"; g.fillRect(0, 0, W, H);                          // apron concrete
+      g.fillStyle = "#566a4a"; g.fillRect(0, 0, W, 70); g.fillRect(0, 620, W, 20); // grass
+      // parked aircraft on the inner apron (keep off!)
+      jetTop(g, 175, 220, 0, 1.25); jetTop(g, 300, 225, 0, 1.25); jetTop(g, 240, 455, Math.PI, 1.25);
+      // taxiway
+      g.fillStyle = "#3a4048"; g.fillRect(0, TAXI.y, W, TAXI.h);
+      g.fillStyle = "#f2c200"; for (let xx = 0; xx < W; xx += 26) g.fillRect(xx, TAXI.y + TAXI.h / 2 - 1.5, 14, 3);
+      g.fillStyle = "#2f7de1"; for (let xx = 10; xx < W; xx += 60) { g.beginPath(); g.arc(xx, TAXI.y + 3, 2.5, 0, 7); g.arc(xx, TAXI.y + TAXI.h - 3, 2.5, 0, 7); g.fill(); }
+      // service roads
+      ROADS.forEach((r) => { g.fillStyle = "#5b636c"; g.fillRect(r[0], r[1], r[2], r[3]); });
+      g.fillStyle = "#f4f7f9";
+      ROADS.forEach((r) => { if (r[2] > r[3]) { g.fillRect(r[0], r[1], r[2], 2); g.fillRect(r[0], r[1] + r[3] - 2, r[2], 2); } else { g.fillRect(r[0], r[1], 2, r[3]); g.fillRect(r[0] + r[2] - 2, r[1], 2, r[3]); } });
+      // the road crossing the taxiway, and its hold lines
+      [40, 400].forEach((rx) => { g.fillStyle = "#4a5058"; g.fillRect(rx, TAXI.y, 40, TAXI.h);
+        HOLD.forEach((hl) => { for (let k = 0; k < 4; k++) { g.fillStyle = k % 2 ? "#ffffff" : "#d62f2f"; g.fillRect(rx + k * 10, hl.y - 3, 10, 6); } }); });
+      g.fillStyle = "#ffffff"; g.font = `700 9px ${FONT}`; g.textAlign = "center";
+      [40, 400].forEach((rx) => { g.fillText("STOP", rx + 20, HOLD[0].y - 6); g.fillText("STOP", rx + 20, HOLD[1].y + 14); });
+      // stand boxes
+      BAYS.forEach((b) => {
+        const target = task && task.bay === b;
+        g.strokeStyle = target ? "#5fd0c3" : "rgba(255,255,255,0.7)"; g.lineWidth = target ? 3 : 1.5; g.setLineDash(target ? [] : [4, 3]);
+        g.strokeRect(b.x, b.y, b.w, b.h); g.setLineDash([]);
+        if (target) { g.fillStyle = "rgba(95,208,195,0.25)"; g.fillRect(b.x, b.y, b.w, b.h); }
+        g.fillStyle = target ? "#0b5f57" : "#1a222f"; g.font = `700 9px ${FONT}`; g.fillText(b.name.replace("Stand ", "S"), b.x + b.w / 2, b.y + b.h / 2 + 3);
+      });
+    }
+    function hud() {
+      g.fillStyle = "rgba(26,34,47,0.88)"; g.fillRect(0, 0, W, 64);
+      g.textAlign = "left"; g.fillStyle = "#ffffff"; g.font = `600 14px ${FONT}`;
+      g.fillText(task && mode === "drive" ? `Take ${task.load} to ${task.bay.name}` : "Airside Driver", 12, 22);
+      g.font = `500 12px ${FONT}`; g.fillStyle = "#a9ddd5";
+      g.fillText(mode === "drive" ? `Time ${Math.ceil(Math.max(0, taskLeft))} s · Score ${score}` : `Score ${score}`, 12, 42);
+      const kmh = Math.round(Math.abs(v) * KMH);
+      g.textAlign = "right"; g.font = `700 22px ${FONT}`; g.fillStyle = kmh > LIMIT ? "#ff6b6b" : "#ffffff"; g.fillText(`${kmh}`, W - 80, 30);
+      g.font = `500 11px ${FONT}`; g.fillStyle = "#a9ddd5"; g.fillText("km/h · limit 30", W - 80, 46);
+      for (let i = 0; i < 3; i++) { g.fillStyle = i < strikes ? "#e5484d" : "#3a4b66"; g.beginPath(); g.arc(W - 54 + i * 18, 30, 6, 0, 7); g.fill(); }
+    }
+
+    stopCurrent = startLoop(canvas, function (dt) {
+      t += dt; cool = Math.max(0, cool - dt);
+      // aircraft taxiing along the taxiway
+      if (mode !== "ready") {
+        spawnIn -= dt;
+        if (spawnIn <= 0 && planes.length < 2) { const dir = Math.random() < 0.5 ? 1 : -1; planes.push({ x: dir > 0 ? -140 : W + 140, dir, sp: 70 + Math.random() * 40 }); spawnIn = 5 + Math.random() * 5; }
+        planes.forEach((p) => { p.x += p.dir * p.sp * dt; }); planes = planes.filter((p) => p.x > -200 && p.x < W + 200);
+      }
+      if (mode === "drive") {
+        // Brake stops the van and holds it. Keep holding Brake for nearly a second once stopped to reverse.
+        if (ctl.d && v <= 0.5) brakeHeld += dt; else brakeHeld = 0;
+        if (ctl.u) v = Math.min(MAXV, v + 90 * dt);
+        else if (ctl.d) v = v > 0.5 ? Math.max(0, v - 200 * dt) : brakeHeld > 0.8 ? Math.max(-30, v - 40 * dt) : Math.min(0, v + 200 * dt);
+        else v = v > 0 ? Math.max(0, v - 35 * dt) : Math.min(0, v + 35 * dt);
+        const turn = (ctl.r ? 1 : 0) - (ctl.l ? 1 : 0);
+        ang += turn * 2.6 * Math.min(1, Math.abs(v) / 40) * Math.sign(v || 1) * dt;
+        const nx = x + Math.sin(ang) * v * dt, ny = y - Math.cos(ang) * v * dt;
+        x = nx; y = ny;
+        // rules
+        if (Math.abs(v) * KMH > LIMIT + 0.5) { overSpeed += dt; if (overSpeed > 1) { violation("Speeding – the limit is 30 km/h"); overSpeed = 0; } } else overSpeed = Math.max(0, overSpeed - dt);
+        if (!onRoad(x, y)) { violation("Off the service road"); x = last.x; y = last.y; v = 0; } else last = { x, y };
+        const nearHold = (y > HOLD[0].y - 34 && y < TAXI.y) || (y > TAXI.y + TAXI.h && y < HOLD[1].y + 34);
+        if (nearHold && Math.abs(v) < 4) stoppedAtHold = true;
+        const nowInTaxi = inTaxi(y);
+        if (nowInTaxi && !wasInTaxi && !stoppedAtHold) violation("Didn’t stop at the hold line");
+        if (!nowInTaxi && wasInTaxi) stoppedAtHold = false;
+        if (!nowInTaxi && !nearHold) stoppedAtHold = false;
+        wasInTaxi = nowInTaxi;
+        if (nowInTaxi && planes.some((p) => Math.abs(p.x - x) < 95)) end("Taxiway incursion – aircraft have right of way");
+        // the task
+        taskLeft -= dt;
+        const b = task.bay;
+        if (mode === "drive" && inRect(x, y, [b.x, b.y, b.w, b.h]) && Math.abs(v) < 6) {
+          const bonus = Math.round(Math.max(0, taskLeft)); score += 50 + bonus;
+          flash = { text: `Delivered ${task.load} to ${b.name} +${50 + bonus}`, at: t, bad: false }; newTask();
+        } else if (mode === "drive" && taskLeft <= 0) { flash = { text: `Too slow – ${task.load} went with someone else`, at: t, bad: true }; newTask(); }
+      }
+      drawMap();
+      planes.forEach((p) => jetTop(g, p.x, TAXI.y + TAXI.h / 2, p.dir > 0 ? Math.PI / 2 : -Math.PI / 2, 1.35));
+      if (x !== undefined) vanTop(g, x, y, ang);
+      hud();
+      if (flash && t - flash.at < 2.2) {
+        g.globalAlpha = Math.min(1, 2.2 - (t - flash.at)); g.font = `600 14px ${FONT}`;
+        const tw = g.measureText(flash.text).width + 24; g.fillStyle = flash.bad ? "rgba(229,72,77,0.92)" : "rgba(8,143,131,0.92)";
+        g.fillRect(W / 2 - tw / 2, 76, tw, 30); g.fillStyle = "#ffffff"; g.textAlign = "center"; g.fillText(flash.text, W / 2, 96); g.globalAlpha = 1;
+      }
+      if (mode === "ready") overlay(g, "Airside Driver", ["Deliver to the stands – stop inside the box", "30 km/h · stop at hold lines · give way to aircraft", "Arrows or buttons to drive · tap to start"]);
+      if (mode === "over") overlay(g, why.indexOf("incursion") !== -1 ? "Incursion!" : "Shift over", [why, `Score ${score}`, "Tap or press Space to drive again"]);
+    }, () => { unkeys(); window.removeEventListener("resize", cv.size); });
+  }
+
+  // ==================================================================
+  // 10. Pushback Pro
+  // ==================================================================
+  function pushbackGame(main, ctx, def) {
+    const { h } = ctx;
+    const ROUNDS = 5, S = 1.8, L = 32 * S, MAXD = 1.05, MAXV = 24, TY = 470;   // jet scale, wheelbase, max steering, max speed, taxiway centreline
+    const cv = makeCanvas(h, "Pushback Pro. Arrow keys or the buttons to steer and push; Space when parked.");
+    const { canvas, g } = cv;
+    const ctl = { l: false, r: false, u: false, d: false };
+    const done = h("button", { class: "btn game-pad", type: "button" }, "✓ Set brakes");
+    const pads = h("div", { class: "game-pads game-pads-drive" },
+      holdButton(h, "◀ Steer", (v) => { ctl.l = v; }), holdButton(h, "▲ Push", (v) => { ctl.u = v; }), holdButton(h, "▼ Slow", (v) => { ctl.d = v; }), holdButton(h, "Steer ▶", (v) => { ctl.r = v; }), done);
+    const { board, status } = shell(main, ctx, def,
+      "Push each jet back off its stand and onto the taxiway, finishing on the yellow centreline facing the way shown. You steer the nose, so the tail swings the other way. Stop, then set the brakes. Don’t hit the parked jets.",
+      canvas, pads);
+    cv.size(); window.addEventListener("resize", cv.size);
+
+    let mode = "ready", t = 0, msgAt = 0, n = 0, total = 0, results = [], mx, my, th, del, v, sx, face, neighbours, elapsed, res = null;
+    // world point from a point on the jet (lx right, ly towards the tail), relative to the fuselage centre
+    function centre() { return { x: mx + Math.sin(th) * 10 * S, y: my - Math.cos(th) * 10 * S }; }   // the fuselage centre is 10·S ahead of the main gear
+    function pt(lx, ly) { const c = centre(), cs = Math.cos(th), sn = Math.sin(th); return { x: c.x + lx * cs - ly * sn, y: c.y + lx * sn + ly * cs }; }
+    function setup() {
+      sx = pickOne([170, 240, 310]); face = Math.random() < 0.5 ? 1 : -1;      // 1 = face east (right), −1 = west
+      th = 0; mx = sx; my = 250; del = 0; v = 0; elapsed = 0;
+      const gap = 128 - n * 3;
+      neighbours = [{ x: sx - gap, y: 230 }, { x: sx + gap, y: 230 }].filter((nb) => nb.x > 20 && nb.x < W - 20);
+    }
+    function boxes() { // parked jets as rectangles: wings and fuselage
+      const out = [];
+      neighbours.forEach((nb) => { out.push([nb.x - 26 * S, nb.y - 4 * S, 52 * S, 14 * S]); out.push([nb.x - 6 * S, nb.y - 27 * S, 12 * S, 56 * S]); });
+      out.push([0, 0, W, 34]);   // terminal building
+      return out;
+    }
+    function hits() {
+      const pts = [pt(-26 * S, 8 * S), pt(26 * S, 8 * S), pt(0, -28 * S), pt(0, 30 * S), pt(-11 * S, 27 * S), pt(11 * S, 27 * S)];
+      if (pts.some((p) => p.x < 0 || p.x > W || p.y > H)) return "Off the apron";
+      return boxes().some((r) => pts.some((p) => p.x > r[0] && p.x < r[0] + r[2] && p.y > r[1] && p.y < r[1] + r[3])) ? "Wingtip strike!" : null;
+    }
+    function score() {
+      const target = face > 0 ? Math.PI / 2 : -Math.PI / 2;
+      let err = Math.abs(((th - target + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI) * 180 / Math.PI;
+      const off = Math.abs(my - TY) / S * 0.5;                    // metres-ish off the centreline
+      const pts = Math.round(Math.max(0, 100 - Math.max(0, off - 0.5) * 6 - err * 1.5 - Math.max(0, elapsed - 35) * 1));
+      return { pts, off, err };
+    }
+    function next() {
+      if (mode === "ready") { n = 0; total = 0; results = []; setup(); mode = "push"; ctx.setStatus(status, ""); return; }
+      if (mode === "result" && t - msgAt > 0.5) { n++; if (n >= ROUNDS) { mode = "done"; msgAt = t; finish(ctx, def, board, status, total); } else { setup(); mode = "push"; } return; }
+      if (mode === "done" && t - msgAt > 0.8) mode = "ready";
+    }
+    function park() {
+      if (mode !== "push") { next(); return; }
+      if (Math.abs(v) > 0.5) { ctx.setStatus(status, "Stop first – then set the brakes.", true); return; }
+      res = score(); total += res.pts; results.push(res.pts); res.word = res.pts >= 90 ? "Perfect pushback!" : res.pts >= 70 ? "Nicely done" : res.pts >= 40 ? "Acceptable" : "The crew are not impressed";
+      mode = "result"; msgAt = t; ctx.setStatus(status, "");
+    }
+    done.addEventListener("click", park);
+    const unkeys = keys(canvas,
+      (e) => { const k = { ArrowLeft: "l", ArrowRight: "r", ArrowUp: "u", ArrowDown: "d" }[e.code];
+        if (k) { ctl[k] = true; return true; }
+        if (e.code === "Space" || e.code === "Enter") { park(); return true; } },
+      (e) => { const k = { ArrowLeft: "l", ArrowRight: "r", ArrowUp: "u", ArrowDown: "d" }[e.code]; if (k) { ctl[k] = false; return true; } });
+    canvas.addEventListener("pointerdown", (e) => { e.preventDefault(); canvas.focus(); if (mode !== "push") next(); });
+
+    function scene() {
+      g.fillStyle = "#9aa3ab"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "#31415a"; g.fillRect(0, 0, W, 34); g.fillStyle = "#5fd0c3"; g.font = `700 13px ${FONT}`; g.textAlign = "center"; g.fillText("IAA FBO", W / 2, 22);
+      // stands and lead-in lines
+      [170, 240, 310].forEach((x) => { g.fillStyle = "#f2c200"; g.fillRect(x - 1.5, 60, 3, 300); g.fillRect(x - 14, 156, 28, 3); });
+      // taxiway
+      g.fillStyle = "#3a4048"; g.fillRect(0, TY - 50, W, 100);
+      g.fillStyle = "#f2c200"; g.fillRect(0, TY - 2, W, 4);
+      g.fillStyle = "#2f7de1"; for (let x = 10; x < W; x += 50) { g.beginPath(); g.arc(x, TY - 47, 2.5, 0, 7); g.arc(x, TY + 47, 2.5, 0, 7); g.fill(); }
+      // which way to face
+      if (mode === "push" || mode === "result") {
+        g.fillStyle = "rgba(95,208,195,0.9)"; const ax = face > 0 ? W - 60 : 60;
+        g.beginPath(); g.moveTo(ax + face * 26, TY); g.lineTo(ax - face * 6, TY - 16); g.lineTo(ax - face * 6, TY + 16); g.closePath(); g.fill();
+        g.fillStyle = "#ffffff"; g.font = `700 12px ${FONT}`; g.fillText(face > 0 ? "FACE EAST" : "FACE WEST", ax - face * 8, TY - 24);
+      }
+      neighbours && neighbours.forEach((nb) => jetTop(g, nb.x, nb.y + 3 * S, 0, S, "#3a4b66"));
+    }
+    function tug() {
+      const nose = pt(0, -30 * S);
+      g.save(); g.translate(nose.x, nose.y); g.rotate(th + del);
+      g.fillStyle = "#1a222f"; g.fillRect(-9, -26, 18, 24); g.fillStyle = "#f2c200"; g.fillRect(-9, -26, 18, 4);
+      g.restore();
+    }
+    function hud() {
+      g.fillStyle = "rgba(10,16,26,0.6)"; g.fillRect(10, H - 74, W - 20, 62);
+      g.fillStyle = "#ffffff"; g.textAlign = "left"; g.font = `600 14px ${FONT}`;
+      g.fillText(`Pushback ${Math.min(n + 1, ROUNDS)} of ${ROUNDS} · Score ${total}`, 22, H - 50);
+      g.font = `500 12px ${FONT}`; g.fillStyle = "#a9ddd5";
+      g.fillText(`Speed ${(v * 0.25).toFixed(1)} km/h · Steering ${Math.round(del * 57)}° · Off centreline ${(Math.abs(my - TY) / S * 0.5).toFixed(1)} m`, 22, H - 30);
+    }
+
+    setup(); mode = "ready";
+    stopCurrent = startLoop(canvas, function (dt) {
+      t += dt;
+      if (mode === "push") {
+        elapsed += dt;
+        const steer = (ctl.r ? 1 : 0) - (ctl.l ? 1 : 0);
+        del += steer ? steer * 1.4 * dt : -del * Math.min(1, 1.6 * dt);
+        del = Math.max(-MAXD, Math.min(MAXD, del));
+        if (ctl.u) v = Math.min(MAXV, v + 14 * dt); else if (ctl.d) v = Math.max(0, v - 30 * dt); else v = Math.max(0, v - 4 * dt);
+        // pushed backwards: the main gear moves tail-first; the nose wheel angle turns the aircraft
+        mx -= Math.sin(th) * v * dt; my += Math.cos(th) * v * dt;
+        th -= (v / L) * Math.tan(del) * dt;
+        const hit = hits();
+        if (hit) { res = { pts: 0, word: hit, off: 0, err: 0, crash: true }; results.push(0); mode = "result"; msgAt = t; v = 0; }
+      }
+      scene();
+      jetTop(g, centre().x, centre().y, th, S);
+      if (mode !== "ready") tug();
+      hud();
+      if (mode === "ready") overlay(g, "Pushback Pro", ["Five pushbacks onto the taxiway", "◀ ▶ steer the nose · ▲ push · ▼ slow", "Stop on the centreline, then set the brakes", "Tap or press Space to begin"]);
+      if (mode === "result" && res) overlay(g, res.word, res.crash ? ["0 points for this pushback", n + 1 >= ROUNDS ? "Tap for your total" : "Tap for the next aircraft"]
+        : [`${res.pts} points`, `${res.off.toFixed(1)} m off the centreline · ${Math.round(res.err)}° off heading`, n + 1 >= ROUNDS ? "Tap for your total" : "Tap for the next aircraft"]);
+      if (mode === "done") overlay(g, `Total ${total}`, [results.join(" · "), `Best ${Math.max(board.best, total)}`, "Tap to push again"]);
+    }, () => { unkeys(); window.removeEventListener("resize", cv.size); });
   }
 
   window.IAAGame = { render: render };

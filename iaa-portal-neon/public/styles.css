@@ -1324,3 +1324,6 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
 .word-key.is-wide { min-width: 3.6rem; font-size: 0.8rem; }
 .word-msg { font-weight: 600; text-align: center; max-width: 28rem; }
 @media (max-width: 420px) { .word-row { grid-template-columns: repeat(5, 2.7rem); } .word-cell { height: 2.7rem; } .word-key { min-width: 1.75rem; } }
+.game-pads-drive { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.game-pads-drive .btn:last-child:nth-child(5) { grid-column: 1 / -1; }
+.game-pad.is-held { background: var(--field); border-color: var(--brand); }
