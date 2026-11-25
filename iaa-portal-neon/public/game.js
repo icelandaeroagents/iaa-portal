@@ -1005,51 +1005,51 @@
   // 8. Daily Riddle – one a day, one answer
   // ==================================================================
   const RIDDLES = [
-    { q: "I have a tail but no body, I sit beside the runway, and I show which way the wind blows. What am I?", a: ["windsock", "wind sock", "wind cone"], e: "A windsock – its tail points the way the wind is blowing." },
-    { q: "The more of me you take, the more you leave behind on the ramp. What am I?", a: ["footsteps", "footprints", "steps"], e: "Footsteps. (Walk, don’t run, on the apron.)" },
-    { q: "I’m a word in the phonetic alphabet and also a dance from Argentina. What am I?", a: ["tango"], e: "Tango – the T in TF." },
-    { q: "Pilots say me instead of “nine” so it isn’t mistaken for the German “nein”. What do they say?", a: ["niner"], e: "Niner." },
-    { q: "I’m the routine weather report for an airport, issued every half hour or hour. Five letters – what am I?", a: ["metar"], e: "A METAR." },
-    { q: "I warn pilots about changes at an airport – a closed taxiway, a broken light – but never the weather. Five letters – what am I?", a: ["notam", "notams"], e: "A NOTAM – Notice to Air Missions." },
-    { q: "I go down as you climb and up as you descend, and pilots set me on the altimeter before every flight. What am I?", a: ["air pressure", "pressure", "atmospheric pressure", "barometric pressure", "qnh"], e: "Air pressure (the QNH setting)." },
-    { q: "Pilots turn me with one hand to steer the nose wheel on the ground. What am I?", a: ["tiller", "steering tiller", "nose wheel steering", "nosewheel steering", "nose wheel tiller"], e: "The nose wheel steering tiller." },
-    { q: "I hold the aircraft still, I come in pairs, and I’m the first thing on and the last thing off. What am I?", a: ["chocks", "chock", "wheel chocks"], e: "Chocks – first on after arrival, last off before departure." },
-    { q: "I’m orange and white and I stand at the wingtips, nose and tail on stand. What am I?", a: ["cone", "cones", "safety cone", "safety cones", "traffic cone"], e: "Safety cones." },
-    { q: "On the radio I’m Bravo India Kilo Foxtrot. Which airport am I?", a: ["keflavik", "bikf", "keflavik airport", "keflavik international"], e: "Keflavík (BIKF)." },
-    { q: "Runway 13 points roughly towards which compass direction?", a: ["south east", "southeast", "se", "130", "130 degrees", "sse"], e: "South-east – about 130°." },
-    { q: "I’m how long de-icing fluid keeps the wings clean before it must be done again. Two words – what am I?", a: ["holdover time", "holdover", "hot"], e: "Holdover time." },
-    { q: "I’m measured from chocks off to chocks on. Two words – what am I?", a: ["block time", "blocks time", "block"], e: "Block time – off-blocks to on-blocks." },
-    { q: "I have a nose, a belly and a tail but no face, and wings but no feathers. What am I?", a: ["aircraft", "airplane", "aeroplane", "plane", "jet", "business jet"], e: "An aircraft." },
-    { q: "On the radio, one word that means “I understand and will comply”. What am I?", a: ["wilco"], e: "Wilco – will comply. “Roger” only means “received”." },
-    { q: "Which four-digit transponder code means emergency?", a: ["7700"], e: "7700. (7600 is radio failure, 7500 unlawful interference.)" },
-    { q: "Which four-digit transponder code means radio failure?", a: ["7600"], e: "7600." },
-    { q: "I’m painted yellow on the apron and every aircraft follows me to its stand. What am I?", a: ["lead in line", "leadin line", "lead in", "lead-in line", "taxi line", "guidance line", "stand line"], e: "The lead-in line." },
-    { q: "A GPU lets the crew switch me off and save fuel. Three letters – what am I?", a: ["apu", "auxiliary power unit"], e: "The APU – auxiliary power unit, a small engine usually in the tail." },
-    { q: "Three letters, and the thing every ramp agent should pick up and every jet engine hates. What am I?", a: ["fod", "foreign object debris", "foreign object damage", "debris"], e: "FOD – foreign object debris." },
-    { q: "I flash red on the top and bottom of the aircraft. When I’m on, stay well clear. What am I?", a: ["beacon", "anti collision beacon", "anti collision light", "anticollision beacon", "anticollision light", "beacon light", "red beacon"], e: "The anti-collision beacon – engines are starting or running." },
-    { q: "What colour is the navigation light on the right wingtip?", a: ["green"], e: "Green – red is on the left." },
-    { q: "What colour are taxiway edge lights?", a: ["blue"], e: "Blue. Taxiway centrelines are green." },
-    { q: "Every Icelandic aircraft registration starts with these two letters. What are they?", a: ["tf"], e: "TF – as in TF-ABC." },
-    { q: "I’m the airport in south Greenland where many transatlantic business jets stop for fuel. Name me.", a: ["narsarsuaq", "bgbw"], e: "Narsarsuaq (BGBW)." },
-    { q: "Most business jets fuel with me in Iceland. What fuel am I?", a: ["jet a1", "jet a 1", "jeta1", "jet a", "jet fuel", "kerosene", "jet-a1", "jet-a"], e: "Jet A-1. Avgas is for piston engines." },
-    { q: "Two pilots, ten passengers, a dog and three golf bags. Who decides where everything goes in the hold?", a: ["crew", "flight crew", "pilot", "pilots", "captain", "commander", "pic"], e: "The crew – they’re responsible for mass and balance." },
-    { q: "I come in pairs, I glow orange, and I speak without a word. What am I?", a: ["wands", "wand", "marshalling wands", "marshaling wands", "batons", "paddles"], e: "Marshalling wands." },
-    { q: "On the radio, how do you say the letter M?", a: ["mike"], e: "Mike." },
-    { q: "Every ICAO airport code starting with BI is in which country?", a: ["iceland"], e: "Iceland – BIKF, BIRK, BIAR, BIEG." },
-    { q: "What is standard pressure in hectopascals? (four digits)", a: ["1013", "1013.25", "1013 hpa"], e: "1013 hPa (1013.25)." },
-    { q: "Snow on the wings, frost on the tail. Who decides whether the aircraft needs de-icing?", a: ["crew", "flight crew", "pilot", "pilots", "captain", "commander", "pic"], e: "The crew – we request de-icing when they ask." },
-    { q: "I lift the nose wheel off the ground and push the aircraft back without a towbar. What am I?", a: ["tug", "towbarless tug", "tractor", "towbarless tractor", "pushback tug", "tow tractor", "pushback tractor"], e: "A towbarless tug." },
-    { q: "Hot coffee, quiet sofas and a crew’s best friend after a long night flight. What do we call it at Iceland Aero Agents?", a: ["vip lounge", "lounge"], e: "Our VIP Lounge." },
-    { q: "I’m a recording on repeat telling pilots the weather, the runway in use and an information letter. Four letters – what am I?", a: ["atis"], e: "ATIS – automatic terminal information service." },
-    { q: "On the radio, which word comes between Juliett and Lima?", a: ["kilo"], e: "Kilo." },
-    { q: "Three letters: I plug into the aircraft and give it electricity on stand. What am I?", a: ["gpu", "ground power unit", "ground power"], e: "A GPU – ground power unit." },
-    { q: "Before departure we check all round the aircraft for open panels, FOD and equipment. What is that check called?", a: ["walk around", "walkaround", "walk-around", "walkround", "walk round", "pre flight inspection", "preflight inspection", "departure walk around"], e: "The walk-around." },
-    { q: "I’m a little tube on the nose that measures airspeed and must never be covered or blocked. What am I?", a: ["pitot", "pitot tube", "pitot probe", "pitot head"], e: "The pitot tube – remove any covers before departure." },
-    { q: "After landing I pop up on top of the wing to dump lift. What am I?", a: ["spoiler", "spoilers", "ground spoilers", "speed brake", "speed brakes", "speedbrake", "speedbrakes", "lift dumpers"], e: "Spoilers (lift dumpers)." },
-    { q: "On the radio, the letter Q is…?", a: ["quebec"], e: "Quebec." }
+    { q: "I’m full of air but never fly, and I’m all tail with no body.", a: ["windsock", "wind sock", "wind cone"], e: "A windsock – its tail points downwind." },
+    { q: "The more of me you take, the more you leave behind.", a: ["footsteps", "footprints", "steps"], e: "Footsteps." },
+    { q: "I’m a dance, and I lead every Icelandic tail.", a: ["tango"], e: "Tango – the T in TF." },
+    { q: "On the radio I carry one syllable more than I need, all so a German won’t hear “no”.", a: ["niner"], e: "Niner – so it isn’t heard as “nein”." },
+    { q: "Every hour I tell you how it is – never how it will be.", a: ["metar"], e: "A METAR: current weather. A TAF is the forecast." },
+    { q: "The airport’s small print: what’s closed, broken or moved. Skip me at your peril.", a: ["notam", "notams"], e: "A NOTAM." },
+    { q: "Heavy but invisible, I fall as you rise, and pilots dial me in before they go.", a: ["air pressure", "pressure", "atmospheric pressure", "barometric pressure", "qnh"], e: "Air pressure – set on the altimeter as QNH." },
+    { q: "Turned by the captain’s hand, I only work while the wheels are on the ground.", a: ["tiller", "steering tiller", "nose wheel steering", "nosewheel steering", "nose wheel tiller"], e: "The nose wheel steering tiller." },
+    { q: "First on, last off, and never seen in flight.", a: ["chocks", "chock", "wheel chocks"], e: "Chocks." },
+    { q: "Orange sentries at the wingtips, nose and tail.", a: ["cone", "cones", "safety cone", "safety cones", "traffic cone"], e: "Safety cones." },
+    { q: "Bravo India Kilo Foxtrot. Where am I?", a: ["keflavik", "bikf", "keflavik airport", "keflavik international"], e: "Keflavík." },
+    { q: "I’m painted 13 at one end. Which way am I facing?", a: ["south east", "southeast", "se", "130", "130 degrees", "sse"], e: "South-east – runway numbers are the heading divided by ten." },
+    { q: "The clock that starts when the spraying stops.", a: ["holdover time", "holdover", "hot"], e: "Holdover time – how long de-icing fluid protects the aircraft." },
+    { q: "I start when the chocks come away and stop when they go back in.", a: ["block time", "blocks time", "block"], e: "Block time." },
+    { q: "One word on the radio that means “I heard you” – and promises nothing more.", a: ["roger"], e: "Roger – received. “Wilco” adds “and will comply”." },
+    { q: "Two syllables: heard it, and I’ll do it.", a: ["wilco"], e: "Wilco – will comply." },
+    { q: "Four digits that turn every controller’s head – a mayday without a word.", a: ["7700"], e: "7700, the emergency squawk." },
+    { q: "Four digits for when nobody can hear you.", a: ["7600"], e: "7600 – radio failure." },
+    { q: "A yellow path that ends where the nose wheel should stop.", a: ["lead in line", "leadin line", "lead in", "lead-in line", "taxi line", "guidance line", "stand line"], e: "The lead-in line." },
+    { q: "A small jet engine that never pushes anything, hiding in the tail.", a: ["apu", "auxiliary power unit"], e: "The APU – auxiliary power unit." },
+    { q: "The smallest thing on the apron that can cost the most.", a: ["fod", "foreign object debris", "foreign object damage", "debris"], e: "FOD – one bolt can wreck an engine." },
+    { q: "When I start blinking red, everyone steps back.", a: ["beacon", "anti collision beacon", "anti collision light", "anticollision beacon", "anticollision light", "beacon light", "red beacon"], e: "The anti-collision beacon – engines starting or running." },
+    { q: "Port is red. What am I on the other side?", a: ["green"], e: "Green – the starboard (right) navigation light." },
+    { q: "I line the taxiways at night. What colour am I?", a: ["blue"], e: "Blue edge lights. The centreline is green." },
+    { q: "Two letters on every Icelandic tail.", a: ["tf"], e: "TF – as in TF-ABC." },
+    { q: "A fjord, a runway and a fuel truck at the bottom of Greenland.", a: ["narsarsuaq", "bgbw"], e: "Narsarsuaq (BGBW) – a classic transatlantic fuel stop." },
+    { q: "Paraffin by another name – every business jet in Iceland drinks me.", a: ["jet a1", "jet a 1", "jeta1", "jet a", "jet fuel", "kerosene", "jet-a1", "jet-a", "paraffin"], e: "Jet A-1 (kerosene). Avgas is for piston engines." },
+    { q: "Ten passengers, three golf bags and a dog. Whose call is where it all goes?", a: ["crew", "flight crew", "pilot", "pilots", "captain", "commander", "pic", "the pilot"], e: "The crew – they’re responsible for mass and balance." },
+    { q: "I speak only in gestures, glow at night, and always come in pairs.", a: ["wands", "wand", "marshalling wands", "marshaling wands", "batons", "paddles"], e: "Marshalling wands." },
+    { q: "Between Lima and November on the radio.", a: ["mike"], e: "Mike." },
+    { q: "Every airport code starting BI is in which country?", a: ["iceland"], e: "Iceland – BIKF, BIRK, BIAR, BIEG." },
+    { q: "Above the transition altitude, every altimeter in the sky agrees on me.", a: ["1013", "1013.25", "1013 hpa", "29.92", "2992"], e: "1013 hPa (29.92 inches) – standard pressure." },
+    { q: "Frost on the wings. Whose call is it?", a: ["crew", "flight crew", "pilot", "pilots", "captain", "commander", "pic", "the pilot"], e: "The crew’s – we request de-icing when they ask." },
+    { q: "I push without a bar, lifting the nose to do it.", a: ["tug", "towbarless tug", "tractor", "towbarless tractor", "pushback tug", "tow tractor", "pushback tractor"], e: "A towbarless tug." },
+    { q: "Sofas and coffee for tired crews. What do we call it?", a: ["vip lounge", "lounge"], e: "Our VIP Lounge." },
+    { q: "I say the same thing over and over, until my letter changes.", a: ["atis"], e: "ATIS – updated with a new information letter." },
+    { q: "A thousand grams, or the letter after Juliett.", a: ["kilo"], e: "Kilo." },
+    { q: "I plug in when the engines stop, so the lights stay on.", a: ["gpu", "ground power unit", "ground power"], e: "A GPU – ground power unit." },
+    { q: "The last lap before the door closes.", a: ["walk around", "walkaround", "walk-around", "walkround", "walk round", "pre flight inspection", "preflight inspection", "departure walk around"], e: "The departure walk-around." },
+    { q: "A tiny tube that knows how fast you’re going. Cover me, and the pilots are blind.", a: ["pitot", "pitot tube", "pitot probe", "pitot head"], e: "The pitot tube – always remove its cover before departure." },
+    { q: "I rise from the wing to ruin the lift – on purpose.", a: ["spoiler", "spoilers", "ground spoilers", "speed brake", "speed brakes", "speedbrake", "speedbrakes", "lift dumpers"], e: "Spoilers (lift dumpers)." },
+    { q: "A Canadian province, and a letter on the radio.", a: ["quebec"], e: "Quebec." }
   ];
   // Answers are checked forgivingly: case, accents, punctuation and "the/a/our" are
-  // ignored, and a small typo is accepted (one letter in longer words, two in phrases).
+  // ignored, and a small typo is accepted (one letter in words of 6–8 letters, two in longer answers).
   function norm(t) {
     return String(t || "").toLowerCase().replace(/ð/g, "d").replace(/þ/g, "th").replace(/æ/g, "ae").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9.]+/g, " ").trim().replace(/^(the|a|an|our) /, "").trim();
@@ -1063,12 +1063,16 @@
   function matches(guess, answers) {
     const g = norm(guess); if (!g) return false;
     return answers.some((ans) => { const a = norm(ans); if (g === a) return true;
-      const allow = /^\d+$/.test(a) ? 0 : a.length >= 9 ? 2 : a.length >= 5 ? 1 : 0;
+      // Typos: none for short answers (so "nine" isn't "niner"), one for 6–8 letters, two for longer.
+      const allow = /^\d+$/.test(a) ? 0 : a.length >= 9 ? 2 : a.length >= 6 ? 1 : 0;
       return allow > 0 && distance(g, a) <= allow; });
   }
   function riddleGame(main, ctx, def) {
     const { h } = ctx;
-    const r = RIDDLES[dayNumber() % RIDDLES.length], key = "iaa-riddle2-" + todayIceland();
+    // A chosen riddle for a particular day, otherwise the next in the list.
+    const CHOSEN = { "2026-11-25": 0 };
+    const pickIdx = CHOSEN[todayIceland()] !== undefined ? CHOSEN[todayIceland()] : dayNumber() % RIDDLES.length;
+    const r = RIDDLES[pickIdx], key = "iaa-riddle3-" + todayIceland();
     const POINTS = [30, 20, 10], TRIES = 3;
     const area = h("div", { class: "quiz-game riddle-game" });
     const { board, status } = shell(main, ctx, def, "Type your answer. Three tries: 30 points first time, 20 second, 10 third – with a hint after the first miss. 1 point for playing.", area, null);
