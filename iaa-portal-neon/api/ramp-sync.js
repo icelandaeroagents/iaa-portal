@@ -106,7 +106,7 @@ async function syncServices() {
 }
 
 async function syncFlights(from, to) {
-  let count = 0;
+  let count = 0; const problems = [];
   for (const [station, ds] of Object.entries(STATIONS)) {
     const filter = { or: [
       { and: [{ property: "Arrival", date: { on_or_after: from } }, { property: "Arrival", date: { on_or_before: to + "T23:59:59Z" } }] },
@@ -116,6 +116,7 @@ async function syncFlights(from, to) {
     for (const r of rows) {
       const p = r.properties || {};
       const name = text(p.Name) || "Flight";
+      try {
       await db().query(
         `insert into public.flights (notion_id, station, name, registration, aircraft_type, operator, origin, destination, arrival, departure,
                                      services_requested, services_complete, services_checked, synced_at)
@@ -131,14 +132,27 @@ async function syncFlights(from, to) {
          (p["Services Provided"] && p["Services Provided"].multi_select || []).map((x) => x.name),
          !!(p["Services complete"] && p["Services complete"].checkbox), text(p["Services checked"]) || null]);
       count++;
+      } catch (err) { problems.push(`${station} ${name}: ${msg(err)}`); }
     }
   }
+  syncFlights.problems = problems;
   return count;
 }
 
 // ----------------------------------------------------------------------
 // Sending to Notion
 // ----------------------------------------------------------------------
+// The same wording as the "Summary" formula in the Notion Services Log:
+// 2 × Crew Transport · 1.5 h GPU · 120 L Potable Water · 2 nights Hangar · Lav
+function describe(qty, name, unit) {
+  const q = Number(qty), n = String(name || "Service");
+  if (!q || unit === "service") return n;
+  if (unit === "hours") return `${q} h ${n}`;
+  if (unit === "litres") return `${q} L ${n}`;
+  if (unit === "nights") return `${q} ${q === 1 ? "night" : "nights"} ${n}`;
+  if (unit === "pax") return `${q} pax ${n}`;
+  return `${q} × ${n}`;
+}
 function stamp(d) {   // "Josh · 9 Oct 13:52Z" – the same style as the phone page
   const t = new Date(d);
   return `${t.getUTCDate()} ${t.toLocaleString("en-GB", { month: "short", timeZone: "UTC" })} ${String(t.getUTCHours()).padStart(2, "0")}:${String(t.getUTCMinutes()).padStart(2, "0")}Z`;
@@ -157,7 +171,7 @@ async function pushLogs() {
     const l = q.rows[0]; if (!l) continue;
     try {
       const qty = Number(l.quantity);
-      const line = `${l.registration || l.flight_name} - ${qty !== 1 ? qty + " x " : ""}${l.service_name}`;
+      const line = `${l.registration || l.flight_name} — ${describe(qty, l.service_name, l.unit)}`;   // as the phone page: "N99TP — 2 × Crew Transport"
       const props = {
         Line: { title: rich(line) },
         Quantity: { number: qty },
@@ -222,18 +236,21 @@ module.exports = async function handler(req, res) {
       const secret = process.env.CRON_SECRET;
       if (!secret || req.headers.authorization !== "Bearer " + secret) return send(res, 401, { error: "Not allowed" });
       const services = await syncServices();
-      const flights = await syncFlights(plusDays(-3), plusDays(3));
+      const flights = await syncFlights(plusDays(-3), plusDays(14));
       const results = (await pushLogs()).concat(await pushCompletions());
-      return send(res, 200, { services, flights, results });
+      return send(res, 200, { services, flights, problems: syncFlights.problems, results });
     }
     if (req.method === "POST") {
       const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
       if (body.kind === "push") return send(res, 200, { results: (await pushLogs()).concat(await pushCompletions()) });
       if (body.kind === "refresh") {
-        const last = await db().query("select max(synced_at) as t from public.flights");
-        if (last.rows[0].t && Date.now() - new Date(last.rows[0].t).getTime() < 60000) return send(res, 200, { flights: 0, note: "Refreshed less than a minute ago" });
+        // the chosen day and the day either side (default: today), from a week back to two months ahead
+        let day = /^\d{4}-\d{2}-\d{2}$/.test(String(body.day || "")) ? String(body.day) : isoDay(new Date());
+        if (day < plusDays(-7) || day > plusDays(60)) return send(res, 400, { error: "Choose a day from a week ago to two months ahead" });
+        const d = new Date(day + "T12:00:00Z"), around = (n) => { const x = new Date(d); x.setUTCDate(x.getUTCDate() + n); return isoDay(x); };
         const services = await syncServices();
-        return send(res, 200, { services, flights: await syncFlights(plusDays(-1), plusDays(1)) });
+        const flights = await syncFlights(around(-1), around(1));
+        return send(res, 200, { services, flights, problems: syncFlights.problems });
       }
       if (body.kind === "import") {
         const from = String(body.from || ""), to = String(body.to || "");
