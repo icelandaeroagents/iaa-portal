@@ -179,7 +179,7 @@
     { id: "phonetic", icon: "📻", title: "Phonetic Rush", blurb: "Registrations and callsigns in the phonetic alphabet – 60 seconds, as many as you can.", play: phoneticGame },
     { id: "world", icon: "🌍", title: "Where in the World?", blurb: "ICAO codes and the airports behind them – 60 seconds against the clock.", play: worldGame },
     { id: "word", icon: "🔤", title: "Daily Word", blurb: "Guess today’s five-letter aviation word in six tries. One go a day.", play: wordGame, daily: true },
-    { id: "riddle", icon: "🧩", title: "Daily Riddle", blurb: "One aviation riddle a day – one answer, one chance.", play: riddleGame, daily: true },
+    { id: "riddle", icon: "🧩", title: "Daily Riddle", blurb: "One aviation riddle a day – type the answer, three tries.", play: riddleGame, daily: true },
     { id: "airside", icon: "🚐", title: "Airside Driver", blurb: "Deliver around the apron: 30 km/h, stop at hold lines, give way to aircraft.", play: airsideGame },
     { id: "pushback", icon: "🚜", title: "Pushback Pro", blurb: "Push five jets back onto the taxiway – line up, and mind the wingtips.", play: pushbackGame }
   ];
@@ -1005,79 +1005,113 @@
   // 8. Daily Riddle – one a day, one answer
   // ==================================================================
   const RIDDLES = [
-    { q: "I have wings but never fly, a tail but no body to wag it. I sit by the runway and tell you which way to go. What am I?", o: ["A windsock", "A weathervane", "A taxiway sign", "A marshaller"], a: 0, e: "A windsock – its ‘tail’ points the way the wind is blowing." },
-    { q: "The more of me you take, the more you leave behind on the ramp. What am I?", o: ["Footsteps", "Fuel", "Chocks", "Bags"], a: 0, e: "Footsteps. (Please still walk, don’t run, on the apron.)" },
-    { q: "In the phonetic alphabet I’m a hotel, a sport and a dance. Which three letters am I?", o: ["H, G, T", "H, S, D", "H, G, F", "M, G, T"], a: 0, e: "Hotel, Golf and Tango." },
-    { q: "Pilots say me instead of 9 so I’m not mistaken for a German ‘no’. What am I?", o: ["Niner", "Nine-ah", "Nonner", "Nein"], a: 0, e: "Niner – it can’t be confused with ‘nein’." },
-    { q: "I’m read at the start of every flight, I change every half hour or hour, and I tell you about the weather at one airport. What am I?", o: ["A METAR", "A NOTAM", "A TAF", "A SIGMET"], a: 0, e: "A METAR – the routine weather report for an aerodrome." },
-    { q: "I warn pilots of what’s changed at an airport – a closed taxiway, a broken light – but I’m never about the weather. What am I?", o: ["A NOTAM", "A METAR", "An ATIS", "A PIREP"], a: 0, e: "A NOTAM – Notice to Air Missions (formerly Airmen)." },
-    { q: "I go down as you climb and up as you descend, and pilots set me on the altimeter before every flight. What am I?", o: ["Air pressure", "The flaps", "Fuel weight", "The rudder"], a: 0, e: "Air pressure – it falls as you climb and rises as you descend." },
-    { q: "Turn me one way and the aircraft goes left, turn me the other and it goes right – but only on the ground. What am I?", o: ["The rudder", "The nose wheel steering tiller", "The ailerons", "The yoke"], a: 1, e: "The nose wheel steering tiller – the rudder pedals only steer slowly at speed." },
-    { q: "I hold the aircraft still, I come in pairs, and I’m the first thing on and the last thing off. What am I?", o: ["Chocks", "Cones", "Brakes", "Tie-downs"], a: 0, e: "Chocks – first on after arrival, last off before departure." },
-    { q: "I’m orange and white, I stand at wingtips and tails, and nobody wants to touch me with a jet. What am I?", o: ["A safety cone", "A windsock", "A GPU", "A taxi light"], a: 0, e: "Safety cones mark the wingtips, nose and tail on stand." },
-    { q: "On the radio I’m Bravo India Kilo Foxtrot. Which airport am I?", o: ["Keflavík", "Reykjavík", "Akureyri", "Egilsstaðir"], a: 0, e: "BIKF is Keflavík. BIRK is Reykjavík and BIAR Akureyri." },
-    { q: "I’m a big number on every runway, but I’m really a compass direction divided by ten. Runway 13 points roughly which way?", o: ["130°, south-east", "13°, north", "310°, north-west", "230°, south-west"], a: 0, e: "Runway 13 faces about 130° magnetic – roughly south-east." },
-    { q: "I keep ice off the wings, but only for so long. Pilots call my time limit what?", o: ["Holdover time", "Hangar time", "Block time", "Slot time"], a: 0, e: "Holdover time – how long the de-icing fluid protects the aircraft." },
-    { q: "I’m measured from chocks off to chocks on, and the crew are paid by me. What am I?", o: ["Block time", "Air time", "Duty time", "Slot time"], a: 0, e: "Block time – off-blocks to on-blocks." },
-    { q: "I have a nose, a belly and a tail, but no face. I have wings, but no feathers. What am I?", o: ["An aircraft", "A bird", "A rocket", "A kite"], a: 0, e: "An aircraft." },
-    { q: "Say me twice on the radio and I mean ‘I understand and will comply’. What am I?", o: ["Wilco", "Roger", "Affirm", "Copy"], a: 0, e: "Wilco – will comply. ‘Roger’ only means ‘received’." },
-    { q: "I’m a squawk, but I’m not a bird. Which code do I use in an emergency?", o: ["7700", "7500", "7600", "1200"], a: 0, e: "7700 is emergency. 7600 is radio failure, 7500 unlawful interference." },
-    { q: "I’m the code a pilot squawks when the radio stops working. What am I?", o: ["7600", "7700", "7000", "2000"], a: 0, e: "7600 – radio failure." },
-    { q: "I’m yellow, I’m painted on the ground, and every aircraft follows me to the stand. What am I?", o: ["The lead-in line", "The hold line", "The stop bar", "The taxiway edge"], a: 0, e: "The lead-in line guides the nose wheel to the stop position." },
-    { q: "I’m a ground power unit’s best friend and a battery’s worst enemy on a long turnaround. What do I save?", o: ["The aircraft’s APU running time and fuel", "The tug", "The lavatory", "The catering"], a: 0, e: "A GPU lets the crew switch off the APU, saving fuel and noise." },
-    { q: "I’m the busiest letter on the apron – Foxtrot Oscar Delta. What am I?", o: ["FOD – foreign object debris", "A taxiway", "A stand number", "A callsign"], a: 0, e: "FOD – foreign object debris. Pick it up!" },
-    { q: "Without me the cabin would be cold and dark on stand, but I’m not the GPU and I’m not the engines. What am I?", o: ["The APU", "The battery", "The ram air turbine", "The de-icer"], a: 0, e: "The APU – auxiliary power unit, a small engine usually in the tail." },
-    { q: "I live in the tail, I give power and air on the ground, and the ramp hates my noise. What am I?", o: ["The APU", "The rudder", "The black box", "The beacon"], a: 0, e: "The APU." },
-    { q: "I’m red, I flash, and when I’m on, nobody goes near the aircraft. What am I?", o: ["The anti-collision beacon", "The navigation light", "The landing light", "The logo light"], a: 0, e: "Beacon on means engines are about to start or are running." },
-    { q: "Which way does the wind blow at an airport called ‘crosswind from the left’ on runway 31?", o: ["From the south-west", "From the north-east", "From the north-west", "From the south-east"], a: 0, e: "Runway 31 faces north-west, so a wind from its left comes from the south-west." },
-    { q: "Iceland’s registrations all start with me. What am I?", o: ["TF", "IS", "OY", "LN"], a: 0, e: "TF – OY is Denmark, LN is Norway." },
-    { q: "On the radio, how do you say the letter M?", o: ["Mike", "Mama", "Mexico", "Max"], a: 0, e: "Mike – Juliett, Kilo, Lima, Mike." },
-    { q: "I’m an airport in Greenland where many transatlantic business jets stop for fuel. Which one am I?", o: ["Narsarsuaq (BGBW)", "Nuuk (BGGH)", "Kulusuk (BGKK)", "Thule (BGTL)"], a: 0, e: "Narsarsuaq, in south Greenland, is a classic fuel stop." },
-    { q: "I’m a jet engine’s favourite breakfast and the reason we never leave cones near an inlet. What am I?", o: ["FOD", "Avgas", "De-icing fluid", "Snow"], a: 0, e: "FOD can be sucked into an engine – keep the area clear." },
-    { q: "I’m the fuel most business jets drink in Iceland. What am I?", o: ["Jet A-1", "Avgas 100LL", "Mogas", "Diesel"], a: 0, e: "Jet A-1 – Avgas is for piston engines." },
-    { q: "Two pilots, ten passengers, a dog and three golf bags. Who decides where everything goes in the hold?", o: ["The crew", "The ramp agent", "The tower", "The fuel driver"], a: 0, e: "The crew decide loading – they’re responsible for mass and balance." },
-    { q: "I’m a light you only see at night on the right wingtip. What colour am I?", o: ["Green", "Red", "White", "Blue"], a: 0, e: "Green on the right (starboard), red on the left." },
-    { q: "I’m the colour of the taxiway edge lights. What colour am I?", o: ["Blue", "Green", "White", "Amber"], a: 0, e: "Taxiway edges are blue; taxiway centrelines are green." },
-    { q: "I come in wands, I’m orange, and I speak without a word. What am I?", o: ["Marshalling signals", "A windsock", "A traffic light", "A beacon"], a: 0, e: "Marshalling wands – the marshaller’s language." },
-    { q: "I’m the busiest five minutes of a turnaround: the moment the door opens. Who opens me?", o: ["The crew, from inside", "The ramp agent, from outside", "The tower", "The fuel driver"], a: 0, e: "On business jets the crew open the door – never open it from outside unless asked." },
-    { q: "Every ICAO airport code that starts with BI is in which country?", o: ["Iceland", "Bermuda", "Belize", "Bahrain"], a: 0, e: "BI is Iceland – BIKF, BIRK, BIAR, BIEG." },
-    { q: "I’m 1013 on a cold Icelandic morning, the standard everyone sets above the transition altitude. What am I?", o: ["Standard pressure (hPa)", "A squawk code", "A runway length", "A flight level"], a: 0, e: "1013 hPa – standard pressure." },
-    { q: "Snow on the wings, frost on the tail, slush on the ramp. Who decides if the aircraft needs de-icing?", o: ["The crew", "The ramp agent", "The tower", "Isavia"], a: 0, e: "De-icing is the pilot’s decision – we request it when they ask." },
-    { q: "I lift the nose wheel off the ground and push the aircraft back without a towbar. What am I?", o: ["A towbarless tug", "A GPU", "Air stairs", "A catering truck"], a: 0, e: "A towbarless tug – it cradles the nose wheel instead of using a towbar." },
-    { q: "I’m a crew’s best friend after a long night flight: hot coffee, quiet sofas, and the name Iceland Aero Agents uses for me. What am I?", o: ["Our VIP Lounge", "The crew room", "The terminal", "The hangar"], a: 0, e: "Our VIP Lounge." }
+    { q: "I have a tail but no body, I sit beside the runway, and I show which way the wind blows. What am I?", a: ["windsock", "wind sock", "wind cone"], e: "A windsock – its tail points the way the wind is blowing." },
+    { q: "The more of me you take, the more you leave behind on the ramp. What am I?", a: ["footsteps", "footprints", "steps"], e: "Footsteps. (Walk, don’t run, on the apron.)" },
+    { q: "I’m a word in the phonetic alphabet and also a dance from Argentina. What am I?", a: ["tango"], e: "Tango – the T in TF." },
+    { q: "Pilots say me instead of “nine” so it isn’t mistaken for the German “nein”. What do they say?", a: ["niner"], e: "Niner." },
+    { q: "I’m the routine weather report for an airport, issued every half hour or hour. Five letters – what am I?", a: ["metar"], e: "A METAR." },
+    { q: "I warn pilots about changes at an airport – a closed taxiway, a broken light – but never the weather. Five letters – what am I?", a: ["notam", "notams"], e: "A NOTAM – Notice to Air Missions." },
+    { q: "I go down as you climb and up as you descend, and pilots set me on the altimeter before every flight. What am I?", a: ["air pressure", "pressure", "atmospheric pressure", "barometric pressure", "qnh"], e: "Air pressure (the QNH setting)." },
+    { q: "Pilots turn me with one hand to steer the nose wheel on the ground. What am I?", a: ["tiller", "steering tiller", "nose wheel steering", "nosewheel steering", "nose wheel tiller"], e: "The nose wheel steering tiller." },
+    { q: "I hold the aircraft still, I come in pairs, and I’m the first thing on and the last thing off. What am I?", a: ["chocks", "chock", "wheel chocks"], e: "Chocks – first on after arrival, last off before departure." },
+    { q: "I’m orange and white and I stand at the wingtips, nose and tail on stand. What am I?", a: ["cone", "cones", "safety cone", "safety cones", "traffic cone"], e: "Safety cones." },
+    { q: "On the radio I’m Bravo India Kilo Foxtrot. Which airport am I?", a: ["keflavik", "bikf", "keflavik airport", "keflavik international"], e: "Keflavík (BIKF)." },
+    { q: "Runway 13 points roughly towards which compass direction?", a: ["south east", "southeast", "se", "130", "130 degrees", "sse"], e: "South-east – about 130°." },
+    { q: "I’m how long de-icing fluid keeps the wings clean before it must be done again. Two words – what am I?", a: ["holdover time", "holdover", "hot"], e: "Holdover time." },
+    { q: "I’m measured from chocks off to chocks on. Two words – what am I?", a: ["block time", "blocks time", "block"], e: "Block time – off-blocks to on-blocks." },
+    { q: "I have a nose, a belly and a tail but no face, and wings but no feathers. What am I?", a: ["aircraft", "airplane", "aeroplane", "plane", "jet", "business jet"], e: "An aircraft." },
+    { q: "On the radio, one word that means “I understand and will comply”. What am I?", a: ["wilco"], e: "Wilco – will comply. “Roger” only means “received”." },
+    { q: "Which four-digit transponder code means emergency?", a: ["7700"], e: "7700. (7600 is radio failure, 7500 unlawful interference.)" },
+    { q: "Which four-digit transponder code means radio failure?", a: ["7600"], e: "7600." },
+    { q: "I’m painted yellow on the apron and every aircraft follows me to its stand. What am I?", a: ["lead in line", "leadin line", "lead in", "lead-in line", "taxi line", "guidance line", "stand line"], e: "The lead-in line." },
+    { q: "A GPU lets the crew switch me off and save fuel. Three letters – what am I?", a: ["apu", "auxiliary power unit"], e: "The APU – auxiliary power unit, a small engine usually in the tail." },
+    { q: "Three letters, and the thing every ramp agent should pick up and every jet engine hates. What am I?", a: ["fod", "foreign object debris", "foreign object damage", "debris"], e: "FOD – foreign object debris." },
+    { q: "I flash red on the top and bottom of the aircraft. When I’m on, stay well clear. What am I?", a: ["beacon", "anti collision beacon", "anti collision light", "anticollision beacon", "anticollision light", "beacon light", "red beacon"], e: "The anti-collision beacon – engines are starting or running." },
+    { q: "What colour is the navigation light on the right wingtip?", a: ["green"], e: "Green – red is on the left." },
+    { q: "What colour are taxiway edge lights?", a: ["blue"], e: "Blue. Taxiway centrelines are green." },
+    { q: "Every Icelandic aircraft registration starts with these two letters. What are they?", a: ["tf"], e: "TF – as in TF-ABC." },
+    { q: "I’m the airport in south Greenland where many transatlantic business jets stop for fuel. Name me.", a: ["narsarsuaq", "bgbw"], e: "Narsarsuaq (BGBW)." },
+    { q: "Most business jets fuel with me in Iceland. What fuel am I?", a: ["jet a1", "jet a 1", "jeta1", "jet a", "jet fuel", "kerosene", "jet-a1", "jet-a"], e: "Jet A-1. Avgas is for piston engines." },
+    { q: "Two pilots, ten passengers, a dog and three golf bags. Who decides where everything goes in the hold?", a: ["crew", "flight crew", "pilot", "pilots", "captain", "commander", "pic"], e: "The crew – they’re responsible for mass and balance." },
+    { q: "I come in pairs, I glow orange, and I speak without a word. What am I?", a: ["wands", "wand", "marshalling wands", "marshaling wands", "batons", "paddles"], e: "Marshalling wands." },
+    { q: "On the radio, how do you say the letter M?", a: ["mike"], e: "Mike." },
+    { q: "Every ICAO airport code starting with BI is in which country?", a: ["iceland"], e: "Iceland – BIKF, BIRK, BIAR, BIEG." },
+    { q: "What is standard pressure in hectopascals? (four digits)", a: ["1013", "1013.25", "1013 hpa"], e: "1013 hPa (1013.25)." },
+    { q: "Snow on the wings, frost on the tail. Who decides whether the aircraft needs de-icing?", a: ["crew", "flight crew", "pilot", "pilots", "captain", "commander", "pic"], e: "The crew – we request de-icing when they ask." },
+    { q: "I lift the nose wheel off the ground and push the aircraft back without a towbar. What am I?", a: ["tug", "towbarless tug", "tractor", "towbarless tractor", "pushback tug", "tow tractor", "pushback tractor"], e: "A towbarless tug." },
+    { q: "Hot coffee, quiet sofas and a crew’s best friend after a long night flight. What do we call it at Iceland Aero Agents?", a: ["vip lounge", "lounge"], e: "Our VIP Lounge." },
+    { q: "I’m a recording on repeat telling pilots the weather, the runway in use and an information letter. Four letters – what am I?", a: ["atis"], e: "ATIS – automatic terminal information service." },
+    { q: "On the radio, which word comes between Juliett and Lima?", a: ["kilo"], e: "Kilo." },
+    { q: "Three letters: I plug into the aircraft and give it electricity on stand. What am I?", a: ["gpu", "ground power unit", "ground power"], e: "A GPU – ground power unit." },
+    { q: "Before departure we check all round the aircraft for open panels, FOD and equipment. What is that check called?", a: ["walk around", "walkaround", "walk-around", "walkround", "walk round", "pre flight inspection", "preflight inspection", "departure walk around"], e: "The walk-around." },
+    { q: "I’m a little tube on the nose that measures airspeed and must never be covered or blocked. What am I?", a: ["pitot", "pitot tube", "pitot probe", "pitot head"], e: "The pitot tube – remove any covers before departure." },
+    { q: "After landing I pop up on top of the wing to dump lift. What am I?", a: ["spoiler", "spoilers", "ground spoilers", "speed brake", "speed brakes", "speedbrake", "speedbrakes", "lift dumpers"], e: "Spoilers (lift dumpers)." },
+    { q: "On the radio, the letter Q is…?", a: ["quebec"], e: "Quebec." }
   ];
+  // Answers are checked forgivingly: case, accents, punctuation and "the/a/our" are
+  // ignored, and a small typo is accepted (one letter in longer words, two in phrases).
+  function norm(t) {
+    return String(t || "").toLowerCase().replace(/ð/g, "d").replace(/þ/g, "th").replace(/æ/g, "ae").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9.]+/g, " ").trim().replace(/^(the|a|an|our) /, "").trim();
+  }
+  function distance(a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i].concat(Array(b.length).fill(0)));
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[a.length][b.length];
+  }
+  function matches(guess, answers) {
+    const g = norm(guess); if (!g) return false;
+    return answers.some((ans) => { const a = norm(ans); if (g === a) return true;
+      const allow = /^\d+$/.test(a) ? 0 : a.length >= 9 ? 2 : a.length >= 5 ? 1 : 0;
+      return allow > 0 && distance(g, a) <= allow; });
+  }
   function riddleGame(main, ctx, def) {
     const { h } = ctx;
-    const base = RIDDLES[dayNumber() % RIDDLES.length], key = "iaa-riddle-" + todayIceland();
-    // The same shuffled order for everyone today, so the right answer isn't always first.
-    let seed = dayNumber() * 9301 + 49297;
-    const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-    const order = [0, 1, 2, 3]; for (let i = 3; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-    const r = { q: base.q, e: base.e, o: order.map((i) => base.o[i]), a: order.indexOf(base.a) };
+    const r = RIDDLES[dayNumber() % RIDDLES.length], key = "iaa-riddle2-" + todayIceland();
+    const POINTS = [30, 20, 10], TRIES = 3;
     const area = h("div", { class: "quiz-game riddle-game" });
-    const { board, status } = shell(main, ctx, def, "One aviation riddle a day. 30 points for the right answer, 1 point for playing. One answer – think first!", area, null);
+    const { board, status } = shell(main, ctx, def, "Type your answer. Three tries: 30 points first time, 20 second, 10 third – with a hint after the first miss. 1 point for playing.", area, null);
     stopCurrent = null;
-    function show(chosen, note) {
-      put(area, 
+    let tries = store(key) || [], over = false;
+    const first = r.a[0];
+    // Hint: the shape of the answer, with its first letter – e.g. "V _ _   _ _ _ _ _ _"
+    const hint = () => { const words = first.split(" ");
+      return "Hint:  " + words.map((w, wi) => w.split("").map((c, i) => (wi === 0 && i === 0 ? c.toUpperCase() : /[a-z0-9]/i.test(c) ? "_" : c)).join(" ")).join("     ") +
+        (words.length > 1 ? `   (${words.length} words)` : ""); };
+    function draw(note) {
+      const solved = tries.length && matches(tries[tries.length - 1], r.a);
+      const input = h("input", { type: "text", id: "riddle-answer", maxlength: 60, autocomplete: "off", autocapitalize: "off", spellcheck: "false", placeholder: "Your answer", "aria-label": "Your answer" });
+      const btn = h("button", { class: "btn", type: "submit" }, "Answer");
+      const form = h("form", { class: "riddle-form", onsubmit: (e) => { e.preventDefault(); guess(input.value); } }, input, btn);
+      put(area,
         h("p", { class: "quiz-prompt riddle-q" }, r.q),
-        h("div", { class: "quiz-opts" }, r.o.map((o, i) => h("button", {
-          class: "opt quiz-opt" + (chosen !== null ? (i === r.a ? " is-right" : i === chosen ? " is-wrong" : "") : ""), type: "button", disabled: chosen !== null,
-          onclick: () => answer(i) }, h("span", { class: "opt-key" }, String(i + 1)), h("span", null, o)))),
-        chosen !== null ? h("p", { class: "word-msg" }, (chosen === r.a ? "Correct! " : "Not this time. ") + r.e) : null,
+        tries.length ? h("ul", { class: "riddle-tries" }, tries.map((t, i) => h("li", { class: matches(t, r.a) ? "is-right" : "is-wrong" }, `${i + 1}. ${t}`))) : null,
+        !over && tries.length ? h("p", { class: "fineprint riddle-hint" }, hint()) : null,
+        over ? h("p", { class: "word-msg" }, (solved ? "Correct! " : `The answer: ${first.charAt(0).toUpperCase() + first.slice(1)}. `) + r.e) : form,
+        !over ? h("p", { class: "fineprint" }, `${TRIES - tries.length} ${TRIES - tries.length === 1 ? "try" : "tries"} left · worth ${POINTS[tries.length]} points`) : null,
         note ? h("p", { class: "fineprint" }, note) : null);
+      if (!over) setTimeout(() => { const i = area.querySelector("#riddle-answer"); if (i) i.focus(); }, 0);
     }
-    function answer(i) {
-      store(key, i);
-      const pts = i === r.a ? 30 : 1;
-      show(i, `+${pts} ${pts === 1 ? "point" : "points"}. A new riddle in ${untilTomorrow()}.`);
-      finish(ctx, def, board, status, pts);
+    function guess(text) {
+      if (over || !norm(text)) return;
+      tries.push(String(text).trim().slice(0, 60)); store(key, tries);
+      const right = matches(text, r.a);
+      if (right || tries.length >= TRIES) {
+        over = true;
+        const pts = right ? POINTS[tries.length - 1] : 1;
+        draw(`+${pts} ${pts === 1 ? "point" : "points"}. A new riddle in ${untilTomorrow()}.`);
+        finish(ctx, def, board, status, pts);
+      } else draw("Not quite – try again.");
     }
     (async function () {
       const prev = await playedToday(ctx, def.id);
-      const saved = store(key);
-      if (prev !== null) { show(saved === null || saved === undefined ? r.a : saved, `You’ve answered today’s riddle (${prev} ${prev === 1 ? "point" : "points"}). A new one in ${untilTomorrow()}.`); return; }
-      if (saved !== null && saved !== undefined) { answer(saved); return; }
-      show(null);
+      if (prev !== null) { over = true; draw(`You’ve answered today’s riddle (${prev} ${prev === 1 ? "point" : "points"}). A new one in ${untilTomorrow()}.`); return; }
+      if (tries.length && (matches(tries[tries.length - 1], r.a) || tries.length >= TRIES)) {   // finished but not saved (e.g. offline): save now
+        over = true; const right = matches(tries[tries.length - 1], r.a); const pts = right ? POINTS[tries.length - 1] : 1;
+        draw(`+${pts} ${pts === 1 ? "point" : "points"}.`); finish(ctx, def, board, status, pts); return;
+      }
+      draw();
     })();
   }
 

@@ -1327,3 +1327,10 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
 .game-pads-drive { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .game-pads-drive .btn:last-child:nth-child(5) { grid-column: 1 / -1; }
 .game-pad.is-held { background: var(--field); border-color: var(--brand); }
+.riddle-form { display: flex; gap: 0.5rem; }
+.riddle-form input { flex: 1; font-size: 1.05rem; }
+.riddle-tries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.riddle-tries li { padding: 0.35rem 0.6rem; border-radius: var(--radius-s); border: 1px solid var(--line); }
+.riddle-tries li.is-wrong { border-color: var(--danger); color: var(--danger); text-decoration: line-through; }
+.riddle-tries li.is-right { border-color: var(--success); color: var(--success); font-weight: 700; }
+.riddle-hint { white-space: pre-wrap; font-family: var(--font-sign); font-size: 1rem; letter-spacing: 0.04em; }
