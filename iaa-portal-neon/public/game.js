@@ -1318,7 +1318,7 @@
     const pads = h("div", { class: "game-pads game-pads-drive" },
       holdButton(h, "◀ Steer", (v) => { ctl.l = v; }), holdButton(h, "▲ Push", (v) => { ctl.u = v; }), holdButton(h, "▼ Slow", (v) => { ctl.d = v; }), holdButton(h, "Steer ▶", (v) => { ctl.r = v; }), done);
     const { board, status } = shell(main, ctx, def,
-      "Push each jet back off its stand and onto the taxiway, finishing on the yellow centreline facing the way shown. You steer the nose, so the tail swings the other way. Stop, then set the brakes. Don’t hit the parked jets.",
+      "Push each jet back off its stand and onto the taxiway, finishing on the yellow centreline facing the way shown. You steer the nose, so the tail swings the other way. Stop, then set the brakes. Don’t hit the parked jets. Up to 100 points for accuracy, plus up to 30 for speed – the quicker and cleaner, the better.",
       canvas, pads);
     cv.size(); window.addEventListener("resize", cv.size);
 
@@ -1347,8 +1347,11 @@
       const target = face > 0 ? Math.PI / 2 : -Math.PI / 2;
       let err = Math.abs(((th - target + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI) * 180 / Math.PI;
       const off = Math.abs(my - TY) / S * 0.5;                    // metres-ish off the centreline
-      const pts = Math.round(Math.max(0, 100 - Math.max(0, off - 0.5) * 6 - err * 1.5 - Math.max(0, elapsed - 35) * 1));
-      return { pts, off, err };
+      // Accuracy: up to 100. Time bonus: up to 30 (15 s or faster) down to 0 at 40 s,
+      // scaled by accuracy so a rushed, sloppy finish doesn't pay.
+      const acc = Math.round(Math.max(0, 100 - Math.max(0, off - 0.5) * 6 - err * 1.5));
+      const bonus = Math.round(Math.max(0, Math.min(1, (40 - elapsed) / 25)) * 30 * acc / 100);
+      return { pts: acc + bonus, acc, bonus, secs: elapsed, off, err };
     }
     function next() {
       if (mode === "ready") { n = 0; total = 0; results = []; setup(); mode = "push"; ctx.setStatus(status, ""); return; }
@@ -1358,7 +1361,7 @@
     function park() {
       if (mode !== "push") { next(); return; }
       if (Math.abs(v) > 0.5) { ctx.setStatus(status, "Stop first – then set the brakes.", true); return; }
-      res = score(); total += res.pts; results.push(res.pts); res.word = res.pts >= 90 ? "Perfect pushback!" : res.pts >= 70 ? "Nicely done" : res.pts >= 40 ? "Acceptable" : "The crew are not impressed";
+      res = score(); total += res.pts; results.push(res.pts); res.word = res.acc >= 90 ? "Perfect pushback!" : res.acc >= 70 ? "Nicely done" : res.acc >= 40 ? "Acceptable" : "The crew are not impressed";
       mode = "result"; msgAt = t; ctx.setStatus(status, "");
     }
     done.addEventListener("click", park);
@@ -1396,6 +1399,7 @@
       g.fillStyle = "rgba(10,16,26,0.6)"; g.fillRect(10, H - 74, W - 20, 62);
       g.fillStyle = "#ffffff"; g.textAlign = "left"; g.font = `600 14px ${FONT}`;
       g.fillText(`Pushback ${Math.min(n + 1, ROUNDS)} of ${ROUNDS} · Score ${total}`, 22, H - 50);
+      if (mode === "push") { g.textAlign = "right"; g.fillStyle = elapsed <= 15 ? "#5fd0c3" : elapsed < 40 ? "#ffffff" : "#ff9b9b"; g.fillText(`⏱ ${elapsed.toFixed(1)} s`, W - 22, H - 50); g.textAlign = "left"; }
       g.font = `500 12px ${FONT}`; g.fillStyle = "#a9ddd5";
       g.fillText(`Speed ${(v * 0.25).toFixed(1)} km/h · Steering ${Math.round(del * 57)}° · Off centreline ${(Math.abs(my - TY) / S * 0.5).toFixed(1)} m`, 22, H - 30);
     }
@@ -1421,7 +1425,7 @@
       hud();
       if (mode === "ready") overlay(g, "Pushback Pro", ["Five pushbacks onto the taxiway", "◀ ▶ steer the nose · ▲ push · ▼ slow", "Stop on the centreline, then set the brakes", "Tap or press Space to begin"]);
       if (mode === "result" && res) overlay(g, res.word, res.crash ? ["0 points for this pushback", n + 1 >= ROUNDS ? "Tap for your total" : "Tap for the next aircraft"]
-        : [`${res.pts} points`, `${res.off.toFixed(1)} m off the centreline · ${Math.round(res.err)}° off heading`, n + 1 >= ROUNDS ? "Tap for your total" : "Tap for the next aircraft"]);
+        : [`${res.pts} points: ${res.acc} accuracy + ${res.bonus} time bonus`, `${res.off.toFixed(1)} m off the centreline · ${Math.round(res.err)}° off heading · ${Math.round(res.secs)} s`, n + 1 >= ROUNDS ? "Tap for your total" : "Tap for the next aircraft"]);
       if (mode === "done") overlay(g, `Total ${total}`, [results.join(" · "), `Best ${Math.max(board.best, total)}`, "Tap to push again"]);
     }, () => { unkeys(); window.removeEventListener("resize", cv.size); });
   }
