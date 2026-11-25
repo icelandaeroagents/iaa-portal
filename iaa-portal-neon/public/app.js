@@ -105,6 +105,15 @@
       render: renderEquipment
     },
     {
+      id: "maintenance",
+      title: "Maintenance",
+      description: "The GSE and vehicle register, maintenance log and defect requests.",
+      roles: ALL_ROLES,
+      // Management have this under Management → Equipment.
+      show: (p) => !!p.maintenance_manager && p.role !== "management",
+      render: renderMaintenance
+    },
+    {
       id: "reports",
       title: "Reports",
       description: "Submit and follow up internal reports.",
@@ -352,7 +361,7 @@
       return;
     }
 
-    const allowed = MODULES.filter((m) => m.roles.indexOf(state.profile.role) !== -1);
+    const allowed = MODULES.filter((m) => m.roles.indexOf(state.profile.role) !== -1 && (!m.show || m.show(state.profile)));
     const route = currentRoute();
     const mod = allowed.find((m) => m.id === route) || allowed[0];
     if (mod.id !== route) history.replaceState(null, "", "#/" + mod.id);
@@ -634,7 +643,7 @@
       const st = state.stations.find((s) => s.code === code);
       return st ? `${st.code} – ${st.name}` : code;
     });
-    const sections = MODULES.filter((m) => m.id !== "home" && m.roles.indexOf(p.role) !== -1);
+    const sections = MODULES.filter((m) => m.id !== "home" && m.roles.indexOf(p.role) !== -1 && (!m.show || m.show(p)));
 
     const nameInput = h("input", { id: "my-name", type: "text", autocomplete: "name", value: p.full_name || "" });
     const titleInput = h("input", { id: "my-title", type: "text", autocomplete: "organization-title", value: p.job_title || "", placeholder: "e.g. Operations Officer" });
@@ -784,14 +793,47 @@
     return window.IAAPasses.render(main, sectionCtx());
   }
 
+  // Maintenance Manager: the GSE and vehicle register without the rest of Management.
+  async function renderMaintenance(main) {
+    if (!window.IAAFleet) return sectionMissing(main, "Maintenance");
+    const ctx = sectionCtx();
+    const draw = async function () {
+      const body = await window.IAAFleet.view(ctx, main, draw);
+      fill(main,
+        pageHead("Maintenance", "The GSE and vehicle register and maintenance log for every station."),
+        h("div", { class: "row" },
+          h("a", { class: "btn btn-quiet btn-small", href: "#/equipment" }, "Equipment Info"),
+          h("a", { class: "btn btn-quiet btn-small", href: "#/requests/service" }, "Defect and equipment requests")),
+        body);
+    };
+    return draw();
+  }
+
   async function renderRequests(main) {
     if (!window.IAARequests) return sectionMissing(main, "Requests");
     return window.IAARequests.render(main, sectionCtx());
   }
 
+  // Maintenance Manager: equipment due or overdue, and open defect and equipment requests.
+  async function maintenanceAttention() {
+    const items = [];
+    try {
+      if (window.IAAFleet) (await window.IAAFleet.attention(db)).forEach((t) => items.push(["#/maintenance", t]));
+      const r = await db.from("service_requests").select("id, kind, urgency").in("status", ["open", "in_progress"]).in("kind", ["vehicle_defect", "equipment"]);
+      const open = r.data || [];
+      const defects = open.filter((x) => x.kind === "vehicle_defect").length, equip = open.length - defects;
+      if (defects) items.push(["#/requests/service", `${defects} vehicle defect ${defects === 1 ? "request" : "requests"} open`]);
+      if (equip) items.push(["#/requests/service", `${equip} equipment ${equip === 1 ? "request" : "requests"} open`]);
+    } catch (e) { return null; }
+    if (!items.length) return null;
+    return h("section", { class: "panel panel-attention", "aria-labelledby": "attn-h" },
+      h("h2", { id: "attn-h" }, "Needs attention"),
+      h("ul", { class: "attention-list" }, items.map((i) => h("li", null, h("a", { href: i[0] }, i[1])))));
+  }
+
   // Management: one line per thing waiting for them.
   async function attentionPanel() {
-    if (state.profile.role !== "management") return null;
+    if (state.profile.role !== "management") return state.profile.maintenance_manager ? maintenanceAttention() : null;
     const items = [];
     try {
       const [acc, req, exp, rev] = await Promise.all([
@@ -972,6 +1014,13 @@
         ? h("label", { class: "choice choice-inline", title: "Receives the reporter’s name on confidential reports. Must have the Management role." },
             safetyBox, h("span", null, "Safety & Security Manager"))
         : null;
+      // Only shown once database update 41 has been run. Any number of people.
+      const hasMaintFlag = Object.prototype.hasOwnProperty.call(person, "maintenance_manager");
+      const maintBox = hasMaintFlag ? h("input", { type: "checkbox", checked: !!person.maintenance_manager }) : null;
+      const maintLabel = hasMaintFlag
+        ? h("label", { class: "choice choice-inline", title: "Manages the GSE and vehicle register, equipment and defect requests at every station, without the rest of Management." },
+            maintBox, h("span", null, "Maintenance Manager"))
+        : null;
 
       const save = h(
         "button",
@@ -990,6 +1039,7 @@
               job_title: titleBox.value.trim() || null
             };
             if (rosterBox) changes.roster_names = rosterBox.value.split(",").map((x) => x.trim()).filter(Boolean).join(", ") || null;
+            if (maintBox) changes.maintenance_manager = maintBox.checked;
             if (safetyBox) {
               changes.safety_manager = safetyBox.checked;
               if (changes.safety_manager && changes.role !== "management") {
@@ -1030,7 +1080,7 @@
       return h(
         "tr",
         null,
-        h("td", { class: "person-edit" }, nameBox, titleBox, rosterBox, safetyLabel, h("span", { class: "sub" }, person.email)),
+        h("td", { class: "person-edit" }, nameBox, titleBox, rosterBox, safetyLabel, maintLabel, h("span", { class: "sub" }, person.email)),
         h("td", null, role),
         h("td", null, station.node),
         h("td", null, active),

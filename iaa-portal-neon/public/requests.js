@@ -188,7 +188,8 @@
     const { h, fill, pageHead, state, setStatus } = ctx;
     const role = state.profile.role;
     const myStations = state.profile.station_codes || [];
-    const canUpdate = (r) => role === "management" || (role === "station_lead" && myStations.indexOf(r.station_code) !== -1);
+    const canUpdate = (r) => role === "management" || (role === "station_lead" && myStations.indexOf(r.station_code) !== -1) ||
+      (!!state.profile.maintenance_manager && (r.kind === "vehicle_defect" || r.kind === "equipment"));
     fill(main, pageHead("Requests"), tabs(ctx, "service"), h("p", { class: "empty" }, "Loading…"));
 
     const res = await ctx.db.from("service_requests").select("*").order("created_at", { ascending: false }).limit(300);
