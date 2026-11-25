@@ -20,15 +20,23 @@
     rows.forEach((r) => { if (!by[r.profile_id] || r.score > by[r.profile_id].score) by[r.profile_id] = r; });
     return Object.values(by).sort((a, b) => b.score - a.score || String(a.played_at).localeCompare(String(b.played_at)));
   }
+  const DAILY = ["word", "riddle"];
+  // Daily games: points add up. Other games: each person's best score.
+  function totalPerPerson(rows) {
+    const by = {};
+    rows.forEach((r) => { const b = by[r.profile_id] || (by[r.profile_id] = { profile_id: r.profile_id, player_name: r.player_name, score: 0, days: 0, played_at: r.played_at }); b.score += r.score; b.days++; });
+    return Object.values(by).sort((a, b) => b.score - a.score || b.days - a.days);
+  }
   async function loadBoard(ctx, game) {
     const cols = "profile_id, player_name, score, played_at";
+    const rank = DAILY.indexOf(game) !== -1 ? totalPerPerson : bestPerPerson;
     const q = () => ctx.db.from("game_scores").select(cols).eq("game", game);
     const [all, month] = await Promise.all([
-      q().order("score", { ascending: false }).limit(500),
-      q().gte("played_at", monthStart()).order("score", { ascending: false }).limit(500)
+      q().order("score", { ascending: false }).limit(5000),
+      q().gte("played_at", monthStart()).order("score", { ascending: false }).limit(2000)
     ]);
     if (all.error) return { error: all.error.message };
-    return { all: bestPerPerson(all.data || []), month: bestPerPerson(month.data || []) };
+    return { all: rank(all.data || []), month: rank(month.data || []) };
   }
   async function saveScore(ctx, game, score) {
     const s = Math.max(1, Math.min(MAX_SCORE, Math.round(score)));
@@ -128,7 +136,7 @@
       h("div", { class: "game-layout" },
         h("section", { class: "panel game-panel" }, canvas, controls || null, status),
         h("section", { class: "panel" }, h("h2", null, "Leaderboard"), board.el,
-          h("p", { class: "fineprint" }, "Your best score counts. For breaks only – never on the ramp or while on duty with aircraft."))));
+          h("p", { class: "fineprint" }, (DAILY.indexOf(def.id) !== -1 ? "Points add up over the month – play every day. " : "Your best score counts. ") + "For breaks only – never on the ramp or while on duty with aircraft."))));
     board.refresh();
     return { board, status };
   }
@@ -167,7 +175,11 @@
     { id: "flight", icon: "✈️", title: "Flight", blurb: "Fly through the gaps between the storm clouds and the mountains.", play: flightGame },
     { id: "crosswind", icon: "🌬️", title: "Crosswind Landing", blurb: "Five approaches to runway 13 at BIRK – the wind gets stronger each time.", play: crosswindGame },
     { id: "marshal", icon: "🦺", title: "Marshal Me In", blurb: "Give the right signals to park each jet on the stop line.", play: marshalGame },
-    { id: "apron", icon: "🅿️", title: "Apron Tetris", blurb: "Jets keep arriving and leaving – park them nose-in before three divert to BIKF.", play: apronGame }
+    { id: "apron", icon: "🅿️", title: "Apron Tetris", blurb: "Jets keep arriving and leaving – park them nose-in before three divert to BIKF.", play: apronGame },
+    { id: "phonetic", icon: "📻", title: "Phonetic Rush", blurb: "Registrations and callsigns in the phonetic alphabet – 60 seconds, as many as you can.", play: phoneticGame },
+    { id: "world", icon: "🌍", title: "Where in the World?", blurb: "ICAO codes and the airports behind them – 60 seconds against the clock.", play: worldGame },
+    { id: "word", icon: "🔤", title: "Daily Word", blurb: "Guess today’s five-letter aviation word in six tries. One go a day.", play: wordGame, daily: true },
+    { id: "riddle", icon: "🧩", title: "Daily Riddle", blurb: "One aviation riddle a day – one answer, one chance.", play: riddleGame, daily: true }
   ];
 
   async function render(main, ctx) {
@@ -188,14 +200,41 @@
         h("span", { class: "game-card-icon", "aria-hidden": "true" }, d.icon),
         h("span", { class: "game-card-text" },
           h("b", null, d.title), h("span", { class: "sub" }, d.blurb),
-          h("span", { class: "game-card-best" }, bests[d.id] ? `Your best: ${bests[d.id]}` : "Not played yet")),
+          h("span", { class: "game-card-best" }, d.daily ? "New every day" : bests[d.id] ? `Your best: ${bests[d.id]}` : "Not played yet")),
         h("span", { class: "btn btn-small" }, "Play"))));
     }
     draw();
-    fill(main, pageHead("Games", "Short aviation games for your break, each with a staff leaderboard."), cards,
+    const champ = h("div");
+    fill(main, pageHead("Games", "Short aviation games for your break, each with a staff leaderboard."), champ, cards,
       h("p", { class: "fineprint" }, "For breaks only – never on the ramp or while on duty with aircraft."));
-    const r = await ctx.db.from("game_scores").select("game, score").eq("profile_id", me).order("score", { ascending: false }).limit(200);
-    if (!r.error) { (r.data || []).forEach((x) => { const k = x.game || "flight"; if (!bests[k] || x.score > bests[k]) bests[k] = x.score; }); draw(); }
+    const r = await ctx.db.from("game_scores").select("game, score").eq("profile_id", me).order("score", { ascending: false }).limit(500);
+    if (!r.error) {
+      (r.data || []).forEach((x) => { const k = x.game || "flight"; if (DAILY.indexOf(k) !== -1) return; if (!bests[k] || x.score > bests[k]) bests[k] = x.score; });
+      draw();
+    }
+    // Monthly champion: the leader of each game this month, and whoever leads the most games.
+    const m = await ctx.db.from("game_scores").select("game, profile_id, player_name, score, played_at").gte("played_at", monthStart()).order("score", { ascending: false }).limit(5000);
+    if (m.error || !(m.data || []).length) return;
+    const leaders = [];
+    GAMES.forEach((d) => {
+      const rows = (m.data || []).filter((x) => (x.game || "flight") === d.id);
+      if (!rows.length) return;
+      const top = (DAILY.indexOf(d.id) !== -1 ? totalPerPerson : bestPerPerson)(rows)[0];
+      leaders.push({ d: d, top: top });
+    });
+    const wins = {};
+    leaders.forEach((l) => { const w = wins[l.top.profile_id] || (wins[l.top.profile_id] = { name: l.top.player_name, n: 0 }); w.n++; });
+    const best = Object.values(wins).sort((a, b) => b.n - a.n)[0];
+    const monthName = new Date().toLocaleDateString("en-GB", { month: "long" });
+    champ.replaceChildren(h("section", { class: "panel game-champion" },
+      h("div", { class: "game-champion-head" },
+        h("span", { class: "game-trophy", "aria-hidden": "true" }, "🏆"),
+        h("div", null,
+          h("p", { class: "briefing-kicker" }, `Champion of ${monthName}`),
+          h("h2", null, best.name || "Player"),
+          h("p", { class: "fineprint" }, `Leads ${best.n} of ${leaders.length} ${leaders.length === 1 ? "game" : "games"} played this month`))),
+      h("ul", { class: "game-leaders" }, leaders.map((l) => h("li", null,
+        h("span", null, l.d.icon + " " + l.d.title), h("b", null, l.top.player_name || "Player"), h("span", { class: "game-score" }, String(l.top.score)))))));
   }
 
   // ==================================================================
@@ -743,6 +782,301 @@
       }
       draw();
     }, () => { unkeys(); window.removeEventListener("resize", cv.size); });
+  }
+
+  // Like replaceChildren, but skips empty slots and expands lists.
+  function put(el) { el.replaceChildren(...Array.prototype.slice.call(arguments, 1).flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false)); }
+
+  // ==================================================================
+  // Shared: a 60-second multiple-choice round (Phonetic Rush, Where in the World?)
+  // ==================================================================
+  function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+  function pickOne(a) { return a[Math.floor(Math.random() * a.length)]; }
+
+  // next() returns { prompt, sub, options: [4 strings], answer: index }
+  function quizRound(main, ctx, def, intro, next, seconds) {
+    const { h } = ctx;
+    const area = h("div", { class: "quiz-game" });
+    const { board, status } = shell(main, ctx, def, intro, area, null);
+    let score = 0, streak = 0, right = 0, wrong = 0, left = seconds, timer = null, q = null, locked = false;
+    const stop = () => { if (timer) { clearInterval(timer); timer = null; } window.removeEventListener("keydown", onKey); };
+    stopCurrent = stop;
+    function onKey(e) {
+      if (!area.isConnected) { stop(); return; }
+      if (/^(input|textarea|select)$/i.test(e.target.tagName)) return;
+      const n = parseInt(e.key, 10);
+      if (q && n >= 1 && n <= 4) { e.preventDefault(); answer(n - 1); }
+      else if (!q && (e.code === "Space" || e.code === "Enter")) { e.preventDefault(); start(); }
+    }
+    window.addEventListener("keydown", onKey);
+    function startScreen(title, lines, label) {
+      put(area, h("div", { class: "quiz-start" }, h("h2", null, title), lines.map((l) => h("p", null, l)),
+        h("button", { class: "btn", type: "button", onclick: start }, label)));
+    }
+    function start() {
+      score = 0; streak = 0; right = 0; wrong = 0; left = seconds; locked = false; ctx.setStatus(status, "");
+      if (timer) clearInterval(timer);
+      timer = setInterval(() => {
+        if (!area.isConnected) { stop(); return; }
+        left -= 0.1;
+        const bar = area.querySelector(".quiz-time i"); if (bar) bar.style.width = Math.max(0, left / seconds * 100) + "%";
+        const tx = area.querySelector(".quiz-time-left"); if (tx) tx.textContent = Math.ceil(Math.max(0, left)) + " s";
+        if (left <= 0) end();
+      }, 100);
+      ask();
+    }
+    function end() {
+      clearInterval(timer); timer = null; q = null;
+      startScreen(`Score ${score}`, [`${right} right · ${wrong} wrong`, `Your best: ${Math.max(board.best, score)}`], "Play again");
+      finish(ctx, def, board, status, score);
+    }
+    function ask() {
+      q = next(); locked = false;
+      put(area, 
+        h("div", { class: "quiz-top" },
+          h("div", { class: "quiz-time" }, h("i", { style: null })), h("span", { class: "quiz-time-left" }, Math.ceil(left) + " s"),
+          h("span", { class: "quiz-score" }, `${score}`), streak > 1 ? h("span", { class: "quiz-streak" }, `🔥 ${streak}`) : null),
+        h("p", { class: "quiz-prompt" }, q.prompt), q.sub ? h("p", { class: "quiz-sub" }, q.sub) : null,
+        h("div", { class: "quiz-opts" }, q.options.map((o, i) => h("button", { class: "opt quiz-opt", type: "button", onclick: () => answer(i) },
+          h("span", { class: "opt-key" }, String(i + 1)), h("span", null, o)))));
+      const bar = area.querySelector(".quiz-time i"); if (bar) bar.style.width = Math.max(0, left / seconds * 100) + "%";
+    }
+    function answer(i) {
+      if (locked || !q) return; locked = true;
+      const btns = area.querySelectorAll(".quiz-opt");
+      if (i === q.answer) { streak++; right++; score += 10 + Math.min(10, (streak - 1) * 2); btns[i].classList.add("is-right"); setTimeout(() => { if (timer) ask(); }, 250); }
+      else { streak = 0; wrong++; btns[i].classList.add("is-wrong"); btns[q.answer].classList.add("is-right"); setTimeout(() => { if (timer) ask(); }, 900); }
+    }
+    startScreen(def.title, [intro, `${seconds} seconds. Answer with the buttons or the keys 1–4.`], "Start");
+  }
+
+  // ==================================================================
+  // 5. Phonetic Rush
+  // ==================================================================
+  const NATO = { A: "Alfa", B: "Bravo", C: "Charlie", D: "Delta", E: "Echo", F: "Foxtrot", G: "Golf", H: "Hotel", I: "India", J: "Juliett", K: "Kilo", L: "Lima", M: "Mike",
+    N: "November", O: "Oscar", P: "Papa", Q: "Quebec", R: "Romeo", S: "Sierra", T: "Tango", U: "Uniform", V: "Victor", W: "Whiskey", X: "X-ray", Y: "Yankee", Z: "Zulu",
+    "0": "Zero", "1": "One", "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six", "7": "Seven", "8": "Eight", "9": "Niner" };
+  const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ", DIGITS = "0123456789";
+  function rnd(set, n) { let s = ""; for (let i = 0; i < n; i++) s += set[Math.floor(Math.random() * set.length)]; return s; }
+  function makeReg() {
+    return pickOne([
+      () => "TF-" + rnd(LETTERS, 3), () => "TF-" + rnd(LETTERS, 3), () => "N" + rnd("123456789", 1) + rnd(DIGITS, 2) + rnd(LETTERS, 2),
+      () => "G-" + rnd(LETTERS, 4), () => "9H-" + rnd(LETTERS, 3), () => "HB-" + rnd(LETTERS, 3), () => "OE-" + rnd(LETTERS, 3),
+      () => "M-" + rnd(LETTERS, 4), () => "D-" + rnd(LETTERS, 4), () => "VP-C" + rnd(LETTERS, 2)
+    ])();
+  }
+  const spell = (reg) => reg.replace(/-/g, "").split("").map((c) => NATO[c]).join(" ");
+  function nearMiss(reg) {
+    // change one or two characters (never the hyphen) to a similar-looking alternative
+    const chars = reg.split(""); const spots = chars.map((c, i) => (c === "-" ? -1 : i)).filter((i) => i >= 0);
+    const k = 1 + (Math.random() < 0.35 ? 1 : 0);
+    shuffle(spots).slice(0, k).forEach((i) => { const pool = /\d/.test(chars[i]) ? DIGITS : LETTERS; let c; do { c = pool[Math.floor(Math.random() * pool.length)]; } while (c === chars[i]); chars[i] = c; });
+    return chars.join("");
+  }
+  function phoneticGame(main, ctx, def) {
+    quizRound(main, ctx, def, "Pick the right phonetic version of each registration – or the registration for the phonetic version.", function () {
+      const reg = makeReg(); const opts = new Set([reg]);
+      while (opts.size < 4) opts.add(nearMiss(reg));
+      const list = shuffle(Array.from(opts));
+      const reverse = Math.random() < 0.3;
+      return reverse
+        ? { prompt: spell(reg), sub: "Which registration is this?", options: list, answer: list.indexOf(reg) }
+        : { prompt: reg, sub: "How do you say it on the radio?", options: list.map(spell), answer: list.indexOf(reg) };
+    }, 60);
+  }
+
+  // ==================================================================
+  // 6. Where in the World?
+  // ==================================================================
+  const AIRPORTS = [
+    ["BIKF", "Keflavík"], ["BIRK", "Reykjavík"], ["BIAR", "Akureyri"], ["BIEG", "Egilsstaðir"], ["BIIS", "Ísafjörður"], ["BIVM", "Vestmannaeyjar"],
+    ["BGBW", "Narsarsuaq"], ["BGSF", "Kangerlussuaq"], ["BGGH", "Nuuk"], ["EKVG", "Vágar, Faroe Islands"],
+    ["EGLL", "London Heathrow"], ["EGGW", "London Luton"], ["EGLF", "Farnborough"], ["EGKB", "Biggin Hill"], ["EGSS", "London Stansted"], ["EGLC", "London City"],
+    ["EGPH", "Edinburgh"], ["EGPF", "Glasgow"], ["EGJJ", "Jersey"], ["EIDW", "Dublin"], ["EINN", "Shannon"],
+    ["LFPB", "Paris Le Bourget"], ["LFPG", "Paris Charles de Gaulle"], ["LFMN", "Nice"], ["LFMD", "Cannes Mandelieu"], ["LFLB", "Chambéry"], ["LFKJ", "Ajaccio"],
+    ["LSGG", "Geneva"], ["LSZH", "Zurich"], ["LSGS", "Sion"], ["LSZS", "Samedan (St. Moritz)"],
+    ["LIML", "Milan Linate"], ["LIRA", "Rome Ciampino"], ["LIPZ", "Venice"], ["LIEO", "Olbia"],
+    ["LEMD", "Madrid"], ["LEBL", "Barcelona"], ["LEIB", "Ibiza"], ["LEPA", "Palma de Mallorca"], ["LPPT", "Lisbon"], ["LPFR", "Faro"],
+    ["EDDM", "Munich"], ["EDDF", "Frankfurt"], ["EDDB", "Berlin"], ["EHAM", "Amsterdam"], ["EBBR", "Brussels"], ["LOWW", "Vienna"], ["LKPR", "Prague"],
+    ["EKCH", "Copenhagen"], ["ENGM", "Oslo"], ["ENSB", "Svalbard Longyearbyen"], ["ESSA", "Stockholm Arlanda"], ["EFHK", "Helsinki"],
+    ["LMML", "Malta"], ["LGAV", "Athens"], ["LTFM", "Istanbul"], ["OMDB", "Dubai"], ["OMDW", "Dubai World Central"], ["OTHH", "Doha"],
+    ["CYQX", "Gander"], ["CYYT", "St. John’s"], ["CYUL", "Montréal"], ["CYYZ", "Toronto"],
+    ["KTEB", "Teterboro"], ["KJFK", "New York JFK"], ["KHPN", "White Plains"], ["KBED", "Bedford (Boston)"], ["KBOS", "Boston"], ["KIAD", "Washington Dulles"],
+    ["KPBI", "Palm Beach"], ["KMIA", "Miami"], ["KVNY", "Van Nuys"], ["KLAS", "Las Vegas"], ["KSFO", "San Francisco"], ["KORD", "Chicago O’Hare"], ["KASE", "Aspen"],
+    ["TNCM", "St Maarten"], ["MYNN", "Nassau"], ["VHHH", "Hong Kong"], ["RJTT", "Tokyo Haneda"], ["WSSS", "Singapore"], ["FAOR", "Johannesburg"], ["SBGR", "São Paulo"]
+  ];
+  function worldGame(main, ctx, def) {
+    quizRound(main, ctx, def, "Match ICAO codes to their airports – and airports to their codes.", function () {
+      const pick = pickOne(AIRPORTS);
+      // wrong answers from the same region where possible (same first letter of the code)
+      const same = shuffle(AIRPORTS.filter((a) => a !== pick && a[0][0] === pick[0][0]));
+      const others = shuffle(AIRPORTS.filter((a) => a !== pick && a[0][0] !== pick[0][0]));
+      const pool = same.slice(0, 3).concat(others).slice(0, 3);
+      const list = shuffle([pick].concat(pool));
+      return Math.random() < 0.6
+        ? { prompt: pick[0], sub: "Which airport is this?", options: list.map((a) => a[1]), answer: list.indexOf(pick) }
+        : { prompt: pick[1], sub: "What is its ICAO code?", options: list.map((a) => a[0]), answer: list.indexOf(pick) };
+    }, 60);
+  }
+
+  // ==================================================================
+  // Shared: daily games – the same for everyone, once a day
+  // ==================================================================
+  function todayIceland() { return new Date().toLocaleDateString("en-CA", { timeZone: "Atlantic/Reykjavik" }); }
+  function dayNumber() { return Math.round((Date.parse(todayIceland() + "T12:00:00Z") - Date.parse("2026-01-01T12:00:00Z")) / 86400000); }
+  async function playedToday(ctx, game) {
+    const r = await ctx.db.from("game_scores").select("score").eq("profile_id", ctx.state.profile.id).eq("game", game).eq("played_on", todayIceland());
+    return !r.error && (r.data || []).length ? r.data[0].score : null;
+  }
+  function untilTomorrow() {
+    const now = new Date(), next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+    const m = Math.round((next - now) / 60000); return `${Math.floor(m / 60)} h ${m % 60} min`;
+  }
+  function store(key, val) { try { if (val === undefined) return JSON.parse(localStorage.getItem(key) || "null"); localStorage.setItem(key, JSON.stringify(val)); } catch (e) { return null; } }
+
+  // ==================================================================
+  // 7. Daily Word – the aviation word of the day, six tries
+  // ==================================================================
+  const WORDS = ["APRON", "FLAPS", "PITOT", "NOTAM", "METAR", "RADAR", "PILOT", "CABIN", "WINGS", "SLATS", "FLARE", "ROUTE", "CHOCK", "STAND", "PITCH", "CLIMB", "GLIDE", "STALL", "TOWER", "GATES", "ICING", "SLUSH", "GUSTS", "HOLDS", "CARGO", "STRUT", "PYLON", "AVGAS", "ORBIT", "LEVEL", "ROTOR", "BLADE", "WHEEL", "BRAKE", "TRIMS", "CREWS", "RAMPS", "TAXIS", "NORTH", "VISAS", "AISLE", "FIXES", "SPEED", "FUELS", "CHART", "ALOFT", "PLANE", "FERRY", "STACK", "ROGER", "WILCO", "HOVER", "DELAY", "SLOTS", "STEPS", "NOSES", "LIGHT", "SPINS", "JUMPS", "CLEAR"];
+  function wordGame(main, ctx, def) {
+    const { h } = ctx;
+    const word = WORDS[dayNumber() % WORDS.length], key = "iaa-word-" + todayIceland();
+    const area = h("div", { class: "word-game" });
+    const { board, status } = shell(main, ctx, def, "Guess today’s five-letter aviation word in six tries. Teal: right letter, right place. Amber: in the word, wrong place. Grey: not in the word.", area, null);
+    let guesses = store(key) || [], cur = "", over = false;
+    const stop = () => window.removeEventListener("keydown", onKey); stopCurrent = stop;
+    function marks(g) {
+      const res = Array(5).fill("absent"), pool = word.split("");
+      g.split("").forEach((c, i) => { if (c === word[i]) { res[i] = "correct"; pool[i] = null; } });
+      g.split("").forEach((c, i) => { if (res[i] !== "correct") { const j = pool.indexOf(c); if (j !== -1) { res[i] = "present"; pool[j] = null; } } });
+      return res;
+    }
+    function keyState() { const st = {}; guesses.forEach((g) => marks(g).forEach((m, i) => { const c = g[i], rank = { correct: 3, present: 2, absent: 1 }; if (!st[c] || rank[m] > rank[st[c]]) st[c] = m; })); return st; }
+    function draw(msg) {
+      const rows = [];
+      for (let r = 0; r < 6; r++) {
+        const g = guesses[r] || (r === guesses.length && !over ? cur.padEnd(5) : "     ");
+        const m = guesses[r] ? marks(guesses[r]) : null;
+        rows.push(h("div", { class: "word-row" }, g.split("").map((c, i) => h("span", { class: "word-cell" + (m ? " is-" + m[i] : c.trim() ? " is-typed" : "") }, c.trim()))));
+      }
+      const ks = keyState();
+      const kb = ["QWERTYUIOP", "ASDFGHJKL", "ENTER ZXCVBNM ⌫"].map((row) => h("div", { class: "word-keys" },
+        (row.indexOf(" ") !== -1 ? row.split(" ").flatMap((part) => part === "ENTER" || part === "⌫" ? [part] : part.split("")) : row.split("")).map((k) =>
+          h("button", { class: "word-key" + (ks[k] ? " is-" + ks[k] : "") + (k.length > 1 ? " is-wide" : ""), type: "button", onclick: () => press(k) }, k))));
+      put(area, h("div", { class: "word-grid" }, rows), msg ? h("p", { class: "word-msg" }, msg) : null, over ? null : kb);
+    }
+    function press(k) {
+      if (over) return;
+      if (k === "⌫" || k === "Backspace") cur = cur.slice(0, -1);
+      else if (k === "ENTER" || k === "Enter") { if (cur.length === 5) submit(); else draw("Five letters, please."); return; }
+      else if (/^[A-Z]$/.test(k) && cur.length < 5) cur += k;
+      draw();
+    }
+    function onKey(e) {
+      if (!area.isConnected) { stop(); return; }
+      if (e.ctrlKey || e.metaKey || /^(input|textarea|select)$/i.test(e.target.tagName)) return;
+      if (e.key === "Enter" || e.key === "Backspace") { e.preventDefault(); press(e.key); }
+      else if (/^[a-zA-Z]$/.test(e.key)) press(e.key.toUpperCase());
+    }
+    window.addEventListener("keydown", onKey);
+    function submit() {
+      guesses.push(cur); cur = ""; store(key, guesses);
+      if (guesses[guesses.length - 1] === word || guesses.length >= 6) done();
+      else draw();
+    }
+    function done() {
+      over = true;
+      const solved = guesses[guesses.length - 1] === word;
+      const pts = solved ? (7 - guesses.length) * 10 : 1;
+      draw(solved ? `Solved in ${guesses.length}! +${pts} points. A new word in ${untilTomorrow()}.` : `Today’s word was ${word}. +1 point for playing. A new word in ${untilTomorrow()}.`);
+      finish(ctx, def, board, status, pts);
+    }
+    (async function () {
+      const prev = await playedToday(ctx, def.id);
+      if (prev !== null) { over = true; draw(`You’ve played today (${prev} ${prev === 1 ? "point" : "points"}). A new word in ${untilTomorrow()}.`); return; }
+      if (guesses.length && (guesses[guesses.length - 1] === word || guesses.length >= 6)) { done(); return; }
+      draw();
+    })();
+  }
+
+  // ==================================================================
+  // 8. Daily Riddle – one a day, one answer
+  // ==================================================================
+  const RIDDLES = [
+    { q: "I have wings but never fly, a tail but no body to wag it. I sit by the runway and tell you which way to go. What am I?", o: ["A windsock", "A weathervane", "A taxiway sign", "A marshaller"], a: 0, e: "A windsock – its ‘tail’ points the way the wind is blowing." },
+    { q: "The more of me you take, the more you leave behind on the ramp. What am I?", o: ["Footsteps", "Fuel", "Chocks", "Bags"], a: 0, e: "Footsteps. (Please still walk, don’t run, on the apron.)" },
+    { q: "In the phonetic alphabet I’m a hotel, a sport and a dance. Which three letters am I?", o: ["H, G, T", "H, S, D", "H, G, F", "M, G, T"], a: 0, e: "Hotel, Golf and Tango." },
+    { q: "Pilots say me instead of 9 so I’m not mistaken for a German ‘no’. What am I?", o: ["Niner", "Nine-ah", "Nonner", "Nein"], a: 0, e: "Niner – it can’t be confused with ‘nein’." },
+    { q: "I’m read at the start of every flight, I change every half hour or hour, and I tell you about the weather at one airport. What am I?", o: ["A METAR", "A NOTAM", "A TAF", "A SIGMET"], a: 0, e: "A METAR – the routine weather report for an aerodrome." },
+    { q: "I warn pilots of what’s changed at an airport – a closed taxiway, a broken light – but I’m never about the weather. What am I?", o: ["A NOTAM", "A METAR", "An ATIS", "A PIREP"], a: 0, e: "A NOTAM – Notice to Air Missions (formerly Airmen)." },
+    { q: "I go down as you climb and up as you descend, and pilots set me on the altimeter before every flight. What am I?", o: ["Air pressure", "The flaps", "Fuel weight", "The rudder"], a: 0, e: "Air pressure – it falls as you climb and rises as you descend." },
+    { q: "Turn me one way and the aircraft goes left, turn me the other and it goes right – but only on the ground. What am I?", o: ["The rudder", "The nose wheel steering tiller", "The ailerons", "The yoke"], a: 1, e: "The nose wheel steering tiller – the rudder pedals only steer slowly at speed." },
+    { q: "I hold the aircraft still, I come in pairs, and I’m the first thing on and the last thing off. What am I?", o: ["Chocks", "Cones", "Brakes", "Tie-downs"], a: 0, e: "Chocks – first on after arrival, last off before departure." },
+    { q: "I’m orange and white, I stand at wingtips and tails, and nobody wants to touch me with a jet. What am I?", o: ["A safety cone", "A windsock", "A GPU", "A taxi light"], a: 0, e: "Safety cones mark the wingtips, nose and tail on stand." },
+    { q: "On the radio I’m Bravo India Kilo Foxtrot. Which airport am I?", o: ["Keflavík", "Reykjavík", "Akureyri", "Egilsstaðir"], a: 0, e: "BIKF is Keflavík. BIRK is Reykjavík and BIAR Akureyri." },
+    { q: "I’m a big number on every runway, but I’m really a compass direction divided by ten. Runway 13 points roughly which way?", o: ["130°, south-east", "13°, north", "310°, north-west", "230°, south-west"], a: 0, e: "Runway 13 faces about 130° magnetic – roughly south-east." },
+    { q: "I keep ice off the wings, but only for so long. Pilots call my time limit what?", o: ["Holdover time", "Hangar time", "Block time", "Slot time"], a: 0, e: "Holdover time – how long the de-icing fluid protects the aircraft." },
+    { q: "I’m measured from chocks off to chocks on, and the crew are paid by me. What am I?", o: ["Block time", "Air time", "Duty time", "Slot time"], a: 0, e: "Block time – off-blocks to on-blocks." },
+    { q: "I have a nose, a belly and a tail, but no face. I have wings, but no feathers. What am I?", o: ["An aircraft", "A bird", "A rocket", "A kite"], a: 0, e: "An aircraft." },
+    { q: "Say me twice on the radio and I mean ‘I understand and will comply’. What am I?", o: ["Wilco", "Roger", "Affirm", "Copy"], a: 0, e: "Wilco – will comply. ‘Roger’ only means ‘received’." },
+    { q: "I’m a squawk, but I’m not a bird. Which code do I use in an emergency?", o: ["7700", "7500", "7600", "1200"], a: 0, e: "7700 is emergency. 7600 is radio failure, 7500 unlawful interference." },
+    { q: "I’m the code a pilot squawks when the radio stops working. What am I?", o: ["7600", "7700", "7000", "2000"], a: 0, e: "7600 – radio failure." },
+    { q: "I’m yellow, I’m painted on the ground, and every aircraft follows me to the stand. What am I?", o: ["The lead-in line", "The hold line", "The stop bar", "The taxiway edge"], a: 0, e: "The lead-in line guides the nose wheel to the stop position." },
+    { q: "I’m a ground power unit’s best friend and a battery’s worst enemy on a long turnaround. What do I save?", o: ["The aircraft’s APU running time and fuel", "The tug", "The lavatory", "The catering"], a: 0, e: "A GPU lets the crew switch off the APU, saving fuel and noise." },
+    { q: "I’m the busiest letter on the apron – Foxtrot Oscar Delta. What am I?", o: ["FOD – foreign object debris", "A taxiway", "A stand number", "A callsign"], a: 0, e: "FOD – foreign object debris. Pick it up!" },
+    { q: "Without me the cabin would be cold and dark on stand, but I’m not the GPU and I’m not the engines. What am I?", o: ["The APU", "The battery", "The ram air turbine", "The de-icer"], a: 0, e: "The APU – auxiliary power unit, a small engine usually in the tail." },
+    { q: "I live in the tail, I give power and air on the ground, and the ramp hates my noise. What am I?", o: ["The APU", "The rudder", "The black box", "The beacon"], a: 0, e: "The APU." },
+    { q: "I’m red, I flash, and when I’m on, nobody goes near the aircraft. What am I?", o: ["The anti-collision beacon", "The navigation light", "The landing light", "The logo light"], a: 0, e: "Beacon on means engines are about to start or are running." },
+    { q: "Which way does the wind blow at an airport called ‘crosswind from the left’ on runway 31?", o: ["From the south-west", "From the north-east", "From the north-west", "From the south-east"], a: 0, e: "Runway 31 faces north-west, so a wind from its left comes from the south-west." },
+    { q: "Iceland’s registrations all start with me. What am I?", o: ["TF", "IS", "OY", "LN"], a: 0, e: "TF – OY is Denmark, LN is Norway." },
+    { q: "On the radio, how do you say the letter M?", o: ["Mike", "Mama", "Mexico", "Max"], a: 0, e: "Mike – Juliett, Kilo, Lima, Mike." },
+    { q: "I’m an airport in Greenland where many transatlantic business jets stop for fuel. Which one am I?", o: ["Narsarsuaq (BGBW)", "Nuuk (BGGH)", "Kulusuk (BGKK)", "Thule (BGTL)"], a: 0, e: "Narsarsuaq, in south Greenland, is a classic fuel stop." },
+    { q: "I’m a jet engine’s favourite breakfast and the reason we never leave cones near an inlet. What am I?", o: ["FOD", "Avgas", "De-icing fluid", "Snow"], a: 0, e: "FOD can be sucked into an engine – keep the area clear." },
+    { q: "I’m the fuel most business jets drink in Iceland. What am I?", o: ["Jet A-1", "Avgas 100LL", "Mogas", "Diesel"], a: 0, e: "Jet A-1 – Avgas is for piston engines." },
+    { q: "Two pilots, ten passengers, a dog and three golf bags. Who decides where everything goes in the hold?", o: ["The crew", "The ramp agent", "The tower", "The fuel driver"], a: 0, e: "The crew decide loading – they’re responsible for mass and balance." },
+    { q: "I’m a light you only see at night on the right wingtip. What colour am I?", o: ["Green", "Red", "White", "Blue"], a: 0, e: "Green on the right (starboard), red on the left." },
+    { q: "I’m the colour of the taxiway edge lights. What colour am I?", o: ["Blue", "Green", "White", "Amber"], a: 0, e: "Taxiway edges are blue; taxiway centrelines are green." },
+    { q: "I come in wands, I’m orange, and I speak without a word. What am I?", o: ["Marshalling signals", "A windsock", "A traffic light", "A beacon"], a: 0, e: "Marshalling wands – the marshaller’s language." },
+    { q: "I’m the busiest five minutes of a turnaround: the moment the door opens. Who opens me?", o: ["The crew, from inside", "The ramp agent, from outside", "The tower", "The fuel driver"], a: 0, e: "On business jets the crew open the door – never open it from outside unless asked." },
+    { q: "Every ICAO airport code that starts with BI is in which country?", o: ["Iceland", "Bermuda", "Belize", "Bahrain"], a: 0, e: "BI is Iceland – BIKF, BIRK, BIAR, BIEG." },
+    { q: "I’m 1013 on a cold Icelandic morning, the standard everyone sets above the transition altitude. What am I?", o: ["Standard pressure (hPa)", "A squawk code", "A runway length", "A flight level"], a: 0, e: "1013 hPa – standard pressure." },
+    { q: "Snow on the wings, frost on the tail, slush on the ramp. Who decides if the aircraft needs de-icing?", o: ["The crew", "The ramp agent", "The tower", "Isavia"], a: 0, e: "De-icing is the pilot’s decision – we request it when they ask." },
+    { q: "I lift the nose wheel off the ground and push the aircraft back without a towbar. What am I?", o: ["A towbarless tug", "A GPU", "Air stairs", "A catering truck"], a: 0, e: "A towbarless tug – it cradles the nose wheel instead of using a towbar." },
+    { q: "I’m a crew’s best friend after a long night flight: hot coffee, quiet sofas, and the name Iceland Aero Agents uses for me. What am I?", o: ["Our VIP Lounge", "The crew room", "The terminal", "The hangar"], a: 0, e: "Our VIP Lounge." }
+  ];
+  function riddleGame(main, ctx, def) {
+    const { h } = ctx;
+    const base = RIDDLES[dayNumber() % RIDDLES.length], key = "iaa-riddle-" + todayIceland();
+    // The same shuffled order for everyone today, so the right answer isn't always first.
+    let seed = dayNumber() * 9301 + 49297;
+    const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    const order = [0, 1, 2, 3]; for (let i = 3; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    const r = { q: base.q, e: base.e, o: order.map((i) => base.o[i]), a: order.indexOf(base.a) };
+    const area = h("div", { class: "quiz-game riddle-game" });
+    const { board, status } = shell(main, ctx, def, "One aviation riddle a day. 30 points for the right answer, 1 point for playing. One answer – think first!", area, null);
+    stopCurrent = null;
+    function show(chosen, note) {
+      put(area, 
+        h("p", { class: "quiz-prompt riddle-q" }, r.q),
+        h("div", { class: "quiz-opts" }, r.o.map((o, i) => h("button", {
+          class: "opt quiz-opt" + (chosen !== null ? (i === r.a ? " is-right" : i === chosen ? " is-wrong" : "") : ""), type: "button", disabled: chosen !== null,
+          onclick: () => answer(i) }, h("span", { class: "opt-key" }, String(i + 1)), h("span", null, o)))),
+        chosen !== null ? h("p", { class: "word-msg" }, (chosen === r.a ? "Correct! " : "Not this time. ") + r.e) : null,
+        note ? h("p", { class: "fineprint" }, note) : null);
+    }
+    function answer(i) {
+      store(key, i);
+      const pts = i === r.a ? 30 : 1;
+      show(i, `+${pts} ${pts === 1 ? "point" : "points"}. A new riddle in ${untilTomorrow()}.`);
+      finish(ctx, def, board, status, pts);
+    }
+    (async function () {
+      const prev = await playedToday(ctx, def.id);
+      const saved = store(key);
+      if (prev !== null) { show(saved === null || saved === undefined ? r.a : saved, `You’ve answered today’s riddle (${prev} ${prev === 1 ? "point" : "points"}). A new one in ${untilTomorrow()}.`); return; }
+      if (saved !== null && saved !== undefined) { answer(saved); return; }
+      show(null);
+    })();
   }
 
   window.IAAGame = { render: render };

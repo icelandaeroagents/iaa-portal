@@ -1285,3 +1285,42 @@ dialog.photo-view[open] { display: flex; flex-direction: column; align-items: ce
 dialog.photo-view::backdrop { background: rgba(10, 16, 26, 0.85); }
 dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--radius-m); display: block; }
 .photo-view-close { background: var(--surface); }
+
+/* Games: champion of the month */
+.game-champion { border-top: 4px solid #e0a526; }
+.game-champion-head { display: flex; align-items: center; gap: 1rem; }
+.game-trophy { font-size: 2.6rem; line-height: 1; }
+.game-champion h2 { font-size: 1.5rem; margin-top: 0.1rem; }
+.game-leaders { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.25rem 1.5rem; }
+.game-leaders li { display: flex; gap: 0.5rem; align-items: baseline; font-size: 0.92rem; border-bottom: 1px solid var(--line); padding: 0.25rem 0; }
+.game-leaders li span:first-child { flex: 1; color: var(--muted); }
+
+/* Games: 60-second quizzes and the daily riddle */
+.quiz-game { width: 100%; max-width: 30rem; display: flex; flex-direction: column; gap: 0.9rem; min-height: 22rem; }
+.quiz-start { display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start; padding: 1rem 0; }
+.quiz-top { display: flex; align-items: center; gap: 0.6rem; }
+.quiz-time { flex: 1; height: 0.5rem; background: var(--line); border-radius: 999px; overflow: hidden; }
+.quiz-time i { display: block; height: 100%; width: 100%; background: var(--brand); border-radius: inherit; transition: width 0.1s linear; }
+.quiz-time-left { font-family: var(--font-sign); font-weight: 600; min-width: 2.6rem; text-align: right; }
+.quiz-score { font-family: var(--font-sign); font-weight: 700; font-size: 1.4rem; min-width: 3rem; text-align: right; }
+.quiz-streak { font-weight: 700; color: #b45309; }
+.quiz-prompt { font-family: var(--font-sign); font-weight: 700; font-size: 2rem; letter-spacing: 0.04em; margin: 0.4rem 0 0; text-align: center; }
+.riddle-q { font-family: var(--font); font-size: 1.2rem; letter-spacing: 0; text-align: left; font-weight: 600; }
+.quiz-sub { color: var(--muted); text-align: center; margin: 0; }
+.quiz-opts { display: grid; gap: 0.5rem; }
+.quiz-opt { width: 100%; }
+
+/* Games: daily word */
+.word-game { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; width: 100%; }
+.word-grid { display: grid; gap: 0.35rem; }
+.word-row { display: grid; grid-template-columns: repeat(5, 3.1rem); gap: 0.35rem; }
+.word-cell { height: 3.1rem; display: flex; align-items: center; justify-content: center; font-family: var(--font-sign); font-weight: 700; font-size: 1.6rem; border: 2px solid var(--line); border-radius: 6px; text-transform: uppercase; }
+.word-cell.is-typed { border-color: var(--muted); }
+.word-cell.is-correct, .word-key.is-correct { background: #088f83; border-color: #088f83; color: #fff; }
+.word-cell.is-present, .word-key.is-present { background: #d9971a; border-color: #d9971a; color: #fff; }
+.word-cell.is-absent, .word-key.is-absent { background: #6b7785; border-color: #6b7785; color: #fff; }
+.word-keys { display: flex; gap: 0.25rem; justify-content: center; }
+.word-key { min-width: 2.1rem; height: 2.8rem; border: 0; border-radius: 6px; background: var(--line); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; }
+.word-key.is-wide { min-width: 3.6rem; font-size: 0.8rem; }
+.word-msg { font-weight: 600; text-align: center; max-width: 28rem; }
+@media (max-width: 420px) { .word-row { grid-template-columns: repeat(5, 2.7rem); } .word-cell { height: 2.7rem; } .word-key { min-width: 1.75rem; } }
