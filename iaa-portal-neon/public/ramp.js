@@ -7,6 +7,11 @@
   "use strict";
 
   let station = null, day = null, openId = null, notice = null;
+  const tried = {};   // days already fetched from Notion during this visit
+  function refreshDay(d) {
+    return fetch("/api/ramp-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "refresh", day: d }) })
+      .then((x) => x.json()).catch(() => ({ error: "No connection – try again" }));
+  }
   const STATION_ORDER = ["BIRK", "BIKF", "BIAR", "BIEG"];
 
   function todayIso() { return new Date().toLocaleDateString("en-CA", { timeZone: "Atlantic/Reykjavik" }); }
@@ -19,6 +24,18 @@
   function when(ts) { return new Date(ts).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Atlantic/Reykjavik" }); }
   const op = (o) => (o && o !== "NONE" ? String(o).replace(/\s*-\s*[A-Z0-9]{3}$/, "") : "");
   const notionLink = (id) => "https://www.notion.so/" + String(id).replace(/-/g, "");
+  // The same wording as the "Summary" formula in the Notion Services Log:
+  // 2 × Crew Transport · 1.5 h GPU · 120 L Potable Water · 2 nights Hangar · Lav
+  function describe(qty, name, unit) {
+    const q = Number(qty), n = String(name || "Service");
+    if (!q || unit === "service") return n;
+    if (unit === "hours") return `${q} h ${n}`;
+    if (unit === "litres") return `${q} L ${n}`;
+    if (unit === "nights") return `${q} ${q === 1 ? "night" : "nights"} ${n}`;
+    if (unit === "pax") return `${q} pax ${n}`;
+    return `${q} × ${n}`;
+  }
+
   function push() { return fetch("/api/ramp-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "push" }) }).catch(() => {}); }
 
   async function render(main, ctx) {
@@ -42,15 +59,22 @@
       .or(`and(arrival.gte."${from}",arrival.lte."${to}"),and(departure.gte."${from}",departure.lte."${to}")`).order("arrival", { ascending: true });
     if (fr.error) { fill(main, pageHead("Ramp"), h("p", { class: "notice is-error" }, "Ramp isn’t set up yet (database update 43).")); return; }
     const flights = fr.data || [];
+    if (!flights.length && !tried[station + day]) {
+      tried[station + day] = true;
+      fill(main, pageHead("Ramp"), h("p", { class: "empty" }, "Checking Notion for flights on this day…"));
+      await refreshDay(day);
+      return listPage(main, ctx);
+    }
     const logs = flights.length ? await db.from("service_logs").select("flight_id, status").in("flight_id", flights.map((f) => f.id)) : { data: [] };
     const counts = {}; (logs.data || []).forEach((l) => { if (l.status !== "removed" && l.status !== "remove") counts[l.flight_id] = (counts[l.flight_id] || 0) + 1; });
     const latest = flights.reduce((t, f) => (f.synced_at > t ? f.synced_at : t), "");
     const status = h("p", { class: "status", role: "status" });
     const refresh = h("button", { class: "btn btn-quiet btn-small", type: "button", onclick: async function () {
       refresh.disabled = true; ctx.setStatus(status, "Getting the latest from Notion…");
-      const r = await fetch("/api/ramp-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "refresh" }) }).then((x) => x.json()).catch(() => ({ error: "No connection" }));
+      const r = await refreshDay(day);
       if (r.error) { refresh.disabled = false; ctx.setStatus(status, r.error, true); return; }
-      notice = { text: r.note || "Flights updated from Notion." }; listPage(main, ctx);
+      notice = { text: `Updated ${r.flights} ${r.flights === 1 ? "flight" : "flights"} from Notion` + ((r.problems || []).length ? ` – couldn’t read: ${r.problems.join("; ")}` : ".") };
+      listPage(main, ctx);
     } }, "↻ Refresh");
     const n = notice; notice = null;
     fill(main,
@@ -73,7 +97,7 @@
             h("span", { class: "sub" }, [op(f.operator), f.arrival ? `Arr ${hhmm(f.arrival)}${f.origin ? " from " + f.origin : ""}` : null, f.departure ? `Dep ${hhmm(f.departure)}${f.destination ? " to " + f.destination : ""}` : null].filter(Boolean).join(" · ")),
             (f.services_requested || []).length ? h("span", { class: "ramp-req" }, f.services_requested.join(" · ")) : null)))
         : h("p", { class: "empty" }, `No ${station} flights ${niceDay(day).toLowerCase() === "today" ? "today" : "on this day"}.`),
-      h("p", { class: "fineprint" }, latest ? `From Notion, last updated ${when(latest)}. Updates every 10 minutes – tap Refresh for the latest.` : "Flights come from Notion every 10 minutes."));
+      h("p", { class: "fineprint" }, latest ? `From Notion, last updated ${when(latest)}. Updates every 10 minutes for the next two weeks – tap Refresh for the latest.` : "Flights come from Notion every 10 minutes, for the next two weeks."));
   }
 
   // ------------------------------------------------------------------
@@ -161,8 +185,7 @@
       h("section", { class: "panel" },
         h("h2", null, `Logged (${shown.length})`),
         shown.length ? h("ul", { class: "ramp-logged" }, shown.map((l) => h("li", null,
-          h("span", null, h("b", null, `${Number(l.quantity) !== 1 ? Number(l.quantity) + " × " : ""}${l.service_types ? l.service_types.name : "Service"}`),
-            l.service_types && l.service_types.unit && l.service_types.unit !== "service" ? ` (${l.service_types.unit})` : "",
+          h("span", null, h("b", null, describe(l.quantity, l.service_types ? l.service_types.name : "Service", l.service_types && l.service_types.unit)),
             h("span", { class: "sub" }, `${l.logged_by_name || "–"} · ${when(l.logged_at)}${l.notes ? " · " + l.notes : ""}`)),
           statusOf(l),
           (l.logged_by === me || isMgmt) && ["pending", "sent", "failed"].indexOf(l.status) !== -1
