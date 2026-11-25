@@ -599,7 +599,10 @@
   function apronGame(main, ctx, def) {
     const { h } = ctx;
     const COLS = 20, ROWS = 21, CELL = 24, TOP = 70;      // grid 20 × 21 cells of 5 m, starting 70 px down
-    const LANES = [10, 20];                               // taxi lane rows
+    const LANES = [0, 10, 20];                            // taxi lanes: top, middle and bottom
+    // Stand positions: the nose row next to a lane. Two parking areas of nine rows,
+    // each with a lane on both sides, so jets can face up or down and interlock.
+    const EDGES = [{ row: 1, dir: -1 }, { row: 9, dir: 1 }, { row: 11, dir: -1 }, { row: 19, dir: 1 }];
     const HOLD_MAX = 3, DIVERT_MAX = 3;
     // Length and span in 5 m cells (odd spans keep the fuselage centred), points, how common, stay in seconds.
     const TYPES = [
@@ -618,37 +621,62 @@
       canvas, h("div", { class: "game-pads" }, flip));
     cv.size(); window.addEventListener("resize", cv.size);
 
-    let grid, parked, holding, score, diverted, mode = "ready", hover = null, t = 0, msgAt = 0, nextIn = 0, arrivals = 0, flash = null;
+    let parked = [], holding, score, diverted, mode = "ready", hover = null, t = 0, msgAt = 0, nextIn = 0, arrivals = 0, flash = null;
     let flipped = false;
     function pick() { const tot = TYPES.reduce((a, b) => a + b.w, 0); let r = Math.random() * tot; for (const ty of TYPES) { if ((r -= ty.w) < 0) return ty; } return TYPES[0]; }
     function reg() { const L = "ABCDEFGHIJKLMNOPRSTUVY"; return "TF-" + Array.from({ length: 3 }, () => L[Math.floor(Math.random() * L.length)]).join(""); }
     // Arrivals speed up from one every 6 s to one every 3 s (after about 50 jets).
     const interval = () => Math.max(3, 6 - arrivals * 0.06);
-    function shape(ty, dir) {
-      const c = (ty.S - 1) / 2, cells = [], wingRow = Math.max(1, Math.floor(ty.L * 0.4));
-      for (let r = 0; r < ty.L; r++) cells.push([0, r]);
-      for (let k = 0; k < ty.S; k++) if (k !== c) cells.push([k - c, wingRow]);
-      if (ty.S >= 5) for (let k = 1; k < ty.S - 1; k++) if (k !== c) cells.push([k - c, wingRow + 1]);
-      if (ty.S >= 5) { cells.push([-1, ty.L - 1]); cells.push([1, ty.L - 1]); }
-      return cells.map(([dx, r]) => [dx, dir < 0 ? r : -r]);
+    // The jet as it is drawn – fuselage, swept wings and tailplane – as convex shapes in
+    // apron coordinates. Whether a jet fits is decided on these, so what you see is what fits.
+    function jetParts(ty, col, edge) {
+      const C = CELL, len = ty.L * C, span = ty.S * C, cx = col * C + C / 2, ny = TOP + edge.row * C + C / 2;
+      const midY = ny + (edge.dir < 0 ? len / 2 - C / 2 : -(len / 2 - C / 2)), flip = edge.dir > 0 ? -1 : 1;
+      const wr = -len / 2 + Math.max(1, Math.floor(ty.L * 0.4)) * C, tw = ty.S >= 5 ? C * 1.4 : C * 0.9;
+      const local = [
+        [[-C * 0.32, -len / 2 + 1], [C * 0.32, -len / 2 + 1], [C * 0.32, len / 2 - 1], [-C * 0.32, len / 2 - 1]],                       // fuselage
+        [[-span / 2 + 2, wr + C * 0.9], [-C * 0.4, wr - C * 0.1], [C * 0.4, wr - C * 0.1], [span / 2 - 2, wr + C * 0.9], [span / 2 - 2, wr + C * 1.2], [-span / 2 + 2, wr + C * 1.2]], // wings
+        [[-tw, len / 2 - 4], [-C * 0.2, len / 2 - C * 0.7], [C * 0.2, len / 2 - C * 0.7], [tw, len / 2 - 4]]                            // tailplane
+      ];
+      return local.map((poly) => poly.map(([x, y]) => [cx + flip * x, midY + flip * y]));
     }
-    const EDGES = [{ row: 9, dir: 1 }, { row: 11, dir: -1 }, { row: 19, dir: 1 }];
-    function cellsAt(ty, col, edge) { return shape(ty, edge.dir).map(([dx, dr]) => [col + dx, edge.row + dr]); }
-    function fits(cells) { return cells.every(([c, r]) => c >= 0 && c < COLS && r >= 0 && r < ROWS && LANES.indexOf(r) === -1 && !grid[r][c]); }
-    function tight(cells, id) {
-      return cells.some(([c, r]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dc, dr]) => {
-        const cc = c + dc, rr = r + dr; return rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && grid[rr][cc] && grid[rr][cc] !== id; }));
+    // Do two convex shapes overlap? (separating axis test)
+    function overlap(A, B) {
+      for (const P of [A, B]) for (let i = 0; i < P.length; i++) {
+        const [x1, y1] = P[i], [x2, y2] = P[(i + 1) % P.length], nx = y2 - y1, ny = x1 - x2;
+        let amin = Infinity, amax = -Infinity, bmin = Infinity, bmax = -Infinity;
+        A.forEach(([x, y]) => { const d = x * nx + y * ny; amin = Math.min(amin, d); amax = Math.max(amax, d); });
+        B.forEach(([x, y]) => { const d = x * nx + y * ny; bmin = Math.min(bmin, d); bmax = Math.max(bmax, d); });
+        if (amax <= bmin || bmax <= amin) return false;
+      }
+      return true;
     }
+    function grow(poly, by) {   // push each corner outwards from the shape’s centre
+      const cx = poly.reduce((a, p) => a + p[0], 0) / poly.length, cy = poly.reduce((a, p) => a + p[1], 0) / poly.length;
+      return poly.map(([x, y]) => { const d = Math.hypot(x - cx, y - cy) || 1; return [x + (x - cx) / d * by, y + (y - cy) / d * by]; });
+    }
+    const LANE_SHAPES = LANES.map((r) => [[0, TOP + r * CELL], [W, TOP + r * CELL], [W, TOP + (r + 1) * CELL], [0, TOP + (r + 1) * CELL]]);
+    function fitsParts(parts) {
+      const inside = parts.every((poly) => poly.every(([x, y]) => x >= 0 && x <= W && y >= TOP && y <= TOP + ROWS * CELL));
+      if (!inside) return false;
+      if (parts.some((poly) => LANE_SHAPES.some((lane) => overlap(poly, lane)))) return false;
+      return !parked.some((p) => !p.leaving && p.parts.some((q) => parts.some((poly) => overlap(poly, q))));
+    }
+    function fits(ty, col, edge) { return fitsParts(jetParts(ty, col, edge)); }
+    // Parked tight: within about 8 px (a few metres) of another jet.
+    function tight(parts) { return parked.some((p) => !p.leaving && p.parts.some((q) => parts.some((poly) => overlap(grow(poly, 8), q)))); }
+    // Positions in half-square steps, so jets can tuck in closer.
+    const COL_STEPS = Array.from({ length: COLS * 2 - 1 }, (_, i) => i / 2);
+    const snapCol = (x) => Math.max(0, Math.min(COLS - 1, Math.round((x - CELL / 2) / (CELL / 2)) / 2));
     function nearestEdge(p) {
       const row = (p.y - TOP) / CELL;
       let best = EDGES[0], d = 1e9;
       EDGES.forEach((e) => { const centre = e.row + (e.dir > 0 ? -1 : 1) * 2; const dd = Math.abs(row - centre); if (dd < d) { d = dd; best = e; } });
-      if (flipped && best.row === 11) best = EDGES[2]; else if (flipped && best.row === 19) best = EDGES[1];
+      if (flipped) best = EDGES[EDGES.indexOf(best) ^ 1];   // the other lane of the same parking area
       return best;
     }
     flip.addEventListener("click", () => { flipped = !flipped; });
     function start() {
-      grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
       parked = []; holding = [pick()]; score = 0; diverted = 0; arrivals = 1; nextIn = interval(); flash = null;
       mode = "play"; ctx.setStatus(status, "");
     }
@@ -666,13 +694,12 @@
       if (mode === "ready") { start(); return; }
       if (mode === "over") { if (t - msgAt > 0.8) mode = "ready"; return; }
       if (!holding.length) return;
-      const ty = holding[0], col = Math.floor(p.x / CELL), edge = nearestEdge(p), cells = cellsAt(ty, col, edge);
-      if (!fits(cells)) { flash = { text: `The ${ty.name} doesn’t fit there`, at: t, bad: true }; return; }
+      const ty = holding[0], col = snapCol(p.x), edge = nearestEdge(p), parts = jetParts(ty, col, edge);
+      if (!fitsParts(parts)) { flash = { text: `The ${ty.name} doesn’t fit there`, at: t, bad: true }; return; }
       const id = nextId++, waiting = holding.length;
-      const isTight = tight(cells, id);
-      cells.forEach(([c, r]) => { grid[r][c] = id; });
+      const isTight = tight(parts);
       const stay = ty.stay[0] + Math.random() * (ty.stay[1] - ty.stay[0]);
-      parked.push({ id, ty, col, edge, cells, reg: reg(), left: stay, stay, leaving: 0 });
+      parked.push({ id, ty, col, edge, parts, reg: reg(), left: stay, stay, leaving: 0 });
       holding.shift(); flipped = false;
       let gain = ty.pts, extra = [];
       if (isTight) { gain += 5; extra.push("tight +5"); }
@@ -746,8 +773,8 @@
       });
       // ghost of the first jet in holding under the pointer
       if (mode === "play" && hover && hover.y > TOP && hover.y < TOP + ROWS * CELL && holding.length) {
-        const ty = holding[0], col = Math.floor(hover.x / CELL), edge = nearestEdge(hover);
-        jetShape(ty, col, edge, true, fits(cellsAt(ty, col, edge)));
+        const ty = holding[0], col = snapCol(hover.x), edge = nearestEdge(hover);
+        jetShape(ty, col, edge, true, fits(ty, col, edge));
       }
       // holding queue along the bottom
       const by = TOP + ROWS * CELL + 8;
@@ -778,7 +805,7 @@
         parked.forEach((p) => {
           if (p.leaving) { p.leaving += dt; return; }
           p.left -= dt;
-          if (p.left <= 0) { p.leaving = 0.001; p.cells.forEach(([c, r]) => { if (grid[r][c] === p.id) grid[r][c] = null; }); }
+          if (p.left <= 0) p.leaving = 0.001;   // its space frees straight away; it fades as it taxis out
         });
         parked = parked.filter((p) => !p.leaving || p.leaving < 0.8);
       }
