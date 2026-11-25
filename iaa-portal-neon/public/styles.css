@@ -1343,3 +1343,58 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
   .word-row.len-6 { grid-template-columns: repeat(6, 2.4rem); } .word-row.len-6 .word-cell { height: 2.4rem; }
   .word-row.len-7 { grid-template-columns: repeat(7, 2.1rem); } .word-row.len-7 .word-cell { height: 2.1rem; font-size: 1.2rem; }
 }
+
+/* "The portal has been updated" bar */
+.update-bar { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 0.75rem); z-index: 1000;
+  display: flex; align-items: center; gap: 0.9rem; padding: 0.6rem 0.75rem 0.6rem 1.1rem; border-radius: 999px;
+  background: var(--chrome); color: var(--chrome-ink); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25); font-weight: 600; max-width: calc(100vw - 1.5rem); }
+
+/* Ramp */
+.ramp-days { display: flex; align-items: center; gap: 0.6rem; margin: 0.25rem 0 0.75rem; }
+.ramp-days b { min-width: 6rem; text-align: center; font-family: var(--font-sign); font-size: 1.1rem; }
+.ramp-list { display: grid; gap: 0.6rem; }
+.ramp-flight { text-decoration: none; color: var(--ink); gap: 0.25rem; padding: 0.85rem 1rem; }
+.ramp-flight:hover { border-color: var(--brand); }
+.ramp-flight.is-done { opacity: 0.75; }
+.ramp-flight-head { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+.ramp-reg { font-family: var(--font-sign); font-size: 1.3rem; letter-spacing: 0.02em; }
+.ramp-type { color: var(--muted); font-weight: 600; }
+.ramp-flight-head .chip { margin-left: auto; }
+.ramp-req { font-size: 0.85rem; color: var(--brand-strong); }
+.ramp-group h3 { font-size: 0.95rem; margin: 0.75rem 0 0.4rem; color: var(--muted); }
+.ramp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.5rem; }
+.ramp-svc { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.55rem 0.7rem; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); }
+.ramp-svc.is-requested { border-color: var(--brand); }
+.ramp-svc.is-on { background: var(--field); border-color: var(--brand-strong); }
+.ramp-svc-name { display: flex; flex-direction: column; font-weight: 600; }
+.ramp-svc input { width: 6rem; }
+.ramp-counter { display: flex; align-items: center; gap: 0.4rem; }
+.ramp-counter .btn { min-width: 2.4rem; font-size: 1.1rem; }
+.ramp-count { min-width: 1.6rem; text-align: center; font-family: var(--font-sign); font-weight: 700; font-size: 1.15rem; }
+.ramp-logged { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.ramp-logged li { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0; border-bottom: 1px solid var(--line); }
+.ramp-logged li > span:first-child { flex: 1; display: flex; flex-direction: column; }
+.ramp-complete { font-weight: 700; color: var(--success); display: flex; flex-direction: column; margin: 0; }
+/* Logbook */
+.lb-stats { flex-direction: row; flex-wrap: wrap; justify-content: space-around; gap: 1rem; }
+.lb-stat { display: flex; flex-direction: column; align-items: center; }
+.lb-stat b { font-family: var(--font-sign); font-size: 2rem; color: var(--brand-strong); line-height: 1.1; }
+.lb-stat span { color: var(--muted); font-size: 0.85rem; }
+.lb-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: 0.6rem; }
+.lb-card { position: relative; display: flex; flex-direction: column; gap: 0.15rem; padding: 0.8rem; border-radius: var(--radius-m); border: 1px solid var(--line); background: linear-gradient(160deg, var(--surface), var(--field)); }
+.lb-card.is-rare { border: 2px solid #d9a21a; background: linear-gradient(160deg, #fff8e1, var(--surface)); }
+.lb-rare { position: absolute; top: 0.5rem; right: 0.5rem; font-size: 0.7rem; font-weight: 700; color: #8a5b00; background: #ffe39a; border-radius: 999px; padding: 0.1rem 0.45rem; }
+.lb-plane { font-size: 1.6rem; color: var(--brand); }
+.lb-badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.5rem; }
+.lb-badge { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.15rem; padding: 0.6rem; border-radius: var(--radius-m); border: 1px dashed var(--line); opacity: 0.55; }
+.lb-badge.is-got { opacity: 1; border-style: solid; border-color: var(--brand); }
+.lb-badge-icon { font-size: 1.6rem; }
+.lb-two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 760px) { .lb-two { grid-template-columns: 1fr; } }
+.lb-flags { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin: 0; }
+.lb-list { list-style: none; margin: 0; padding: 0; }
+.lb-list li { display: flex; justify-content: space-between; gap: 0.6rem; padding: 0.3rem 0; border-bottom: 1px solid var(--line); }
+.lb-regs { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0; }
+.lb-results { display: flex; flex-direction: column; gap: 0.35rem; }
+.lb-hit { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.35rem 0; border-bottom: 1px solid var(--line); }
+@media (prefers-color-scheme: dark) { .lb-card.is-rare { background: linear-gradient(160deg, #3a2f10, var(--surface)); } .lb-rare { background: #5a4510; color: #ffe39a; } }

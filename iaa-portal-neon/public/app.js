@@ -98,6 +98,13 @@
       render: renderRequests
     },
     {
+      id: "ramp",
+      title: "Ramp",
+      description: "Log the services you deliver on each flight.",
+      roles: ALL_ROLES,
+      render: renderRamp
+    },
+    {
       id: "equipment",
       title: "Equipment Info",
       description: "Where equipment is kept at each station, with important notes.",
@@ -119,6 +126,13 @@
       description: "Submit and follow up internal reports.",
       roles: ALL_ROLES,
       render: renderReports
+    },
+    {
+      id: "logbook",
+      title: "Logbook",
+      description: "The aircraft you’ve worked – collect every type.",
+      roles: ALL_ROLES,
+      render: renderLogbook
     },
     {
       id: "game",
@@ -776,6 +790,16 @@
   async function renderEquipment(main) {
     if (!window.IAAEquipment) return sectionMissing(main, "Equipment Info");
     return window.IAAEquipment.render(main, sectionCtx());
+  }
+
+  async function renderRamp(main) {
+    if (!window.IAARamp) return sectionMissing(main, "Ramp");
+    return window.IAARamp.render(main, sectionCtx());
+  }
+
+  async function renderLogbook(main) {
+    if (!window.IAALogbook) return sectionMissing(main, "Logbook");
+    return window.IAALogbook.render(main, sectionCtx());
   }
 
   async function renderGame(main) {
@@ -1599,4 +1623,43 @@
     if (state.profile.full_name) return state.profile.full_name.split(" ")[0];
     return state.profile.email.split("@")[0];
   }
+
+  // ------------------------------------------------------------------
+  // Updates: an open portal keeps running the files it started with, so it
+  // checks which version is live (api/version.js) when opened, when someone
+  // comes back to it, and every 10 minutes. Coming back after an update, it
+  // reloads itself – unless something has been typed into a form, in which
+  // case (and whenever it's on screen) it shows an "Update now" bar instead.
+  // ------------------------------------------------------------------
+  let loadedVersion = null, hiddenAt = 0, updateBar = null;
+  async function liveVersion() {
+    try { const r = await fetch("/api/version", { cache: "no-store" }); if (!r.ok) return null; return (await r.json()).version || null; }
+    catch (e) { return null; }
+  }
+  function somethingTyped() {
+    return Array.from(document.querySelectorAll("main textarea, main input[type=text], main input:not([type]), main input[type=email]"))
+      .some((el) => el.value && el.value.trim() && !el.readOnly && el.id !== "riddle-answer");
+  }
+  function showUpdateBar() {
+    if (updateBar) return;
+    updateBar = h("div", { class: "update-bar", role: "status" },
+      h("span", null, "The portal has been updated."),
+      h("button", { class: "btn btn-small", type: "button", onclick: function () { location.reload(); } }, "Update now"));
+    document.body.appendChild(updateBar);
+  }
+  async function checkForUpdate(returning) {
+    const v = await liveVersion();
+    if (!v) return;
+    if (!loadedVersion) { loadedVersion = v; return; }
+    if (v === loadedVersion) return;
+    if (returning && !somethingTyped()) { location.reload(); return; }
+    showUpdateBar();
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) { hiddenAt = Date.now(); return; }
+    checkForUpdate(hiddenAt && Date.now() - hiddenAt > 20000);
+  });
+  window.addEventListener("pageshow", function (e) { if (e.persisted) checkForUpdate(true); });   // back from the phone’s app switcher
+  setInterval(function () { checkForUpdate(false); }, 10 * 60 * 1000);
+  checkForUpdate(false);
 })();
