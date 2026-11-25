@@ -201,7 +201,14 @@ async function serviceEmail(id) {
   if (!c.rows.length) return { id: id, email: "service request", status: "nothing to send" };
   const s = c.rows[0];
   try {
-    const to = await managers();
+    let to = await managers();
+    // Vehicle defects and equipment requests also go to the Maintenance Manager (database update 41).
+    if (s.kind === "vehicle_defect" || s.kind === "equipment") {
+      try {
+        const m = await db().query("select email from public.profiles where maintenance_manager and active and email is not null and email <> ''");
+        to = Array.from(new Set(to.concat(m.rows.map((r) => r.email))));
+      } catch (e) { /* before update 41: management only */ }
+    }
     if (!to.length) throw new Error("No management recipients set up");
     const label = SERVICE_LABELS[s.kind] || s.kind;
     await mail({
