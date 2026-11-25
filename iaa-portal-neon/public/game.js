@@ -1144,10 +1144,11 @@
     const ROADS = [[40, 90, 40, 510], [400, 90, 40, 510], [40, 90, 400, 40], [40, 560, 400, 40]];  // x, y, w, h
     const TAXI = { y: 290, h: 60 };                         // the taxiway the road crosses
     const HOLD = [{ y: 278 }, { y: 362 }];                  // hold lines either side of the taxiway
+    // Stand boxes open straight off the road (each overlaps it slightly), so you can drive in.
     const BAYS = [
-      { name: "Stand 1", x: 82, y: 160, w: 34, h: 36 }, { name: "Stand 2", x: 82, y: 440, w: 34, h: 36 },
-      { name: "Stand 3", x: 210, y: 132, w: 40, h: 32 }, { name: "Stand 4", x: 364, y: 180, w: 34, h: 36 },
-      { name: "Stand 5", x: 364, y: 470, w: 34, h: 36 }, { name: "Stand 6", x: 250, y: 526, w: 40, h: 32 }
+      { name: "Stand 1", x: 76, y: 158, w: 40, h: 40 }, { name: "Stand 2", x: 76, y: 438, w: 40, h: 40 },
+      { name: "Stand 3", x: 208, y: 126, w: 44, h: 38 }, { name: "Stand 4", x: 364, y: 178, w: 40, h: 40 },
+      { name: "Stand 5", x: 364, y: 468, w: 40, h: 40 }, { name: "Stand 6", x: 248, y: 522, w: 44, h: 42 }
     ];
     const LOADS = ["the GPU", "potable water", "the catering", "the lav truck", "the crew’s bags", "the air stairs"];
     const inRect = (x, y, r) => x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
@@ -1160,7 +1161,7 @@
     const pads = h("div", { class: "game-pads game-pads-drive" },
       holdButton(h, "◀", (v) => { ctl.l = v; }), holdButton(h, "▲ Go", (v) => { ctl.u = v; }), holdButton(h, "▼ Brake", (v) => { ctl.d = v; }), holdButton(h, "▶", (v) => { ctl.r = v; }));
     const { board, status } = shell(main, ctx, def,
-      "Deliver to each stand and stop inside its box. Keep to the service road, under 30 km/h, and stop at the hold line before crossing the taxiway. Three violations end your shift – crossing in front of a taxiing aircraft ends it at once. Hold Brake after stopping to reverse.",
+      "Deliver to each stand and stop inside its box. Keep to the service road, under 30 km/h, and stop at the hold line before crossing the taxiway. Flashing amber lights and a red stop bar mean an aircraft is coming – wait until they go dark. Three violations end your shift – crossing in front of a taxiing aircraft ends it at once. Hold Brake after stopping to reverse.",
       canvas, pads);
     cv.size(); window.addEventListener("resize", cv.size);
 
@@ -1206,14 +1207,40 @@
         const target = task && task.bay === b;
         g.strokeStyle = target ? "#5fd0c3" : "rgba(255,255,255,0.7)"; g.lineWidth = target ? 3 : 1.5; g.setLineDash(target ? [] : [4, 3]);
         g.strokeRect(b.x, b.y, b.w, b.h); g.setLineDash([]);
-        if (target) { g.fillStyle = "rgba(95,208,195,0.25)"; g.fillRect(b.x, b.y, b.w, b.h); }
+        if (target) {
+          g.fillStyle = `rgba(95,208,195,${0.25 + 0.15 * Math.sin(t * 5)})`; g.fillRect(b.x, b.y, b.w, b.h);
+          const cx = b.x + b.w / 2, top = b.y - 8 + Math.sin(t * 5) * 2;
+          g.fillStyle = "#5fd0c3"; g.beginPath(); g.moveTo(cx, top); g.lineTo(cx - 8, top - 12); g.lineTo(cx + 8, top - 12); g.closePath(); g.fill();
+        }
         g.fillStyle = target ? "#0b5f57" : "#1a222f"; g.font = `700 9px ${FONT}`; g.fillText(b.name.replace("Stand ", "S"), b.x + b.w / 2, b.y + b.h / 2 + 3);
+      });
+    }
+    // An aircraft is inbound to a crossing if it is heading for it and within about 4 seconds,
+    // or still over it (wingspan included).
+    function inbound(cx) {
+      return planes.some((p) => { const d = (cx - p.x) * p.dir; return (d > -100 && d < p.sp * 4 + 100); });
+    }
+    // Runway-guard style lights: flashing amber either side of the hold line, and a red stop bar.
+    function warningLights() {
+      [40, 400].forEach((rx) => {
+        const on = inbound(rx + 20), phase = Math.floor(t * 4) % 2;
+        HOLD.forEach((hl) => {
+          if (on) { g.save(); g.shadowColor = "#ff2a2a"; g.shadowBlur = 10; g.fillStyle = "#ff3b3b"; g.fillRect(rx + 2, hl.y - 2, 36, 4); g.restore(); }
+          [[rx - 7, 0], [rx + 47, 1]].forEach(([lx, side]) => {
+            const lit = on && phase === side;
+            g.fillStyle = "#1a222f"; g.fillRect(lx - 5, hl.y - 6, 10, 12);
+            g.save();
+            if (lit) { g.shadowColor = "#ffb300"; g.shadowBlur = 16; }
+            g.fillStyle = lit ? "#ffc21a" : on ? "#6b5a20" : "#3d434b";
+            g.beginPath(); g.arc(lx, hl.y, 4, 0, 7); g.fill(); g.restore();
+          });
+        });
       });
     }
     function hud() {
       g.fillStyle = "rgba(26,34,47,0.88)"; g.fillRect(0, 0, W, 64);
       g.textAlign = "left"; g.fillStyle = "#ffffff"; g.font = `600 14px ${FONT}`;
-      g.fillText(task && mode === "drive" ? `Take ${task.load} to ${task.bay.name}` : "Airside Driver", 12, 22);
+      g.fillText(task && mode === "drive" ? `Take ${task.load} to ${task.bay.name} – stop in the teal box` : "Airside Driver", 12, 22);
       g.font = `500 12px ${FONT}`; g.fillStyle = "#a9ddd5";
       g.fillText(mode === "drive" ? `Time ${Math.ceil(Math.max(0, taskLeft))} s · Score ${score}` : `Score ${score}`, 12, 42);
       const kmh = Math.round(Math.abs(v) * KMH);
@@ -1242,7 +1269,7 @@
         x = nx; y = ny;
         // rules
         if (Math.abs(v) * KMH > LIMIT + 0.5) { overSpeed += dt; if (overSpeed > 1) { violation("Speeding – the limit is 30 km/h"); overSpeed = 0; } } else overSpeed = Math.max(0, overSpeed - dt);
-        if (!onRoad(x, y)) { violation("Off the service road"); x = last.x; y = last.y; v = 0; } else last = { x, y };
+        if (!onRoad(x, y)) { violation("Off the service road – keep to the grey road and stand boxes"); x = last.x; y = last.y; v = 0; } else last = { x, y };
         const nearHold = (y > HOLD[0].y - 34 && y < TAXI.y) || (y > TAXI.y + TAXI.h && y < HOLD[1].y + 34);
         if (nearHold && Math.abs(v) < 4) stoppedAtHold = true;
         const nowInTaxi = inTaxi(y);
@@ -1260,6 +1287,7 @@
         } else if (mode === "drive" && taskLeft <= 0) { flash = { text: `Too slow – ${task.load} went with someone else`, at: t, bad: true }; newTask(); }
       }
       drawMap();
+      warningLights();
       planes.forEach((p) => jetTop(g, p.x, TAXI.y + TAXI.h / 2, p.dir > 0 ? Math.PI / 2 : -Math.PI / 2, 1.35));
       if (x !== undefined) vanTop(g, x, y, ang);
       hud();
