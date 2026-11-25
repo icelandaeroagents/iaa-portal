@@ -1267,3 +1267,21 @@ td .btn-small { margin-top: 0.3rem; }
 .game-pads-5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .game-pad { touch-action: manipulation; user-select: none; -webkit-user-select: none; padding: 0.6rem 0.5rem; font-size: 0.9rem; }
 @media (max-width: 520px) { .game-pads-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* News photos */
+.news-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: 0.5rem; margin-top: 0.6rem; max-width: 44rem; }
+.news-photos.is-single { grid-template-columns: minmax(0, 32rem); }
+.news-photo { padding: 0; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--field); cursor: zoom-in; overflow: hidden; display: block; }
+.news-photo img { display: block; width: 100%; height: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.news-photos.is-single .news-photo img { aspect-ratio: auto; max-height: 22rem; }
+.news-photos.is-compact.is-single .news-photo img { max-height: 13rem; }
+.news-photo-edit { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.3rem; }
+.news-photo-thumb { position: relative; width: 7.5rem; height: 5.6rem; border-radius: var(--radius-s); overflow: hidden; border: 1px solid var(--line); }
+.news-photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.news-photo-remove { position: absolute; top: 0.25rem; right: 0.25rem; width: 1.6rem; height: 1.6rem; border-radius: 999px; border: 0; background: rgba(26,34,47,0.8); color: #fff; font-size: 1rem; line-height: 1; cursor: pointer; }
+.news-photo-add { align-self: center; }
+dialog.photo-view { border: 0; padding: 0; background: transparent; max-width: 96vw; max-height: 92vh; }
+dialog.photo-view[open] { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+dialog.photo-view::backdrop { background: rgba(10, 16, 26, 0.85); }
+dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--radius-m); display: block; }
+.photo-view-close { background: var(--surface); }
