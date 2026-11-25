@@ -1334,3 +1334,12 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
 .riddle-tries li.is-wrong { border-color: var(--danger); color: var(--danger); text-decoration: line-through; }
 .riddle-tries li.is-right { border-color: var(--success); color: var(--success); font-weight: 700; }
 .riddle-hint { white-space: pre-wrap; font-family: var(--font-sign); font-size: 1rem; letter-spacing: 0.04em; }
+.word-len { margin: 0; color: var(--muted); font-weight: 600; }
+.word-row.len-6 { grid-template-columns: repeat(6, 2.9rem); }
+.word-row.len-6 .word-cell { height: 2.9rem; }
+.word-row.len-7 { grid-template-columns: repeat(7, 2.6rem); }
+.word-row.len-7 .word-cell { height: 2.6rem; font-size: 1.4rem; }
+@media (max-width: 420px) {
+  .word-row.len-6 { grid-template-columns: repeat(6, 2.4rem); } .word-row.len-6 .word-cell { height: 2.4rem; }
+  .word-row.len-7 { grid-template-columns: repeat(7, 2.1rem); } .word-row.len-7 .word-cell { height: 2.1rem; font-size: 1.2rem; }
+}

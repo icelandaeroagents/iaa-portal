@@ -939,16 +939,24 @@
   // ==================================================================
   // 7. Daily Word – the aviation word of the day, six tries
   // ==================================================================
-  const WORDS = ["APRON", "FLAPS", "PITOT", "NOTAM", "METAR", "RADAR", "PILOT", "CABIN", "WINGS", "SLATS", "FLARE", "ROUTE", "CHOCK", "STAND", "PITCH", "CLIMB", "GLIDE", "STALL", "TOWER", "GATES", "ICING", "SLUSH", "GUSTS", "HOLDS", "CARGO", "STRUT", "PYLON", "AVGAS", "ORBIT", "LEVEL", "ROTOR", "BLADE", "WHEEL", "BRAKE", "TRIMS", "CREWS", "RAMPS", "TAXIS", "NORTH", "VISAS", "AISLE", "FIXES", "SPEED", "FUELS", "CHART", "ALOFT", "PLANE", "FERRY", "STACK", "ROGER", "WILCO", "HOVER", "DELAY", "SLOTS", "STEPS", "NOSES", "LIGHT", "SPINS", "JUMPS", "CLEAR"];
+  // 5 to 7 letters. Mixed into a fixed order (the same for everyone), so the length varies day to day.
+  const WORD_LIST = ["APRON", "FLAPS", "SLATS", "PITOT", "PYLON", "STRUT", "YOKES", "ROTOR", "BLADE", "PROPS", "TYRES", "BRAKE", "CLIMB", "GLIDE", "STALL", "FLARE", "PITCH", "BANKS", "HOVER", "ALOFT", "CHOCK", "CONES", "WANDS", "STAND", "CARGO", "DEICE", "ICING", "NOTAM", "METAR", "RADAR", "TOWER", "ROGER", "WILCO", "SLOTS", "STACK", "CHART", "AVGAS", "BRAVO", "DELTA", "TANGO", "GUSTS", "FLEET", "SPOOL", "BLEED", "JUMBO", "CABIN", "PILOT", "WINGS", "ALPHA", "RUNWAY", "HANGAR", "THRUST", "RUDDER", "SQUAWK", "MAYDAY", "BEACON", "TOWBAR", "CRUISE", "SIGMET", "TARMAC", "FLIGHT", "STROBE", "GALLEY", "ENGINE", "AIRWAY", "GLIDER", "VECTOR", "AIRBUS", "BOEING", "CESSNA", "FALCON", "BOWSER", "STAIRS", "SIERRA", "VICTOR", "JETLAG", "LOUNGE", "DIVERT", "FINALS", "ROTATE", "INTAKE", "REFUEL", "TOWING", "CANOPY", "AILERON", "NACELLE", "HEADING", "LANDING", "TAXIWAY", "HOLDING", "PAYLOAD", "AIRSIDE", "COCKPIT", "CEILING", "BAGGAGE", "CUSTOMS", "CHARTER", "FOXTROT", "WINGLET", "SPOILER", "DEICING", "AIRPORT", "AIRCREW", "TRANSIT", "HANDLER", "MARSHAL", "CIRCUIT", "STANDBY", "LIFTOFF", "STOPBAR", "WINGTIP", "TURBINE", "JETWASH", "EXHAUST", "POTABLE", "GUSTING", "TAILFIN"];
+  const WORDS = (function () { let seed = 7919; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    const a = WORD_LIST.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; })();
+  // A short explanation shown after each game.
+  const WORD_NOTES = { APRON: "the area where aircraft park, load and refuel.", FLAPS: "panels on the trailing edge of the wing that add lift for take-off and landing.", SLATS: "panels on the leading edge of the wing that add lift at low speed.", PITOT: "the tube that measures airspeed – always remove its cover before departure.", PYLON: "the strut that holds an engine to the wing or fuselage.", STRUT: "a leg of the landing gear.", YOKES: "the control wheels pilots fly with.", ROTOR: "the spinning blades that lift a helicopter.", BLADE: "one arm of a propeller or rotor – never walk near one that’s turning.", PROPS: "propellers.", TYRES: "aircraft tyres – checked on every walk-around.", BRAKE: "set before the chocks come off, released on the crew’s signal.", CLIMB: "gaining height after take-off.", GLIDE: "flying without engine power.", STALL: "when the wing loses lift because its angle is too steep.", FLARE: "raising the nose just before touchdown.", PITCH: "the nose moving up or down.", BANKS: "tilting the wings to turn.", HOVER: "a helicopter holding still in the air.", ALOFT: "in the air.", CHOCK: "the wedge that stops a wheel rolling – first on, last off.", CONES: "marking wingtips, nose and tail on stand.", WANDS: "the marshaller’s orange lights.", STAND: "an aircraft’s parking position.", CARGO: "freight carried in the hold.", DEICE: "removing ice, frost and snow before departure – the crew decide.", ICING: "ice forming on the aircraft, on the ground or in cloud.", NOTAM: "a notice of changes at an airport or in the airspace.", METAR: "the routine weather report for an airport.", RADAR: "how controllers see the traffic.", TOWER: "air traffic control for the runway and nearby airspace.", ROGER: "“received” on the radio.", WILCO: "“will comply” on the radio.", SLOTS: "planned take-off times from air traffic flow control.", STACK: "aircraft circling at different levels while waiting to land.", CHART: "an aviation map or approach plate.", AVGAS: "aviation petrol for piston engines – not for jets.", BRAVO: "the letter B on the radio.", DELTA: "the letter D on the radio – and a wing shape.", TANGO: "the letter T on the radio – the T in TF.", GUSTS: "sudden changes in wind speed.", FLEET: "all the aircraft an operator flies.", SPOOL: "an engine winding up or down in power.", BLEED: "hot air taken from the engines for cabin pressure and heating.", JUMBO: "the nickname of the Boeing 747.", CABIN: "where the passengers sit.", PILOT: "the person flying the aircraft.", WINGS: "what keeps it all up.", ALPHA: "the letter A on the radio.", RUNWAY: "the strip used for take-off and landing.", HANGAR: "the building where aircraft are kept and maintained.", THRUST: "the push from the engines.", RUDDER: "the moving part of the fin that yaws the nose left and right.", SQUAWK: "the four-digit transponder code a controller gives an aircraft.", MAYDAY: "the distress call – said three times.", BEACON: "the red flashing light: when it’s on, engines are starting or running.", TOWBAR: "the bar connecting a tug to the nose wheel.", CRUISE: "the long, level part of a flight.", SIGMET: "a warning of significant weather such as severe icing or turbulence.", TARMAC: "the hard surface of the apron – the word comes from tar macadam.", FLIGHT: "a journey by air.", STROBE: "the white flashing lights on the wingtips and tail.", GALLEY: "the aircraft’s kitchen.", ENGINE: "the jet or piston that powers the aircraft.", AIRWAY: "a corridor in the sky between navigation points.", GLIDER: "an aircraft with no engine.", VECTOR: "a heading given by air traffic control.", AIRBUS: "the European aircraft maker.", BOEING: "the American aircraft maker.", CESSNA: "the light-aircraft maker – the 172 is the world’s most built aircraft.", FALCON: "Dassault’s business jets, like the Falcon 7X.", BOWSER: "a fuel truck.", STAIRS: "what passengers use to get on and off.", SIERRA: "the letter S on the radio.", VICTOR: "the letter V on the radio.", JETLAG: "what the crew have after a long east–west trip.", LOUNGE: "our VIP Lounge – where crews and passengers wait in comfort.", DIVERT: "to land somewhere other than planned.", FINALS: "the last part of the approach, lined up with the runway.", ROTATE: "the moment the nose lifts on the take-off run.", INTAKE: "the front of a jet engine – a danger zone when it’s running.", REFUEL: "to top up the tanks between flights.", TOWING: "moving an aircraft with a tug.", CANOPY: "the clear cover over a cockpit on small aircraft.", AILERON: "the moving part at the wingtip that rolls the aircraft.", NACELLE: "the streamlined casing around an engine.", HEADING: "the direction the nose is pointing.", LANDING: "the end of every flight – smooth ones preferred.", TAXIWAY: "the paved route between runways and aprons.", HOLDING: "waiting in a pattern, or short of the runway.", PAYLOAD: "passengers, bags and cargo – what the aircraft is paid to carry.", AIRSIDE: "everything beyond security, where the aircraft are.", COCKPIT: "the flight deck, where the pilots sit.", CEILING: "the height of the lowest cloud covering more than half the sky.", BAGGAGE: "passengers’ bags – loaded as the crew instruct.", CUSTOMS: "part of CIQ – clearing passengers and goods into the country.", CHARTER: "hiring a whole aircraft – most of our flights.", FOXTROT: "the letter F on the radio – the F in TF.", WINGLET: "the upturned tip of a wing that saves fuel.", SPOILER: "a panel that rises on top of the wing to dump lift.", DEICING: "removing ice and snow before departure – the crew decide.", AIRPORT: "where it all happens.", AIRCREW: "the pilots and cabin crew.", TRANSIT: "passing through on the way somewhere else.", HANDLER: "that’s us – the ground handler.", MARSHAL: "to guide an aircraft onto its stand.", CIRCUIT: "the rectangular pattern flown around an airfield.", STANDBY: "“wait” on the radio.", LIFTOFF: "the moment the wheels leave the runway.", STOPBAR: "the red lights across a taxiway that mean stop.", WINGTIP: "the outer end of the wing – watch it on stand.", TURBINE: "the spinning heart of a jet engine.", JETWASH: "the blast behind a jet engine – stay clear.", EXHAUST: "the hot gas leaving the back of an engine.", POTABLE: "drinking water – serviced from approved sources only.", GUSTING: "wind speed jumping up and down.", TAILFIN: "the vertical fin at the back." };
   function wordGame(main, ctx, def) {
     const { h } = ctx;
-    const word = WORDS[dayNumber() % WORDS.length], key = "iaa-word-" + todayIceland();
+    // A chosen word for a particular day, otherwise the next in the mixed list.
+    const CHOSEN = { "2026-11-25": "PITCH" };
+    const word = CHOSEN[todayIceland()] || WORDS[dayNumber() % WORDS.length], key = "iaa-word3-" + todayIceland(), len = word.length;
+    const about = WORD_NOTES[word] ? ` ${word} – ${WORD_NOTES[word]}` : "";
     const area = h("div", { class: "word-game" });
-    const { board, status } = shell(main, ctx, def, "Guess today’s five-letter aviation word in six tries. Teal: right letter, right place. Amber: in the word, wrong place. Grey: not in the word.", area, null);
+    const { board, status } = shell(main, ctx, def, "Guess today’s aviation word in six tries – it has 5, 6 or 7 letters. Teal: right letter, right place. Amber: in the word, wrong place. Grey: not in the word.", area, null);
     let guesses = store(key) || [], cur = "", over = false;
     const stop = () => window.removeEventListener("keydown", onKey); stopCurrent = stop;
     function marks(g) {
-      const res = Array(5).fill("absent"), pool = word.split("");
+      const res = Array(len).fill("absent"), pool = word.split("");
       g.split("").forEach((c, i) => { if (c === word[i]) { res[i] = "correct"; pool[i] = null; } });
       g.split("").forEach((c, i) => { if (res[i] !== "correct") { const j = pool.indexOf(c); if (j !== -1) { res[i] = "present"; pool[j] = null; } } });
       return res;
@@ -957,21 +965,21 @@
     function draw(msg) {
       const rows = [];
       for (let r = 0; r < 6; r++) {
-        const g = guesses[r] || (r === guesses.length && !over ? cur.padEnd(5) : "     ");
+        const g = guesses[r] || (r === guesses.length && !over ? cur.padEnd(len) : " ".repeat(len));
         const m = guesses[r] ? marks(guesses[r]) : null;
-        rows.push(h("div", { class: "word-row" }, g.split("").map((c, i) => h("span", { class: "word-cell" + (m ? " is-" + m[i] : c.trim() ? " is-typed" : "") }, c.trim()))));
+        rows.push(h("div", { class: "word-row len-" + len }, g.split("").map((c, i) => h("span", { class: "word-cell" + (m ? " is-" + m[i] : c.trim() ? " is-typed" : "") }, c.trim()))));
       }
       const ks = keyState();
       const kb = ["QWERTYUIOP", "ASDFGHJKL", "ENTER ZXCVBNM ⌫"].map((row) => h("div", { class: "word-keys" },
         (row.indexOf(" ") !== -1 ? row.split(" ").flatMap((part) => part === "ENTER" || part === "⌫" ? [part] : part.split("")) : row.split("")).map((k) =>
           h("button", { class: "word-key" + (ks[k] ? " is-" + ks[k] : "") + (k.length > 1 ? " is-wide" : ""), type: "button", onclick: () => press(k) }, k))));
-      put(area, h("div", { class: "word-grid" }, rows), msg ? h("p", { class: "word-msg" }, msg) : null, over ? null : kb);
+      put(area, h("p", { class: "word-len" }, `Today’s word has ${len} letters`), h("div", { class: "word-grid" }, rows), msg ? h("p", { class: "word-msg" }, msg) : null, over ? null : kb);
     }
     function press(k) {
       if (over) return;
       if (k === "⌫" || k === "Backspace") cur = cur.slice(0, -1);
-      else if (k === "ENTER" || k === "Enter") { if (cur.length === 5) submit(); else draw("Five letters, please."); return; }
-      else if (/^[A-Z]$/.test(k) && cur.length < 5) cur += k;
+      else if (k === "ENTER" || k === "Enter") { if (cur.length === len) submit(); else draw(`${len} letters, please.`); return; }
+      else if (/^[A-Z]$/.test(k) && cur.length < len) cur += k;
       draw();
     }
     function onKey(e) {
@@ -990,7 +998,7 @@
       over = true;
       const solved = guesses[guesses.length - 1] === word;
       const pts = solved ? (7 - guesses.length) * 10 : 1;
-      draw(solved ? `Solved in ${guesses.length}! +${pts} points. A new word in ${untilTomorrow()}.` : `Today’s word was ${word}. +1 point for playing. A new word in ${untilTomorrow()}.`);
+      draw((solved ? `Solved in ${guesses.length}! +${pts} points.` : `Today’s word was ${word}. +1 point for playing.`) + about + ` A new word in ${untilTomorrow()}.`);
       finish(ctx, def, board, status, pts);
     }
     (async function () {
