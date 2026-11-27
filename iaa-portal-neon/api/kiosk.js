@@ -71,6 +71,7 @@ module.exports = async function handler(req, res) {
          from public.time_shifts s where s.profile_id = $1 and s.clock_out is null limit 1`, [person.id])).rows[0] || null;
     let open = await openShift();
     const who = { name: firstName(person.name) };
+    const comment = String(body.comment || "").trim().slice(0, 300) || null;
 
     // 4. What do they want to do?
     const action = body.action || "lookup";
@@ -79,8 +80,8 @@ module.exports = async function handler(req, res) {
     if (action === "clock_in") {
       if (open) return send(res, 409, Object.assign(who, { open, error: "You’re already clocked in." }));
       const ins = await q(
-        `insert into public.time_shifts (profile_id, person_name, clock_in, in_station, in_confirmed, in_via, reviewed)
-         values ($1, $2, now(), $3, true, $4, true) returning id, clock_in`, [person.id, person.name, k.station, k.name]);
+        `insert into public.time_shifts (profile_id, person_name, clock_in, in_station, in_confirmed, in_via, staff_note, reviewed)
+         values ($1, $2, now(), $3, true, $4, $5, $5::text is null) returning id, clock_in`, [person.id, person.name, k.station, k.name, comment]);
       if (body.lunch) await q("insert into public.time_lunches (shift_id, kind) values ($1, 'at clock-in')", [ins.rows[0].id]);
       return send(res, 200, Object.assign(who, { done: "in", at: ins.rows[0].clock_in, lunch: !!body.lunch }));
     }
@@ -97,9 +98,12 @@ module.exports = async function handler(req, res) {
       const up = await q(
         `update public.time_shifts
             set clock_out = greatest(now(), clock_in + interval '1 minute'),
-                out_station = $2, out_confirmed = true, out_via = $3
+                out_station = $2, out_confirmed = true, out_via = $3,
+                staff_note = case when $4::text is null then staff_note
+                                  else left(coalesce(staff_note || ' / ', '') || $4::text, 500) end,
+                reviewed = case when $4::text is null then reviewed else false end
           where id = $1 and clock_out is null
-          returning clock_in, clock_out`, [open.id, k.station, k.name]);
+          returning clock_in, clock_out`, [open.id, k.station, k.name, comment]);
       const r = up.rows[0];
       const worked = Math.round((new Date(r.clock_out) - new Date(r.clock_in)) / 60000);
       return send(res, 200, Object.assign(who, { done: "out", at: r.clock_out, worked_minutes: worked }));
