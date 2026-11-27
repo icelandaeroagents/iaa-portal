@@ -35,7 +35,7 @@
     { label: "Information", items: ["news", "briefings", "manuals", "policies", "equipment"] },
     { label: "My records", items: ["training", "passes"] },
     { label: "Break", items: ["game"] },
-    { label: "Management", items: ["management", "people", "stations", "team-hours"] }
+    { label: "Management", items: ["management", "people", "stations", "team-hours", "backups"] }
   ];
 
   const MODULES = [
@@ -175,6 +175,14 @@
       roles: ["management"],
       group: "management",
       render: renderStations
+    },
+    {
+      id: "backups",
+      title: "Backups",
+      description: "The weekly copy of Notion in Google Drive.",
+      roles: ["management"],
+      group: "management",
+      render: renderBackups
     }
   ];
 
@@ -1434,6 +1442,11 @@
   }
 
   // ---------- Stations (management) ----------
+
+  async function renderBackups(main) {
+    if (!window.IAABackups) return sectionMissing(main, "Backups");
+    return window.IAABackups.render(main, sectionCtx());
+  }
 
   async function renderStations(main) {
     const status = h("p", { class: "status", role: "status" });

@@ -1481,3 +1481,10 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
 .sw-history td:first-child { white-space: nowrap; }
 .re-grid tr.re-second th, .re-grid tr.re-second td { border-top: 1px dashed var(--line); }
 .re-2nd { margin-left: 0.35rem; font-size: 0.7rem; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 0.35rem; vertical-align: middle; }
+
+/* Backups page */
+.bk-steps { padding-left: 1.2rem; }
+.bk-steps li { margin: 0.45rem 0; }
+.bk-steps li.is-done { color: var(--muted); }
+.bk-found { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.5rem 2rem; }
+.bk-found ul { margin: 0.25rem 0 0; padding-left: 1.1rem; }
