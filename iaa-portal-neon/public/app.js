@@ -408,6 +408,22 @@
     });
   }
 
+  // Day / Night: "auto" follows the device; Day or Night is remembered on this device.
+  function themeSwitch() {
+    let current = "auto";
+    try { current = localStorage.getItem("iaa-theme") || "auto"; } catch (e) { current = "auto"; }
+    const set = (t) => {
+      try { if (t === "auto") localStorage.removeItem("iaa-theme"); else localStorage.setItem("iaa-theme", t); } catch (e) { /* storage off */ }
+      if (t === "auto") document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", t);
+      group.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.t === t)));
+    };
+    const group = h("div", { class: "seg", role: "group", "aria-label": "Appearance" },
+      [["auto", "Auto"], ["light", "Day"], ["dark", "Night"]].map(([t, label]) =>
+        h("button", { type: "button", "data-t": t, "aria-pressed": String(t === current), onclick: () => set(t) }, label)));
+    return h("div", { class: "theme-switch" }, h("p", { class: "nav-group" }, "Appearance"), group);
+  }
+
   function renderShell(activeModule, modules, main) {
     const myStations = state.profile.station_codes || [];
     const activeStations = state.stations.filter((s) => s.active);
@@ -449,7 +465,13 @@
     if (others.length) {
       sections.push(h("div", { class: "nav-section" }, h("ul", null, others.map((m) => link("#/" + m.id, m.title, m.id === activeModule.id)))));
     }
-    const nav = h("nav", { class: "sidenav", "aria-label": "Portal sections" }, sections);
+    // The logo at the top of the menu: navy lettering by day, white at night.
+    const logos = (cls) => [
+      h("img", { class: cls + " logo-day", src: "logo-on-light.svg", alt: cfg.companyName, width: "128", height: "42" }),
+      h("img", { class: cls + " logo-night", src: "logo.svg", alt: "", width: "128", height: "42" })
+    ];
+    const navBrand = h("a", { class: "nav-brand", href: "#/home", "aria-label": `${cfg.companyName} ${cfg.portalName} – Home` }, logos("brand-logo"));
+    const nav = h("nav", { class: "sidenav", "aria-label": "Portal sections" }, navBrand, sections, themeSwitch());
 
     const topbar = h(
       "header",
@@ -457,7 +479,7 @@
       h(
         "a",
         { class: "brand", href: "#/home", "aria-label": `${cfg.companyName} ${cfg.portalName} – Home` },
-        h("img", { class: "brand-logo", src: "logo.svg", alt: cfg.companyName, width: "122", height: "40" }),
+        logos("brand-logo"),
         h("span", { class: "brand-portal" }, cfg.portalName)
       ),
       board,

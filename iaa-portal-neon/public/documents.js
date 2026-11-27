@@ -228,20 +228,61 @@
     const card = cards.find((c) => c.station_code === emergencyStation) || cards[0];
     if (editing && isManagement) return showEditor(main, ctx, card, "emergency");
 
+    // One sheet: the chosen airport's card first, then the other airports in full.
+    // Nothing is hidden behind a tab in an emergency.
+    const others = cards.filter((c) => c.id !== card.id);
+    const sheet = (c) => {
+      const chunks = String(c.body || "").split(/\n(?=## )/).map((x) => x.trim()).filter(Boolean);
+      const art = h("article", { class: "panel emergency-card", "aria-label": c.title },
+        h("div", { class: "emergency-head" }, h("p", { class: "briefing-kicker" }, "ICELAND AERO AGENTS"), h("h2", null, c.title),
+          h("a", { class: "call-112", href: "tel:112" }, "Call 112")),
+        h("div", { class: "emergency-sections" }, chunks.map((chunk) => h("section", null, renderBody(h, chunk)))),
+        h("p", { class: "fineprint" }, `Updated ${fmt(c.updated_at)}${c.updated_by_name ? " by " + c.updated_by_name : ""}`));
+      telLinks(art);
+      return art;
+    };
+
     fill(main,
       h("div", { class: "page-head page-head-row no-print" },
-        h("div", null, h("h1", null, "Emergency"), h("p", null, "In any emergency, call 112. These cards follow SOP Part 5, Section 23.")),
+        h("div", null, h("h1", null, "Emergency"), h("p", null, "In any emergency, call 112. Every airport’s card is on this sheet – the one you pick comes first.")),
         h("div", { class: "row row-tight" },
-          h("button", { class: "btn", type: "button", onclick: function () { window.print(); } }, "Print card"),
-          isManagement ? h("button", { class: "btn btn-quiet", type: "button", onclick: function () { editing = true; renderEmergency(main, ctx); } }, "Edit") : null)),
-      h("nav", { class: "tabs no-print", "aria-label": "Stations" }, cards.map((c) =>
-        h("a", { href: "#/emergency", "aria-current": c.id === card.id ? "page" : null, onclick: function (e) { e.preventDefault(); emergencyStation = c.station_code; renderEmergency(main, ctx); } }, c.station_code))),
+          h("nav", { class: "tabs airport-picker", "aria-label": "Airport" }, cards.map((c) =>
+            h("a", { href: "#/emergency", "aria-current": c.id === card.id ? "page" : null, onclick: function (e) { e.preventDefault(); emergencyStation = c.station_code; renderEmergency(main, ctx); } }, c.station_code))),
+          h("button", { class: "btn", type: "button", onclick: function () { window.print(); } }, "Print this sheet"),
+          isManagement ? h("button", { class: "btn btn-quiet", type: "button", onclick: function () { editing = true; renderEmergency(main, ctx); } }, "Edit " + card.station_code + " card") : null)),
       takeNotice(h),
-      h("article", { class: "panel emergency-card" },
-        h("div", { class: "emergency-head" }, h("p", { class: "briefing-kicker" }, "ICELAND AERO AGENTS"), h("h2", null, card.title),
-          h("p", { class: "emergency-112" }, "Emergency: ", h("a", { href: "tel:112" }, "112"))),
-        renderBody(h, card.body),
-        h("p", { class: "fineprint" }, `Updated ${fmt(card.updated_at)}${card.updated_by_name ? " by " + card.updated_by_name : ""}`)));
+      h("div", { class: "emergency-sheet" },
+        sheet(card),
+        others.length ? h("h2", { class: "emergency-other" }, "Other airports") : null,
+        others.map(sheet)));
+  }
+
+  // Phone numbers on an emergency card become tap-to-call links (112 and 7-digit
+  // Icelandic numbers such as 424 4040).
+  function telLinks(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => (n.parentNode && n.parentNode.closest && n.parentNode.closest("a") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT)
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    const re = /\b(112|\d{3}[ -]?\d{4})\b/g;
+    nodes.forEach((node) => {
+      const text = node.nodeValue;
+      if (!re.test(text)) return;
+      re.lastIndex = 0;
+      const frag = document.createDocumentFragment();
+      let last = 0, m;
+      while ((m = re.exec(text))) {
+        frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+        const a = document.createElement("a");
+        const digits = m[1].replace(/\D/g, "");
+        a.className = "tel"; a.href = digits === "112" ? "tel:112" : "tel:+354" + digits; a.textContent = m[1];
+        frag.appendChild(a);
+        last = m.index + m[1].length;
+      }
+      frag.appendChild(document.createTextNode(text.slice(last)));
+      node.parentNode.replaceChild(frag, node);
+    });
   }
 
   // ------------------------------------------------------------------

@@ -82,7 +82,7 @@
         h("div", null, h("h1", null, "Ramp"), h("p", null, "Log the services you deliver. They go straight to the Services Log in Notion, under your name.")),
         h("div", { class: "row row-tight" }, refresh)),
       n ? h("p", { class: "notice" }, n.text) : null, status,
-      h("nav", { class: "tabs", "aria-label": "Stations" }, STATION_ORDER.slice(0, 3).map((s) => h("a", { href: "#/ramp", "aria-current": s === station ? "page" : null, onclick: (e) => { e.preventDefault(); station = s; listPage(main, ctx); } }, s))),
+      h("nav", { class: "tabs airport-picker", "aria-label": "Airport" }, STATION_ORDER.slice(0, 3).map((s) => h("a", { href: "#/ramp", "aria-current": s === station ? "page" : null, onclick: (e) => { e.preventDefault(); station = s; listPage(main, ctx); } }, s))),
       h("div", { class: "ramp-days" },
         h("button", { class: "btn btn-quiet btn-small", type: "button", "aria-label": "Previous day", onclick: () => { day = shiftDay(day, -1); listPage(main, ctx); } }, "‹"),
         h("b", null, niceDay(day)),

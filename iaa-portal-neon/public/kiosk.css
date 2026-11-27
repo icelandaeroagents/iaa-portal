@@ -1,4 +1,5 @@
-/* Time clock iPad (kiosk.html) */
+/* Time clock iPad (kiosk.html) – navy in both modes */
+.kiosk-body { --chrome: #13293d; --chrome-ink: #f1f6f8; --chrome-muted: #a9c3d3; --chrome-accent: #5fd6c3; }
 .kiosk-body { margin: 0; min-height: 100vh; background: var(--chrome); color: var(--chrome-ink); font-family: var(--font); -webkit-user-select: none; user-select: none; }
 .kiosk { box-sizing: border-box; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 1.5rem 1.25rem 2rem; gap: 1.25rem; }
 .kiosk-top { width: 100%; max-width: 46rem; display: flex; justify-content: space-between; align-items: center; }

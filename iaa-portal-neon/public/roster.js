@@ -11,6 +11,9 @@
   let homeOffset = 0;          // days from today shown on Home
   let pickedSheet = null;      // tab on the Roster page (null = the one with today, else the newest)
   let pickedBlock = null;      // half-month block on the Roster page
+  let pickedMonth = null;      // month shown in the Month view (YYYY-MM)
+  const viewKey = "iaa-roster-view";
+  function rosterView() { try { return localStorage.getItem(viewKey) === "table" ? "table" : "month"; } catch (e) { return "month"; } }
   let prepared = null;         // file being uploaded
   let notice = null;
 
@@ -270,8 +273,57 @@
                 }))))))
       : h("p", { class: "empty" }, "This tab has no dated roster.");
 
+    // Month / Table switch, remembered on this device.
+    const view = rosterView();
+    const setView = (v) => { try { localStorage.setItem(viewKey, v); } catch (e) { /* storage off */ } showRoster(main, ctx); };
+    const viewSwitch = h("div", { class: "seg", role: "group", "aria-label": "Roster view" },
+      h("button", { type: "button", "aria-pressed": String(view === "month"), onclick: () => setView("month") }, "Month"),
+      h("button", { type: "button", "aria-pressed": String(view === "table"), onclick: () => setView("table") }, "Table"));
+
+    if (view === "month") {
+      // The whole month as a calendar: Monday–Sunday, one box per day.
+      const allDates = Array.from(new Set(blocks.reduce((a, b) => a.concat(b.dates), []))).sort();
+      const months = Array.from(new Set(allDates.map((d) => d.slice(0, 7))));
+      if (!pickedMonth || months.indexOf(pickedMonth) === -1) {
+        pickedMonth = months.indexOf(today.slice(0, 7)) !== -1 ? today.slice(0, 7) : months[months.length - 1];
+      }
+      const mi = months.indexOf(pickedMonth);
+      const go = (n) => { pickedMonth = months[mi + n]; showRoster(main, ctx); };
+      const first = new Date(pickedMonth + "-01T12:00:00Z");
+      const nDays = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+      const lead = (first.getUTCDay() + 6) % 7;            // Monday first
+      const cells = [];
+      for (let i = 0; i < lead; i++) cells.push(h("div", { class: "rcal-day is-blank", "aria-hidden": "true" }));
+      for (let d = 1; d <= nDays; d++) {
+        const date = pickedMonth + "-" + String(d).padStart(2, "0");
+        const entries = (P.day(blocks, date) || []);
+        // Lines with the same label (e.g. two 0700-1900 lines) are shown together.
+        const byLabel = [];
+        entries.forEach((e) => { const k = e.label || "Notes"; const g = byLabel.find((x) => x.k === k); if (g) g.v.push(e.value); else byLabel.push({ k, v: [e.value] }); });
+        const rot = rotation(date);
+        cells.push(h("div", { class: "rcal-day" + (date === today ? " is-today" : "") + (allDates.indexOf(date) === -1 ? " is-off" : ""), title: rot ? ROTATION_LABEL[rot] + " shift" : null },
+          h("div", { class: "rcal-bar" + (rot ? " rot-" + rot : "") }),
+          h("div", { class: "rcal-body" },
+            h("div", { class: "rcal-date" }, String(d), h("span", { class: "rcal-wd" }, niceDate(date, { weekday: "long" }))),
+            byLabel.length ? byLabel.map((g) => h("div", { class: "rcal-line" }, h("span", { class: "k" }, g.k),
+              h("span", { class: "v" + (g.v.some((v) => mine(v)) ? " is-me" : "") }, g.v.join(", "))))
+              : h("span", { class: "rcal-none" }, allDates.indexOf(date) === -1 ? "Not on this roster" : "–"))));
+      }
+      const tools = h("div", { class: "roster-tools" }, viewSwitch,
+        h("button", { class: "btn btn-quiet btn-small", type: "button", "aria-label": "Previous month", disabled: mi <= 0 || null, onclick: () => go(-1) }, "‹"),
+        h("span", { class: "month-label" }, first.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })),
+        h("button", { class: "btn btn-quiet btn-small", type: "button", "aria-label": "Next month", disabled: mi >= months.length - 1 || null, onclick: () => go(1) }, "›"),
+        r.file_name ? download : null);
+      fill(main, head, noticeBox(ctx), tabs, tools, dlStatus,
+        h("section", { class: "panel" },
+          h("div", { class: "rcal" }, ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((w) => h("div", { class: "rcal-head" }, w)), cells),
+          rotationLegend(h),
+          h("p", { class: "fineprint" }, "Today is outlined in teal; your own shifts are in bold. Crossed-out names are left out as cancelled.")));
+      return;
+    }
+
     fill(main, head, noticeBox(ctx), tabs,
-      h("div", { class: "row" }, h("div", { class: "field" }, h("label", { for: "roster-block" }, "Period"), blockPicker), r.file_name ? download : null),
+      h("div", { class: "row" }, viewSwitch, h("div", { class: "field" }, h("label", { for: "roster-block" }, "Period"), blockPicker), r.file_name ? download : null),
       dlStatus,
       h("section", { class: "panel" }, table,
         rotationLegend(h),
