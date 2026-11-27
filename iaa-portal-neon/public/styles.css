@@ -1398,3 +1398,29 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
 .lb-results { display: flex; flex-direction: column; gap: 0.35rem; }
 .lb-hit { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.35rem 0; border-bottom: 1px solid var(--line); }
 @media (prefers-color-scheme: dark) { .lb-card.is-rare { background: linear-gradient(160deg, #3a2f10, var(--surface)); } .lb-rare { background: #5a4510; color: #ffe39a; } }
+
+/* ---------- Time clock (clock.js) ---------- */
+.clock-panel.is-on { border-left: 4px solid var(--brand); }
+.clock-row { flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.clock-row select { width: auto; }
+.clock-now b { font-variant-numeric: tabular-nums; }
+.clock-ask:empty { display: none; }
+.clock-ask { margin: 0.75rem 0; }
+.clock-month { gap: 0.75rem; align-items: center; margin: 0.5rem 0 1rem; }
+.clock-list { list-style: none; margin: 0; padding: 0; }
+.clock-list li { padding: 0.55rem 0; border-bottom: 1px solid var(--line); }
+.clock-list li:last-child { border-bottom: 0; }
+.clock-list li .btn { margin-left: 0.5rem; }
+.clock-list li.is-late { color: var(--danger); }
+.clock-list .chip { margin-left: 0.5rem; }
+.clock-table td { vertical-align: top; font-variant-numeric: tabular-nums; }
+.clock-table tr.is-open td { background: var(--field); }
+.clock-table tr.clock-sub td { font-size: 0.92em; color: var(--muted); }
+.clock-table tr.clock-sub.is-flag td:first-child { box-shadow: inset 3px 0 0 var(--notice-line); }
+.clock-table tr.clock-total td { border-top: 2px solid var(--line); font-weight: 600; }
+.clock-note { display: block; font-style: italic; margin-bottom: 0.3rem; max-width: 30ch; }
+.clock-table textarea { width: 100%; min-width: 14rem; }
+.clock-edit { margin: 0.75rem 0; border-left: 4px solid var(--brand); }
+.clock-edit h3 { margin-top: 0; }
+.clock-check { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 500; }
+.clock-check input { width: 1.15rem; height: 1.15rem; }

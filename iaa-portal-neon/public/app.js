@@ -98,6 +98,13 @@
       render: renderRequests
     },
     {
+      id: "hours",
+      title: "Hours",
+      description: "Clock in and out, lunch, and your hours each month.",
+      roles: ALL_ROLES,
+      render: renderHours
+    },
+    {
       id: "ramp",
       title: "Ramp",
       description: "Log the services you deliver on each flight.",
@@ -668,17 +675,20 @@
     let roster = null;
     let attention = null;
     let toRead = null;
+    let clockCard = null;
     const rerenderHome = function () { renderHome(main); };
     await Promise.all([
       (async function () { if (window.IAANews) { try { latest = await window.IAANews.homePanel(sectionCtx()); } catch (e) { latest = null; } } })(),
       (async function () { if (window.IAARoster) { try { roster = await window.IAARoster.homePanel(sectionCtx(), rerenderHome); } catch (e) { roster = null; } } })(),
       (async function () { attention = await attentionPanel(); })(),
+      (async function () { if (window.IAAClock) { try { clockCard = await window.IAAClock.homePanel(sectionCtx(), rerenderHome); } catch (e) { clockCard = null; } } })(),
       (async function () { if (window.IAADocuments) { try { toRead = await window.IAADocuments.homePanel(sectionCtx()); } catch (e) { toRead = null; } } })()
     ]);
 
     fill(
       main,
       pageHead("Hello, " + firstName(), "Here’s what you can do in the staff portal."),
+      clockCard,
       attention,
       toRead,
       latest,
@@ -792,6 +802,11 @@
     return window.IAAEquipment.render(main, sectionCtx());
   }
 
+  async function renderHours(main) {
+    if (!window.IAAClock) return sectionMissing(main, "Hours");
+    return window.IAAClock.render(main, sectionCtx());
+  }
+
   async function renderRamp(main) {
     if (!window.IAARamp) return sectionMissing(main, "Ramp");
     return window.IAARamp.render(main, sectionCtx());
@@ -884,6 +899,9 @@
       }
       if (window.IAAContracts) {
         (await window.IAAContracts.attention(db)).forEach((t) => items.push(["#/management", t]));
+      }
+      if (window.IAAClock) {
+        (await window.IAAClock.attention(db)).forEach((t) => items.push(["#/hours/team", t]));
       }
       if (rev && !rev.error) {
         const last = (rev.data || [])[0];
