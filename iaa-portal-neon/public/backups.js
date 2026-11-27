@@ -73,6 +73,29 @@
         h("div", null, h("h3", null, "Pages"), (latest.found.pages || []).length ? h("ul", null, latest.found.pages.map((p) => h("li", null, p.title))) : h("p", { class: "empty" }, "None"))),
       h("p", { class: "fineprint" }, `Missing something? In Notion, open it, then ••• → Connections → add “${(cfg && cfg.connection) || "IAA Notion Backup"}”. Sub-pages are included with their page.`)) : null;
 
+    // Blank (untitled) pages sitting inside flights or other database rows – to tidy up in Notion.
+    const blank = latest && latest.found && latest.found.blank || [];
+    const day = (ts) => ts ? new Date(ts).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Atlantic/Reykjavik" }) : "–";
+    const blanks = blank.length ? h("details", { class: "panel" },
+      h("summary", null, `Blank pages inside database rows (${blank.length})`),
+      h("p", null, "Untitled pages sitting inside flights or other database rows. They’re backed up with their row, but are usually created by accident or by a script. To remove one: open it, then ••• → Delete (it stays in Notion’s Trash for 30 days)."),
+      (function () {
+        const btn = h("button", { class: "btn btn-quiet btn-small", type: "button" }, "Copy list for Claude");
+        btn.addEventListener("click", async () => {
+          const text = "Blank Notion pages to clean up (" + blank.length + "):\n" +
+            blank.map((b) => `${b.id} | inside: ${b.inside || "?"} | created ${b.created || "?"}`).join("\n");
+          try { await navigator.clipboard.writeText(text); btn.textContent = "Copied ✓ – paste it to Claude"; }
+          catch (e) { window.prompt("Copy this list:", text); }
+        });
+        return h("div", { class: "row" }, btn);
+      })(),
+      h("div", { class: "table-wrap" }, h("table", { class: "mgmt-table" },
+        h("thead", null, h("tr", null, ["Inside", "Created", "Last edited", ""].map((x) => h("th", null, x)))),
+        h("tbody", null, blank.map((b) => h("tr", null,
+          h("td", null, b.inside_url ? h("a", { href: b.inside_url, target: "_blank", rel: "noopener" }, b.inside || "?") : (b.inside || "?")),
+          h("td", null, day(b.created)), h("td", null, day(b.edited)),
+          h("td", null, b.url ? h("a", { href: b.url, target: "_blank", rel: "noopener" }, "Open blank page") : "–"))))))) : null;
+
     // ---- history ----
     const hist = h("section", { class: "panel", "aria-labelledby": "bk-hist" },
       h("h2", { id: "bk-hist" }, "History"),
@@ -95,7 +118,7 @@
 
     fill(main, pageHead("Backups", "A weekly copy of Notion in your Google Drive."),
       active ? h("p", { class: "notice" }, active.kind === "check" ? "Checking what’s included…" : `A backup is running (started ${when(active.started_at || active.created_at)}). It carries on in the background, in steps of a few minutes.`) : null,
-      setup, h("div", { class: "row" }, chk, go), status, found, hist);
+      setup, h("div", { class: "row" }, chk, go), status, found, blanks, hist);
 
     // While something runs: keep it moving and refresh the page.
     if (active) poll = setTimeout(async () => { if (!document.body.contains(main.firstChild)) return; await kick(); if (location.hash.startsWith("#/backups")) redraw(); }, 8000);
