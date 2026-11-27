@@ -1841,3 +1841,14 @@ table:not(.roster-grid):not(.re-grid):not(.clock-grid):not(.risk-heat):not(.doc-
 .eq-updated .linkish { font-size: 0.8rem; }
 /* An empty status line takes no space; messages still appear in place when set */
 .main > p.status:empty { display: none; }
+
+/* Training, as in the mock-up: a progress card, then the record with an action on each module */
+.training-progress { gap: 0.6rem; }
+.training-progress-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.training-progress .progress, .training-progress [role="progressbar"] { width: 100%; max-width: none; }
+.module-end { display: inline-flex; align-items: center; gap: 0.6rem; justify-self: end; }
+.module-action { display: inline-block; font-size: 0.82rem; font-weight: 600; padding: 0.35rem 0.85rem; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); white-space: nowrap; }
+.module-action.is-primary { background: var(--brand-strong); border-color: var(--brand-strong); color: var(--on-brand); }
+.module-list a:hover .module-action { border-color: var(--brand-strong); }
+@media (max-width: 760px) { .module-end { grid-column: 2; justify-self: start; } }
+.training-progress .bar { display: block; width: 100%; max-width: none; }

@@ -237,6 +237,14 @@
     const done = mine.filter((m) => isCurrent(cycles[m.id])).length;
     const dueNow = mine.filter((m) => cycles[m.id].status === "due");
 
+    // What tapping the module does, shown as a small button at the end of the row.
+    function actionLabel(c) {
+      if (c.status === "none") return h("span", { class: "module-action is-primary", "aria-hidden": "true" }, "Start");
+      if (c.status === "failed" || c.status === "due") return h("span", { class: "module-action is-primary", "aria-hidden": "true" }, "Retake");
+      if (c.status === "soon") return h("span", { class: "module-action", "aria-hidden": "true" }, "Renew");
+      return h("span", { class: "module-action", "aria-hidden": "true" }, "Open");
+    }
+
     function moduleItem(m) {
       return h(
         "li",
@@ -246,7 +254,7 @@
           { href: "#/training/" + m.id },
           h("span", { class: "module-code" }, m.code),
           h("span", { class: "module-text" }, h("span", { class: "section-title" }, m.title), h("span", { class: "section-desc" }, m.summary)),
-          cycleChip(ctx, cycles[m.id])
+          h("span", { class: "module-end" }, cycleChip(ctx, cycles[m.id]), actionLabel(cycles[m.id]))
         )
       );
     }
@@ -294,12 +302,15 @@
       pageHead("Training", "Operations Officer SOP Manual v" + T.manual + ". Pass mark " + PASS * 100 + "%."),
       tabs(ctx, "mine"),
       noticeBox(ctx),
+      h("section", { class: "panel training-progress", "aria-labelledby": "prog-h" },
+        h("div", { class: "training-progress-head" }, h("h2", { id: "prog-h" }, "Your progress"),
+          h("span", { class: "sub" }, `${done} of ${mine.length} modules current`)),
+        progressBar(ctx, mine.length ? done / mine.length : 0),
+        dueNow.length ? h("p", { class: "notice is-error" }, `${dueNow.length === 1 ? "1 module is" : dueNow.length + " modules are"} due for renewal: ${dueNow.map((m) => m.code).join(", ")}. Open each one and retake the quiz.`) : null),
       h(
         "section",
         { class: "panel", "aria-labelledby": "rec-h" },
         h("h2", { id: "rec-h" }, "Your training record"),
-        h("p", { class: "progress-line" }, h("span", null, `${done} of ${mine.length} current`), progressBar(ctx, mine.length ? done / mine.length : 0)),
-        dueNow.length ? h("p", { class: "notice is-error" }, `${dueNow.length === 1 ? "1 module is" : dueNow.length + " modules are"} due for renewal: ${dueNow.map((m) => m.code).join(", ")}. Open each one and retake the quiz.`) : null,
         h("p", { class: "fineprint" }, "Most modules are retaken every 6 months, the winter modules every year before 1 October and Quality Awareness every 36 months. Each module shows its own due date, and you’ll get an email when one is due."),
         list,
         noStationNote,
