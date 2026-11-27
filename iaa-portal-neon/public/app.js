@@ -1027,12 +1027,17 @@
   async function renderPeople(main) {
     fill(main, pageHead("People", "Give staff access and set their role and station."), h("p", { class: "empty" }, "Loading staff…"));
 
-    const [peopleRes, invitesRes, requestsRes] = await Promise.all([
+    const [peopleRes, invitesRes, requestsRes, ktRes] = await Promise.all([
       db.from("profiles").select("*").order("full_name", { nullsFirst: false }).order("email"),
       db.from("invitations").select("*").is("accepted_at", null).order("created_at", { ascending: false }),
-      db.from("access_requests").select("*").eq("status", "pending").order("created_at")
+      db.from("access_requests").select("*").eq("status", "pending").order("created_at"),
+      db.rpc("kennitala_status")
     ]);
     const requests = requestsRes.error ? [] : (requestsRes.data || []);
+    // Kennitala for the time clock iPad (database update 45). Only the last four digits come back.
+    const hasKennitala = !ktRes.error;
+    const ktSet = {};
+    (hasKennitala ? ktRes.data || [] : []).forEach((k) => { ktSet[k.profile_id] = k; });
     if (peopleRes.error) throw peopleRes.error;
     if (invitesRes.error) throw invitesRes.error;
     const data = peopleRes.data || [];
@@ -1078,6 +1083,30 @@
             maintBox, h("span", null, "Maintenance Manager"))
         : null;
 
+      // Kennitala for the time clock iPad: typed here, never shown again (only the last four digits).
+      const ktBox = hasKennitala
+        ? h("input", { type: "text", inputmode: "numeric", autocomplete: "off", maxlength: "11", placeholder: ktSet[person.id] ? "New kennitala (to change it)" : "Kennitala (time clock iPad)", "aria-label": "Kennitala for " + label })
+        : null;
+      const ktNote = hasKennitala ? h("span", { class: "sub kt-note" }) : null;
+      const showKt = function () {
+        if (!ktNote) return;
+        ktNote.replaceChildren();
+        const k = ktSet[person.id];
+        if (!k) { ktNote.append("No kennitala – can’t use the time clock iPad"); return; }
+        const remove = h("button", { class: "btn btn-quiet btn-small", type: "button" }, "Remove");
+        remove.addEventListener("click", async function () {
+          if (!confirm(`Remove ${label}’s kennitala? They won’t be able to use the time clock iPad.`)) return;
+          const r = await db.rpc("set_kennitala", { p_profile: person.id, p_kennitala: "" });
+          if (r.error) { setStatus(status, r.error.message, true); return; }
+          delete ktSet[person.id];
+          await logEvent("kennitala_removed", { profile_id: person.id, email: person.email });
+          showKt();
+          setStatus(status, `Removed the kennitala for ${label}.`, false, true);
+        });
+        ktNote.append(`Kennitala set (…${k.last_four}) `, remove);
+      };
+      showKt();
+
       const save = h(
         "button",
         {
@@ -1086,6 +1115,18 @@
           onclick: async function () {
             if (isMe && role.value !== "management" && !confirm("You’re removing your own management access. Continue?")) {
               return;
+            }
+            // The kennitala first, so a typo stops the save before anything else changes.
+            if (ktBox && ktBox.value.trim()) {
+              save.disabled = true;
+              const kr = await db.rpc("set_kennitala", { p_profile: person.id, p_kennitala: ktBox.value.trim() });
+              save.disabled = false;
+              if (kr.error) { setStatus(status, `${label}: ${kr.error.message}`, true); return; }
+              ktSet[person.id] = { profile_id: person.id, last_four: kr.data };
+              ktBox.value = "";
+              ktBox.placeholder = "New kennitala (to change it)";
+              await logEvent("kennitala_set", { profile_id: person.id, email: person.email });
+              showKt();
             }
             const changes = {
               role: role.value,
@@ -1136,7 +1177,7 @@
       return h(
         "tr",
         null,
-        h("td", { class: "person-edit" }, nameBox, titleBox, rosterBox, safetyLabel, maintLabel, h("span", { class: "sub" }, person.email)),
+        h("td", { class: "person-edit" }, nameBox, titleBox, rosterBox, ktBox, ktNote, safetyLabel, maintLabel, h("span", { class: "sub" }, person.email)),
         h("td", null, role),
         h("td", null, station.node),
         h("td", null, active),

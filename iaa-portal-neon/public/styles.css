@@ -1434,3 +1434,5 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
   .nav-section + .nav-section { margin: 0 0 0 0.35rem; padding-left: 0.35rem; border-left: 1px solid var(--chrome-line); }
   .nav-group { display: none; }
 }
+.kt-note { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.clock-list li.is-off { opacity: 0.6; }

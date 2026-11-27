@@ -47,6 +47,7 @@
   const lunchWord = (n) => (n === 1 ? "1 lunch" : `${n} lunches`);
   function where(s, dir) {
     const st = s[dir + "_station"], ok = s[dir + "_confirmed"], km = s[dir + "_distance_km"], why = s[dir + "_reason"];
+    if (s[dir + "_via"]) return s[dir + "_via"];
     if (ok) return st || "Confirmed";
     if (ok === null || ok === undefined) return "–";
     return "⚠ " + (km != null ? `${km} km from ${st || "nearest airport"}` : "location not available") + (why ? ` – “${why}”` : "");
@@ -80,7 +81,7 @@
         },
         (err) => resolve({ confirmed: false, station: null, km: null,
           message: err.code === 1 ? "Location isn’t allowed for the portal on this device." : "Your location couldn’t be found just now." }),
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     });
   }
@@ -300,6 +301,16 @@
           noteCell);
       })))) : h("p", { class: "empty" }, "No shifts this month.");
 
+    const locBtn = h("button", { class: "btn btn-quiet btn-small", type: "button" }, "Check my location");
+    const locOut = h("p", { class: "status", role: "status" });
+    locBtn.addEventListener("click", async () => {
+      locBtn.disabled = true; ctx.setStatus(locOut, "Checking…");
+      const loc = await locate();
+      locBtn.disabled = false;
+      if (loc.confirmed) ctx.setStatus(locOut, `✓ Accepted: at ${loc.station} (${loc.km} km from the airport centre). Clocking in here would be confirmed.`, false, true);
+      else ctx.setStatus(locOut, `Not accepted here. ${loc.message} You could still clock in with a reason.`, true);
+    });
+
     fill(main, pageHead("Hours", "Your shifts, lunch and hours. Clock in and out on the Home page."),
       tabs(ctx, "me"),
       monthNav(ctx, redraw),
@@ -309,6 +320,7 @@
         stat(h, hm(t.extra), "Additional hours (beyond 12 h)", t.extra ? "is-warn" : ""),
         stat(h, t.lunches, "Lunches")),
       table, status,
+      h("div", { class: "row clock-row" }, locBtn), locOut,
       h("p", { class: "fineprint" }, "Worked = clock-out − clock-in. Up to 12 hours on a shift counts as the shift; anything beyond 12 hours is additional hours. Lunches are recorded, not deducted. If something is wrong, ask for a correction – management will fix it and the change is kept in a history."));
   }
 
@@ -318,10 +330,11 @@
     const redraw = () => teamPage(main, ctx);
     fill(main, pageHead("Hours"), tabs(ctx, "team"), h("p", { class: "empty" }, "Loading…"));
     const [from, to] = monthRange(month);
-    const [mr, or, pr] = await Promise.all([
+    const [mr, or, pr, kr] = await Promise.all([
       db.from("time_shift_hours").select("*").gte("clock_in", from).lt("clock_in", to).order("clock_in", { ascending: true }),
       db.from("time_shift_hours").select("*").is("clock_out", null).order("clock_in", { ascending: true }),
-      db.from("profiles").select("id, full_name, email, active").eq("active", true).order("full_name", { ascending: true })
+      db.from("profiles").select("id, full_name, email, active").eq("active", true).order("full_name", { ascending: true }),
+      db.from("time_kiosks").select("*").order("created_at", { ascending: true })
     ]);
     if (mr.error) { fill(main, pageHead("Hours"), tabs(ctx, "team"), h("p", { class: "notice is-error" }, "The time clock isn’t set up yet (database update 44).")); return; }
     const rows = mr.data || [], openNow = or.data || [], people = pr.data || [];
@@ -467,6 +480,8 @@
         h("label", { class: "field field-wide" }, h("span", null, "Reason"), aWhy)),
       aBtn, aMsg);
 
+    const kioskPanel = kr.error ? null : ipadPanel(ctx, kr.data || [], redraw);
+
     const exportBtn = h("button", { class: "btn", type: "button" }, "Download Excel for " + monthLabel(month));
     exportBtn.addEventListener("click", () => exportMonth(rows, ids, byPerson, nameOf));
 
@@ -476,7 +491,46 @@
       h("div", { class: "stat-grid" },
         stat(h, all.shifts, "Shifts"), stat(h, hm(all.worked), "Hours worked"),
         stat(h, hm(all.extra), "Additional hours", all.extra ? "is-warn" : ""), stat(h, all.lunches, "Lunches"), stat(h, review.length, "To review", review.length ? "is-warn" : "")),
-      summary, h("div", { class: "row" }, exportBtn), addPanel, status);
+      summary, h("div", { class: "row" }, exportBtn), addPanel, kioskPanel, status);
+  }
+
+  // ---------------- Time clock iPads (management) ----------------
+  function ipadPanel(ctx, kiosks, redraw) {
+    const { h, db } = ctx;
+    const msg = h("p", { class: "status", role: "status" });
+    const list = kiosks.length ? h("ul", { class: "clock-list" }, kiosks.map((k) => {
+      const toggle = h("button", { class: "btn btn-quiet btn-small", type: "button" }, k.active ? "Switch off" : "Switch on");
+      toggle.addEventListener("click", async () => {
+        if (k.active && !confirm(`Switch off “${k.name}”? It will stop working until switched on again.`)) return;
+        toggle.disabled = true;
+        const u = await db.from("time_kiosks").update({ active: !k.active }).eq("id", k.id);
+        if (u.error) { toggle.disabled = false; ctx.setStatus(msg, u.error.message, true); return; }
+        redraw();
+      });
+      return h("li", { class: k.active ? "" : "is-off" }, h("b", null, k.name), ` · ${k.station} · `,
+        k.active ? (k.last_used_at ? `last used ${dayLabel(k.last_used_at)} ${clock(k.last_used_at)}` : "not used yet") : "switched off",
+        ` · set up by ${k.created_by_name || "?"}`, toggle);
+    })) : h("p", { class: "empty" }, "No iPads set up yet.");
+    const st = h("select", null, ["BIRK", "BIKF", "BIAR"].map((c) => h("option", { value: c }, c)));
+    const nm = h("input", { type: "text", maxlength: "60", placeholder: "e.g. BIRK front desk iPad" });
+    const go = h("button", { class: "btn", type: "button" }, "Set up this device as a time clock");
+    go.addEventListener("click", async () => {
+      if (!confirm(`Make THIS device the ${st.value} time clock?\n\nYou’ll be signed out of the portal on this device, and it will show the kennitala number pad from then on.`)) return;
+      go.disabled = true;
+      const r = await db.rpc("register_kiosk", { p_station: st.value, p_name: nm.value.trim() || st.value + " iPad" });
+      if (r.error) { go.disabled = false; ctx.setStatus(msg, r.error.message, true); return; }
+      try { localStorage.setItem("iaa-kiosk-token", r.data); } catch (e) { go.disabled = false; ctx.setStatus(msg, "This browser can’t store the iPad key – check it isn’t in private browsing.", true); return; }
+      try { await db.auth.signOut(); } catch (e) { /* carry on */ }
+      location.href = "/kiosk.html";
+    });
+    return h("details", { class: "panel" }, h("summary", null, `Time clock iPads (${kiosks.filter((k) => k.active).length})`),
+      h("p", null, "A station iPad where staff clock in and out by typing their kennitala. Set it up on the iPad itself: sign in there, open this page and press the button. Kennitölur are added on the People page."),
+      list,
+      h("div", { class: "form-grid" },
+        h("label", { class: "field" }, h("span", null, "Station"), st),
+        h("label", { class: "field" }, h("span", null, "Name"), nm)),
+      go, msg,
+      h("p", { class: "fineprint" }, "Lost or replaced iPad? Switch it off here – it stops working straight away."));
   }
 
   // ---------------- Excel export ----------------

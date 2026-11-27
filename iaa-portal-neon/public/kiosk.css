@@ -1,0 +1,28 @@
+/* Time clock iPad (kiosk.html) */
+.kiosk-body { margin: 0; min-height: 100vh; background: var(--chrome); color: var(--chrome-ink); font-family: var(--font); -webkit-user-select: none; user-select: none; }
+.kiosk { box-sizing: border-box; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 1.5rem 1.25rem 2rem; gap: 1.25rem; }
+.kiosk-top { width: 100%; max-width: 46rem; display: flex; justify-content: space-between; align-items: center; }
+.kiosk-top img { height: 44px; }
+.kiosk-where { text-align: right; }
+.kiosk-where b { display: block; font-family: var(--font-sign); font-size: 1.6rem; letter-spacing: 0.04em; color: var(--chrome-accent); }
+.kiosk-time { font-family: var(--font-sign); font-size: 3.2rem; font-weight: 600; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; margin: 0; }
+.kiosk-date { margin: -1rem 0 0; color: var(--chrome-muted); }
+.kiosk-card { width: 100%; max-width: 30rem; background: var(--surface); color: var(--ink); border-radius: 14px; padding: 1.5rem; box-sizing: border-box; box-shadow: 0 8px 30px rgba(0,0,0,0.25); }
+.kiosk-card h1 { margin: 0 0 0.25rem; font-size: 1.6rem; }
+.kiosk-card p { margin: 0.25rem 0 0.75rem; color: var(--muted); }
+.kiosk-display { font-family: var(--font-sign); font-size: 2.4rem; letter-spacing: 0.12em; text-align: center; background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem; min-height: 3.2rem; font-variant-numeric: tabular-nums; }
+.kiosk-display .ph { color: #9fb5b0; letter-spacing: 0.12em; }
+.kiosk-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-top: 1rem; }
+.kiosk-pad button { font: 600 1.9rem var(--font); padding: 0.9rem 0; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); touch-action: manipulation; }
+.kiosk-pad button:active { background: var(--field); }
+.kiosk-pad .k-del, .kiosk-pad .k-clear { font-size: 1.1rem; color: var(--muted); }
+.kiosk-actions { display: grid; gap: 0.75rem; margin-top: 1rem; }
+.kiosk-actions .btn { font-size: 1.35rem; padding: 1rem; border-radius: 12px; width: 100%; }
+.kiosk-check { display: flex; align-items: center; gap: 0.75rem; font-size: 1.2rem; font-weight: 600; padding: 0.75rem 0; }
+.kiosk-check input { width: 1.6rem; height: 1.6rem; }
+.kiosk-msg { min-height: 1.5rem; font-weight: 600; text-align: center; color: var(--danger); margin: 0.75rem 0 0; }
+.kiosk-done { text-align: center; }
+.kiosk-done .big { font-size: 3.5rem; line-height: 1; }
+.kiosk-done h1 { margin-top: 0.5rem; }
+.kiosk-foot { color: var(--chrome-muted); font-size: 0.9rem; text-align: center; max-width: 30rem; }
+.kiosk [hidden] { display: none !important; }
