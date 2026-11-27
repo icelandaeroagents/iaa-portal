@@ -1852,3 +1852,18 @@ table:not(.roster-grid):not(.re-grid):not(.clock-grid):not(.risk-heat):not(.doc-
 .module-list a:hover .module-action { border-color: var(--brand-strong); }
 @media (max-width: 760px) { .module-end { grid-column: 2; justify-self: start; } }
 .training-progress .bar { display: block; width: 100%; max-width: none; }
+
+/* Training rows, as in the mock-up: name · result · action */
+.train-list { list-style: none; margin: 0; padding: 0; }
+.train-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.5rem 1rem; align-items: center; padding: 0.75rem 0.25rem; border-top: 1px solid var(--line); }
+.train-row.is-practical { grid-template-columns: minmax(0, 1fr) auto; }
+.train-name { color: var(--ink); text-decoration: none; font-weight: 500; display: flex; flex-wrap: wrap; gap: 0 0.35rem; align-items: baseline; }
+a.train-name:hover { color: var(--brand-strong); }
+.train-name b { font-weight: 700; }
+.train-name .sub { flex-basis: 100%; }
+.train-row .btn { white-space: nowrap; min-width: 6.5rem; text-align: center; }
+@media (max-width: 760px) {
+  .train-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .train-row .chip { grid-column: 1; justify-self: start; }
+  .train-row .btn { grid-column: 2; grid-row: 1 / span 2; }
+}

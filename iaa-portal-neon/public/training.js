@@ -237,26 +237,31 @@
     const done = mine.filter((m) => isCurrent(cycles[m.id])).length;
     const dueNow = mine.filter((m) => cycles[m.id].status === "due");
 
-    // What tapping the module does, shown as a small button at the end of the row.
-    function actionLabel(c) {
-      if (c.status === "none") return h("span", { class: "module-action is-primary", "aria-hidden": "true" }, "Start");
-      if (c.status === "failed" || c.status === "due") return h("span", { class: "module-action is-primary", "aria-hidden": "true" }, "Retake");
-      if (c.status === "soon") return h("span", { class: "module-action", "aria-hidden": "true" }, "Renew");
-      return h("span", { class: "module-action", "aria-hidden": "true" }, "Open");
+    // One compact row per module, as in the new design: name, result, action.
+    function resultPill(c) {
+      const pct = c.cert && c.cert.pct ? c.cert.pct : c.best;
+      if (c.status === "none") return h("span", { class: "chip chip-none" }, "Not started");
+      if (c.status === "failed") return h("span", { class: "chip chip-fail" }, `Best ${c.best}% – retake`);
+      if (c.status === "due") return h("span", { class: "chip chip-sev-high" }, "Due – retake");
+      if (c.awaiting) return h("span", { class: "chip chip-pass" }, `Passed ${pct}%, awaiting sign-off`);
+      if (c.status === "soon") return h("span", { class: "chip chip-status-new" }, `Passed ${pct}% · renew by ${shortDate(c.due)}`);
+      return h("span", { class: "chip chip-cert" }, `Passed ${pct}% · until ${shortDate(c.due)}`);
+    }
+    function actionFor(m, c) {
+      const go = "#/training/" + m.id;
+      if (c.status === "none") return h("a", { class: "btn btn-small", href: go }, "Start");
+      if (c.status === "failed" || c.status === "due") return h("a", { class: "btn btn-small", href: go }, "Retake");
+      if (c.status === "soon") return h("a", { class: "btn btn-quiet btn-small", href: go }, "Renew");
+      if (c.cert) return h("a", { class: "btn btn-quiet btn-small", href: "#/training/cert/" + c.cert.id }, "Certificate");
+      return h("a", { class: "btn btn-quiet btn-small", href: go }, "Open");
     }
 
     function moduleItem(m) {
-      return h(
-        "li",
-        null,
-        h(
-          "a",
-          { href: "#/training/" + m.id },
-          h("span", { class: "module-code" }, m.code),
-          h("span", { class: "module-text" }, h("span", { class: "section-title" }, m.title), h("span", { class: "section-desc" }, m.summary)),
-          h("span", { class: "module-end" }, cycleChip(ctx, cycles[m.id]), actionLabel(cycles[m.id]))
-        )
-      );
+      const c = cycles[m.id];
+      return h("li", { class: "train-row" },
+        h("a", { class: "train-name", href: "#/training/" + m.id, title: m.summary }, h("b", null, m.code), " · ", m.title),
+        resultPill(c),
+        actionFor(m, c));
     }
 
     // Management and station leads can open other stations' modules to review them.
@@ -267,18 +272,14 @@
           { class: "panel", "aria-labelledby": "other-h" },
           h("h2", { id: "other-h" }, "Other stations' modules"),
           h("p", { class: "fineprint" }, "Not required for you. Open them to review what staff at those stations learn."),
-          h("ul", { class: "module-list" }, others.map(moduleItem))
+          h("ul", { class: "train-list" }, others.map(moduleItem))
         )
       : null;
     const noStationNote = !myCodes.length && others.length
       ? h("p", { class: "fineprint" }, "Station winter modules appear here once management has set your station.")
       : null;
 
-    const list = h(
-      "ul",
-      { class: "module-list" },
-      mine.map(moduleItem)
-    );
+    const list = h("ul", { class: "train-list" }, mine.map(moduleItem));
 
     // Earlier completions, kept separately from the current cycle.
     const previous = [];
@@ -320,13 +321,10 @@
         ? h("section", { class: "panel", "aria-labelledby": "prac-h" },
             h("h2", { id: "prac-h" }, "Practical sign-offs"),
             h("p", { class: "fineprint" }, "Practical assessments signed off by management. Each is renewed every year."),
-            h("div", { class: "table-wrap" }, h("table", null,
-              h("thead", null, h("tr", null, h("th", null, "Skill"), h("th", null, "Assessed"), h("th", null, "By"), h("th", null, "Status"))),
-              h("tbody", null, practicalState(practical).map((p) => h("tr", null,
-                h("td", null, h("b", null, p.skill)),
-                h("td", null, shortDate(p.latest.assessed_on)),
-                h("td", null, p.latest.assessor_name || "–"),
-                h("td", null, practicalChip(ctx, p))))))))
+            h("ul", { class: "train-list" }, practicalState(practical).map((p) => h("li", { class: "train-row is-practical" },
+              h("span", { class: "train-name" }, h("b", null, p.skill),
+                h("span", { class: "sub" }, "Assessed " + shortDate(p.latest.assessed_on) + (p.latest.assessor_name ? " by " + p.latest.assessor_name : ""))),
+              practicalChip(ctx, p)))))
         : null,
       previousPanel,
       othersPanel,
