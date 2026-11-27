@@ -27,6 +27,17 @@
   // ------------------------------------------------------------------
   // Sections of the portal. Each one lists which roles can see it.
   // ------------------------------------------------------------------
+  // How the menu is grouped. "team-hours" is a direct link to Hours → Team.
+  const NAV_GROUPS = [
+    { label: null, items: ["home"] },
+    { label: "On shift", items: ["hours", "ramp", "roster", "requests", "maintenance"] },
+    { label: "Safety", items: ["emergency", "reports"] },
+    { label: "Information", items: ["news", "briefings", "manuals", "policies", "equipment"] },
+    { label: "My records", items: ["training", "passes", "logbook"] },
+    { label: "Break", items: ["game"] },
+    { label: "Management", items: ["management", "people", "stations", "team-hours"] }
+  ];
+
   const MODULES = [
     {
       id: "home",
@@ -113,7 +124,7 @@
     },
     {
       id: "equipment",
-      title: "Equipment Info",
+      title: "Equipment",
       description: "Where equipment is kept at each station, with important notes.",
       roles: ALL_ROLES,
       render: renderEquipment
@@ -415,29 +426,29 @@
       )
     );
 
-    const nav = h(
-      "nav",
-      { class: "sidenav", "aria-label": "Portal sections" },
-      h(
-        "ul",
-        null,
-        modules.filter((m) => !m.group).map((m) =>
-          h(
-            "li",
-            null,
-            h("a", { href: "#/" + m.id, "aria-current": m.id === activeModule.id ? "page" : null }, m.title)
-          )
-        )
-      ),
-      // Management's own group of pages, under a heading.
-      modules.some((m) => m.group === "management")
-        ? [
-            h("p", { class: "nav-group" }, "Management"),
-            h("ul", null, modules.filter((m) => m.group === "management").map((m) =>
-              h("li", null, h("a", { href: "#/" + m.id, "aria-current": m.id === activeModule.id ? "page" : null }, m.title))))
-          ]
-        : null
-    );
+    // The menu, in groups. Pages not listed in a group are shown at the end.
+    const onTeamHours = activeModule.id === "hours" && /^#\/hours\/team/.test(location.hash);
+    const link = (href, title, current) =>
+      h("li", null, h("a", { href: href, "aria-current": current ? "page" : null }, title));
+    const listed = {};
+    NAV_GROUPS.forEach((g) => g.items.forEach((id) => { listed[id] = true; }));
+    const sections = NAV_GROUPS.map((g) => {
+      const items = g.items.map((id) => {
+        if (id === "team-hours") {
+          return state.profile.role === "management" && modules.some((m) => m.id === "hours")
+            ? link("#/hours/team", "Team hours", onTeamHours) : null;
+        }
+        const m = modules.find((x) => x.id === id);
+        return m ? link("#/" + m.id, m.title, m.id === activeModule.id && !(m.id === "hours" && onTeamHours)) : null;
+      }).filter(Boolean);
+      if (!items.length) return null;
+      return h("div", { class: "nav-section" }, g.label ? h("p", { class: "nav-group" }, g.label) : null, h("ul", null, items));
+    });
+    const others = modules.filter((m) => !listed[m.id]);
+    if (others.length) {
+      sections.push(h("div", { class: "nav-section" }, h("ul", null, others.map((m) => link("#/" + m.id, m.title, m.id === activeModule.id)))));
+    }
+    const nav = h("nav", { class: "sidenav", "aria-label": "Portal sections" }, sections);
 
     const topbar = h(
       "header",
@@ -664,7 +675,10 @@
       const st = state.stations.find((s) => s.code === code);
       return st ? `${st.code} – ${st.name}` : code;
     });
-    const sections = MODULES.filter((m) => m.id !== "home" && m.roles.indexOf(p.role) !== -1 && (!m.show || m.show(p)));
+    const navOrder = [].concat.apply([], NAV_GROUPS.map((g) => g.items));
+    const rank = (id) => { const i = navOrder.indexOf(id); return i === -1 ? 999 : i; };
+    const sections = MODULES.filter((m) => m.id !== "home" && m.roles.indexOf(p.role) !== -1 && (!m.show || m.show(p)))
+      .sort((a, b) => rank(a.id) - rank(b.id));
 
     const nameInput = h("input", { id: "my-name", type: "text", autocomplete: "name", value: p.full_name || "" });
     const titleInput = h("input", { id: "my-title", type: "text", autocomplete: "organization-title", value: p.job_title || "", placeholder: "e.g. Operations Officer" });
@@ -798,7 +812,7 @@
   }
 
   async function renderEquipment(main) {
-    if (!window.IAAEquipment) return sectionMissing(main, "Equipment Info");
+    if (!window.IAAEquipment) return sectionMissing(main, "Equipment");
     return window.IAAEquipment.render(main, sectionCtx());
   }
 
@@ -841,7 +855,7 @@
       fill(main,
         pageHead("Maintenance", "The GSE and vehicle register and maintenance log for every station."),
         h("div", { class: "row" },
-          h("a", { class: "btn btn-quiet btn-small", href: "#/equipment" }, "Equipment Info"),
+          h("a", { class: "btn btn-quiet btn-small", href: "#/equipment" }, "Equipment"),
           h("a", { class: "btn btn-quiet btn-small", href: "#/requests/service" }, "Defect and equipment requests")),
         body);
     };

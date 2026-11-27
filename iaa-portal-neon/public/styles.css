@@ -1424,3 +1424,13 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
 .clock-edit h3 { margin-top: 0; }
 .clock-check { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 500; }
 .clock-check input { width: 1.15rem; height: 1.15rem; }
+
+/* ---------- Grouped menu ---------- */
+.nav-section:first-child .nav-group { margin-top: 0; }
+.nav-section + .nav-section { margin-top: 0.15rem; }
+@media (max-width: 760px) {
+  .sidenav { display: flex; align-items: center; }
+  .nav-section { display: flex; align-items: center; flex-shrink: 0; }
+  .nav-section + .nav-section { margin: 0 0 0 0.35rem; padding-left: 0.35rem; border-left: 1px solid var(--chrome-line); }
+  .nav-group { display: none; }
+}

@@ -5,7 +5,7 @@
 // The register required by the GSE Maintenance Programme (GH-GSE-001) and
 // Regulation (EU) 2025/20, Subpart ORGH.GSE: each unit's details, service
 // and inspection dates, airport passes, and a maintenance log.
-// Management only (database update 29). Daily checks stay in Equipment Info.
+// Management only (database update 29). Daily checks stay on the Equipment page.
 // =====================================================================
 (function () {
   "use strict";
@@ -123,7 +123,7 @@
         stat(h, active.filter((u) => u.kind === "gse").length, "GSE units", ""),
         stat(h, active.filter((u) => u.kind === "vehicle").length, "Vehicles", "")),
       h("section", { class: "panel" },
-        h("p", { class: "fineprint" }, "The register required by the GSE Maintenance Programme (GH-GSE-001). Next service is the date recorded, or last service plus the service interval. Daily checks and levels stay in Equipment Info; car servicing in the Car Maintenance Tracker."),
+        h("p", { class: "fineprint" }, "The register required by the GSE Maintenance Programme (GH-GSE-001). Next service is the date recorded, or last service plus the service interval. Daily checks and levels stay on the Equipment page; car servicing in the Car Maintenance Tracker."),
         h("div", { class: "form-grid filters" },
           sel("fl-kind", "Type", filter.kind, [["all", "GSE and vehicles"], ["gse", "GSE"], ["vehicle", "Vehicles"]], "kind"),
           sel("fl-st", "Station", filter.station, [["all", "All"]].concat(stations.map((s) => [s, s])), "station"),
@@ -326,7 +326,7 @@
         h("div", { class: "form-grid" },
           field("pass_birk", "Airport pass expires – BIRK"), field("pass_bikf", "Airport pass expires – BIKF"), field("pass_biar", "Airport pass expires – BIAR"),
           field("pass_note", "Pass notes", "e.g. renewal applied for", true), field("runway_crossing", "Runway crossing (BIRK)"),
-          field("equipment_id", "Equipment Info card", "Link to the daily-check card for this unit")),
+          field("equipment_id", "Equipment card", "Link to the daily-check card for this unit")),
         h("div", { class: "field field-wide" }, h("label", { for: "fu-remarks" }, "Remarks"), f.remarks),
         h("div", { class: "row" },
           h("button", { class: "btn", type: "submit" }, isNew ? "Add unit" : "Save"),

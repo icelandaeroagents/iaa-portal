@@ -1,5 +1,5 @@
 /* Iceland Aero Agents – Staff Portal
-   Equipment Info: each station's equipment (Lav Unit, Water Unit, GPU, Tug,
+   Equipment: each station's equipment (Lav Unit, Water Unit, GPU, Tug,
    Air Stairs), where it is kept, important notes, whether it is in service,
    and its latest battery / fuel / tank levels.
    – Everyone can read, and log a level check and/or a comment.
@@ -52,7 +52,7 @@
       const mine = (state.profile.station_codes || []).find((c) => stations.some((s) => s.code === c));
       station = mine || (stations[0] && stations[0].code) || null;
     }
-    fill(main, pageHead("Equipment Info"), h("p", { class: "empty" }, "Loading equipment…"));
+    fill(main, pageHead("Equipment"), h("p", { class: "empty" }, "Loading equipment…"));
 
     const res = await ctx.db.from("equipment").select("*").order("station_code").order("category").order("name");
     if (res.error) throw res.error;
@@ -107,7 +107,7 @@
     fill(
       main,
       h("div", { class: "page-head page-head-row" },
-        h("div", null, h("h1", null, "Equipment Info"), h("p", null, "Where equipment is kept at each station, its levels, and anything important to know about it.")),
+        h("div", null, h("h1", null, "Equipment"), h("p", null, "Where equipment is kept at each station, its levels, and anything important to know about it.")),
         editable && editing !== "new" ? h("button", { class: "btn", type: "button", onclick: function () { editing = "new"; render(main, ctx); } }, "Add equipment") : null),
       tabs,
       n ? h("p", { class: n.isError ? "notice is-error" : "notice" }, n.text) : null,
