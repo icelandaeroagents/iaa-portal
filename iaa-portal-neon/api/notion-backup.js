@@ -332,17 +332,21 @@ async function discover() {
   // A page inside a database row (e.g. a blank page inside a flight) is already backed up
   // with that row's page contents, so it is left out. Others get their parent's name.
   const parents = {};
-  const keep = [];
+  const keep = [], blank = [];
   for (const p of top) {
     if (p.parent && p.parent.type === "page_id") {
       const pid = p.parent.page_id;
       if (!(pid in parents)) {
         try {
           const parent = await notion(`/pages/${pid}`);
-          parents[pid] = { inDatabase: !!(parent.parent && (parent.parent.type === "data_source_id" || parent.parent.type === "database_id")), title: titleOf(parent) };
+          parents[pid] = { inDatabase: !!(parent.parent && (parent.parent.type === "data_source_id" || parent.parent.type === "database_id")), title: titleOf(parent), url: parent.url || null };
         } catch (e) { parents[pid] = { inDatabase: false, title: "" }; }
       }
-      if (parents[pid].inDatabase) continue;
+      if (parents[pid].inDatabase) {
+        // listed on the Backups page so they can be tidied up in Notion
+        if (titleOf(p) === "Untitled") blank.push({ id: p.id, url: p.url || null, inside: parents[pid].title, inside_url: parents[pid].url, created: p.created_time || null, edited: p.last_edited_time || null });
+        continue;
+      }
       p._parentTitle = parents[pid].title;
     }
     keep.push(p);
@@ -354,7 +358,8 @@ async function discover() {
   };
   return {
     databases: sources.map((s) => ({ id: s.id, title: titleOf(s), url: s.url || null })).sort((a, b) => a.title.localeCompare(b.title)),
-    pages: top.map((p) => ({ id: p.id, title: pageTitle(p), url: p.url || null })).sort((a, b) => a.title.localeCompare(b.title))
+    pages: top.map((p) => ({ id: p.id, title: pageTitle(p), url: p.url || null })).sort((a, b) => a.title.localeCompare(b.title)),
+    blank: blank.sort((a, b) => String(a.created).localeCompare(String(b.created)))
   };
 }
 
