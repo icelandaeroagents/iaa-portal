@@ -15,6 +15,7 @@
     { key: "0630-1830", group: "Shifts" },
     { key: "0700-1500", group: "Shifts" },
     { key: "0700-1900", group: "Shifts" },
+    { key: "0700-1900 #2", group: "Shifts", second: true },   // a second line, so two people each get their own
     { key: "0800-1500", group: "Shifts" },
     { key: "0800-1800", group: "Shifts" },
     { key: "0800-2000", group: "Shifts" },
@@ -78,7 +79,12 @@
   // Shifts in order of start time (then end time), then any other rows,
   // then BIKF Resp, BIAR Resp and Management on duty at the bottom.
   const LAST = ["BIKF Resp", "BIAR Resp", "Management on duty"];
-  function isShift(k) { return /^\d{4}-\d{4}$/.test(k); }
+  function isShift(k) { return /^\d{4}-\d{4}( #\d+)?$/.test(k); }
+  // "0700-1900 #2" is the second line of the 0700-1900 shift: shown as 0700-1900.
+  const labelOf = (k) => String(k).replace(/ #\d+$/, "");
+  const isSecond = (k) => / #\d+$/.test(String(k));
+  const nice = (k) => isSecond(k) ? labelOf(k) + " (2nd)" : k;
+  const hasSecond = (k) => DUTIES.some((d) => d.key === k + " #2");
   function dutyOrder(entries) {
     const all = DUTIES.map((d) => d.key);
     entries.forEach((e) => { if (all.indexOf(e.duty) === -1) all.push(e.duty); });
@@ -96,7 +102,7 @@
         blocks.push({
           dates: dates,
           rows: order.map((duty) => ({
-            label: duty,
+            label: labelOf(duty),
             values: dates.map((d) => entries.filter((e) => e.work_date === d && e.duty === duty)
               .map((e) => (names[e.profile_id] || "?") + (e.note ? " (" + e.note + ")" : "")).sort().join(", "))
           }))
@@ -166,21 +172,24 @@
       (s.blocks || []).forEach(function (b) {
         b.dates.forEach(function (d, i) {
           if (d.slice(0, 8) + "01" !== m) return;
+          const seenLabel = {};
           (b.rows || []).forEach(function (row) {
             if (row.struck && row.struck[i]) return;
-            const duty = dutyFromLabel(row.label);
+            let duty = dutyFromLabel(row.label);
+            if (duty) { seenLabel[duty] = (seenLabel[duty] || 0) + 1; if (seenLabel[duty] === 2 && hasSecond(duty)) duty = duty + " #2"; }
             const cell = String(row.values[i] || "").trim();
             if (!duty || !cell) return;
-            cell.split(/\s*(?:[,\/&+]|\bog\b|\band\b)\s*/i).filter(Boolean).forEach(function (part) {
+            cell.split(/\s*(?:[,\/&+]|\bog\b|\band\b)\s*/i).filter(Boolean).forEach(function (part, partNo) {
               const mm = part.match(/^(.*?)\s*(?:\((.*)\)|(-?\s*\d{3,4}.*))?$/);
               const nameText = (mm ? mm[1] : part).trim();
               const note = mm ? (mm[2] || mm[3] || "").trim() : "";
               if (!nameText) return;
               const pid = match(nameText);
               if (!pid) { unmatched.add(nameText); return; }
-              const k = d + "|" + duty + "|" + pid;
+              const lineDuty = partNo === 1 && hasSecond(duty) ? duty + " #2" : duty;   // two names in one 0700-1900 cell
+              const k = d + "|" + lineDuty + "|" + pid;
               if (seen.has(k)) return; seen.add(k);
-              rows.push({ work_date: d, duty: duty, profile_id: pid, note: note ? note.slice(0, 60) : null });
+              rows.push({ work_date: d, duty: lineDuty, profile_id: pid, note: note ? note.slice(0, 60) : null });
             });
           });
         });
@@ -223,27 +232,31 @@
     });
     const firstDayCol = Math.min.apply(null, Object.keys(cols).map(Number));
     const match = personMatcher(people);
-    const rows = [], rowsUsed = {}, unmatched = {}, skipped = [], multi = [];
+    const rows = [], rowsUsed = {}, unmatched = {}, skipped = [], multi = [], pasteSeen = {};
     grid.forEach(function (r, i) {
       if (i === hi) return;
       const label = r.slice(0, firstDayCol).map((x) => x.trim()).filter(Boolean).join(" ");
       if (!label) return;
       if (r.slice(firstDayCol).every((c) => !String(c).trim())) return;
-      const duty = dutyFromLabel(label);
+      let duty = dutyFromLabel(label);
+      if (duty && isShift(duty)) { pasteSeen[duty] = (pasteSeen[duty] || 0) + 1; if (pasteSeen[duty] === 2 && hasSecond(duty)) duty = duty + " #2"; }
       if (!duty || (!isShift(duty) && LAST.indexOf(duty) === -1)) { if (/[a-z]/i.test(label) && !/^(mon|tue|wed|thu|fri|sat|sun|m[aá]n|þri|mi[dð]|fim|f[oö]s|lau|sun)/i.test(label)) skipped.push(label); return; }
       rowsUsed[duty] = (rowsUsed[duty] || 0);
       Object.keys(cols).forEach(function (ci) {
         const parts = splitNames(r[ci]);
-        // One person per row per day: a cell with more than one name is not split.
-        if (parts.length > 1) { multi.push(`${duty} on ${dayNum(cols[ci])}: “${String(r[ci]).trim()}”`); return; }
-        parts.forEach(function (part) {
+        // One person per row per day. Two names in a 0700-1900 cell go on its two lines;
+        // any other cell with more than one name is not split.
+        const twoLines = parts.length === 2 && hasSecond(duty);
+        if (parts.length > 1 && !twoLines) { multi.push(`${nice(duty)} on ${dayNum(cols[ci])}: “${String(r[ci]).trim()}”`); return; }
+        parts.forEach(function (part, partNo) {
           const mm = part.match(/^(.*?)\s*(?:\((.*)\)|(-?\s*\d{3,4}.*))?$/);
           const who = (mm ? mm[1] : part).trim(), note = mm ? (mm[2] || mm[3] || "").trim() : "";
           if (!who) return;
           const pid = match(who);
           if (!pid) { unmatched[who] = (unmatched[who] || 0) + 1; return; }
-          rows.push({ work_date: cols[ci], duty: duty, profile_id: pid, note: note ? note.slice(0, 60) : null });
-          rowsUsed[duty] += 1;
+          const lineDuty = twoLines && partNo === 1 ? duty + " #2" : duty;
+          rows.push({ work_date: cols[ci], duty: lineDuty, profile_id: pid, note: note ? note.slice(0, 60) : null });
+          rowsUsed[lineDuty] = (rowsUsed[lineDuty] || 0) + 1;
         });
       });
     });
@@ -492,7 +505,7 @@
         h("option", { value: p.id, selected: sel.person === p.id }, `${p.full_name || p.email}${names[p.id] && fold(names[p.id]) !== fold(String(p.full_name || "").split(/\s+/)[0]) ? " (" + names[p.id] + ")" : ""}`))));
     const dutyBoxes = DUTIES.map((d) => {
       const box = h("input", { type: "checkbox", checked: sel.duties.has(d.key), onchange: (e) => { e.target.checked ? sel.duties.add(d.key) : sel.duties.delete(d.key); } });
-      return h("label", { class: "choice choice-inline" }, box, h("span", null, d.key));
+      return h("label", { class: "choice choice-inline" }, box, h("span", null, nice(d.key)));
     });
     const dayBoxes = {};
     const cal = h("div", { class: "re-cal" },
@@ -568,7 +581,7 @@
 
     // --- coverage
     const doubled = [];
-    dutyOrder(entries).forEach((duty) => days.forEach((day) => { const n2 = entries.filter((e) => e.work_date === day && e.duty === duty).length; if (n2 > 1) doubled.push(`${duty} on ${dayNum(day)}`); }));
+    dutyOrder(entries).forEach((duty) => days.forEach((day) => { const n2 = entries.filter((e) => e.work_date === day && e.duty === duty).length; if (n2 > 1) doubled.push(`${nice(duty)} on ${dayNum(day)}`); }));
     const missing = DUTIES.filter((d) => d.required).map((d) => [d.key, days.filter((day) => !entries.some((e) => e.work_date === day && e.duty === d.key))]).filter((x) => x[1].length);
     const coverage = h("section", { class: "panel" + (missing.length || doubled.length ? " panel-attention" : "") },
       h("h2", null, "Cover"),
@@ -601,7 +614,7 @@
     // drop it on someone else's name to swap them, or drag a name from the
     // row of people onto a cell to add them. Every drop can be undone.
     const short = (d) => `${dayNum(d)} ${monthName(month).split(" ")[0].slice(0, 3)}`;
-    const place = (duty, d) => `${duty} on ${short(d)}`;
+    const place = (duty, d) => `${nice(duty)} on ${short(d)}`;
     const byId = {};
     entries.forEach((e) => { byId[e.id] = e; });
     let dragging = null;
@@ -676,16 +689,16 @@
         h("span", { class: "sub" }, WEEKDAYS[weekday(d)]), String(dayNum(d)))))),
       h("tbody", null, order.map(function (duty) {
         const req = DUTIES.some((x) => x.key === duty && x.required);
-        return h("tr", null, h("th", { scope: "row" }, duty), dates.map(function (d) {
+        return h("tr", { class: isSecond(duty) ? "re-second" : null }, h("th", { scope: "row" }, labelOf(duty), isSecond(duty) ? h("span", { class: "re-2nd" }, "2nd") : null), dates.map(function (d) {
           const here = entries.filter((e) => e.work_date === d && e.duty === duty)
             .sort((a, b) => String(names[a.profile_id]).localeCompare(String(names[b.profile_id])));
           const td = h("td", { class: !here.length && req ? "is-missing" : here.length > 1 ? "is-doubled" : null, title: here.length > 1 ? "More than one person – remove one" : null },
             here.length ? here.map((e) => draggable(h("span", { class: "re-chip", "data-id": String(e.id), title: "Drag to move · Alt/Option to copy · drop on a name to swap" }, (names[e.profile_id] || "?") + (e.note ? " (" + e.note + ")" : ""),
-              h("button", { type: "button", class: "re-x", "aria-label": `Remove ${names[e.profile_id]} from ${duty} on ${d}`, onclick: async function () {
+              h("button", { type: "button", class: "re-x", "aria-label": `Remove ${names[e.profile_id]} from ${nice(duty)} on ${d}`, onclick: async function () {
                 this.disabled = true;
                 const { error } = await db.from("roster_entries").delete().eq("id", e.id);
                 notice = error ? { text: error.message, isError: true, grid: true, local: true }
-                  : { local: true, text: `Removed ${names[e.profile_id] || "?"} from ${duty} on ${dayNum(d)} ${monthName(month).split(" ")[0]}.`, grid: true };
+                  : { local: true, text: `Removed ${names[e.profile_id] || "?"} from ${nice(duty)} on ${dayNum(d)} ${monthName(month).split(" ")[0]}.`, grid: true };
                 rerender();
               } }, "×")), { kind: "entry", id: e.id, profile_id: e.profile_id }))
               : req ? "–" : "");
