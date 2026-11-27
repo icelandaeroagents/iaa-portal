@@ -437,13 +437,39 @@
         redraw();
       });
       cancel.addEventListener("click", () => holder.remove());
-      holder.append(h("h3", null, `${s.person_name} – ${dayLabel(s.clock_in)}`),
+
+      // Why this shift may need fixing: the person's comment and where they clocked in and out.
+      const context = h("ul", { class: "clock-context" },
+        s.staff_note ? h("li", null, h("b", null, "Comment: "), "“" + s.staff_note + "”") : null,
+        h("li", null, h("b", null, "Clocked in: "), `${clock(s.clock_in)} · ${where(s, "in")}`),
+        h("li", null, h("b", null, "Clocked out: "), s.clock_out ? `${clock(s.clock_out)} · ${where(s, "out")}` : "not yet – still on the clock"));
+
+      // The result, updated as the times change, so it can be checked before saving.
+      const result = h("p", { class: "clock-result" });
+      const showResult = () => {
+        const ci = fromLocalInput(inI.value), co = fromLocalInput(outI.value);
+        if (!ci) { result.textContent = "Enter the clock-in time."; return; }
+        if (!co) { result.textContent = `${dayLabel(ci)} ${clock(ci)} → no clock-out yet (the shift stays open).`; return; }
+        const mins = Math.round((new Date(co) - new Date(ci)) / 60000);
+        if (mins <= 0) { result.textContent = "Clock-out must be after clock-in."; return; }
+        const n = Math.max(0, Math.round(+lunchI.value || 0));
+        const sameDay = new Date(ci).toDateString() === new Date(co).toDateString();
+        result.textContent = `${dayLabel(ci)} ${clock(ci)} → ${sameDay ? "" : dayLabel(co) + " "}${clock(co)} · ${hm(mins)} worked` +
+          ` (${hm(Math.min(mins, SHIFT_MIN))} shift + ${hm(Math.max(0, mins - SHIFT_MIN))} additional) · ${n === 1 ? "1 lunch" : n + " lunches"}`;
+        result.classList.toggle("is-long", mins > 16 * 60);
+      };
+      [inI, outI, lunchI].forEach((x) => x.addEventListener("input", showResult));
+      showResult();
+
+      holder.append(h("h3", null, `${s.person_name} – ${dayLabel(s.clock_in)}`), context,
         h("div", { class: "form-grid" },
-          h("label", { class: "field" }, h("span", null, "Clock in"), inI),
-          h("label", { class: "field" }, h("span", null, "Clock out"), outI),
+          h("label", { class: "field" }, h("span", null, "Clock in (Iceland time)"), inI),
+          h("label", { class: "field" }, h("span", null, "Clock out (Iceland time)"), outI),
           h("label", { class: "field" }, h("span", null, "Lunches"), lunchI)),
+        result,
         h("div", { class: "row" }, save, del, cancel), msg,
-        hist.childNodes.length ? h("div", null, h("b", null, "History"), hist) : null);
+        h("p", { class: "fineprint" }, "Set the times the person actually worked, then Save correction. It’s marked reviewed, the person sees “Corrected by " + (ctx.state.profile.full_name || "management") + "”, and the change is kept in the history below."));
+      if (hist.childNodes.length) holder.append(h("div", { class: "clock-history" }, h("b", null, "History"), hist));
       const old = main.querySelector(".clock-edit"); if (old) old.remove();
       (anchor.closest(".clock-grid-panel") || anchor.closest("li, tr, section")).after(holder);
       inI.focus();
@@ -539,8 +565,21 @@
     const exportBtn = h("button", { class: "btn", type: "button" }, "Download Excel for " + monthLabel(month));
     exportBtn.addEventListener("click", () => exportMonth(rows, ids, byPerson, nameOf));
 
+    const guide = h("details", { class: "panel clock-guide" }, h("summary", null, "How to fix shifts"),
+      h("table", { class: "mgmt-table" },
+        h("thead", null, h("tr", null, h("th", null, "Problem"), h("th", null, "Where you’ll see it"), h("th", null, "What to do"))),
+        h("tbody", null,
+          [["Forgot to clock out", "On the clock now – “Forgot to clock out?” after 13 hours", "Correct → set Clock out to when they finished → Save correction"],
+           ["Clocked in late or out early by mistake (often with a comment)", "To review, or a day in the Month overview", "Correct → change the time → Save correction"],
+           ["Didn’t clock in or out at all", "A blank day in the Month overview (check the roster)", "Add a missed shift (below) → person, times, lunches, reason → Add shift"],
+           ["Location not confirmed", "To review – shows the distance and their reason", "Reason fine? Mark reviewed. Times wrong? Correct"],
+           ["Lunch missing or recorded by mistake", "The Lunches column, or the shift itself", "Correct → set Lunches → Save correction"],
+           ["A shift that shouldn’t exist", "The Month overview or Show shifts", "Correct → Delete shift"]
+          ].map((r) => h("tr", null, h("td", null, h("b", null, r[0])), h("td", null, r[1]), h("td", null, r[2]))))),
+      h("p", { class: "fineprint" }, "Month end: when On the clock now and To review are both empty, the month is clean – download the Excel."));
+
     fill(main, pageHead("Hours", "Who’s on the clock, shifts to review, and each person’s monthly totals."),
-      tabs(ctx, "team"), nowPanel, reviewPanel,
+      tabs(ctx, "team"), guide, nowPanel, reviewPanel,
       monthNav(ctx, redraw),
       h("div", { class: "stat-grid" },
         stat(h, all.shifts, "Shifts"), stat(h, hm(all.worked), "Hours worked"),

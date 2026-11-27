@@ -1453,3 +1453,10 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
 @media (prefers-color-scheme: dark) { .clock-grid td.is-over .clock-cell { color: #f59e0b; } }
 .clock-comment { width: 100%; max-width: 32rem; margin-top: 0.6rem; }
 .clock-comment[hidden], .clock-row [hidden] { display: none; }
+.clock-context { list-style: none; margin: 0 0 0.75rem; padding: 0.6rem 0.8rem; background: var(--field); border-radius: var(--radius-s); }
+.clock-context li { margin: 0.15rem 0; }
+.clock-result { font-weight: 600; margin: 0.5rem 0 0.75rem; }
+.clock-result.is-long { color: var(--danger); }
+.clock-history { margin-top: 0.5rem; }
+.clock-guide summary { cursor: pointer; font-weight: 600; }
+.clock-guide table { margin-top: 0.75rem; }
