@@ -1460,3 +1460,6 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
 .clock-history { margin-top: 0.5rem; }
 .clock-guide summary { cursor: pointer; font-weight: 600; }
 .clock-guide table { margin-top: 0.75rem; }
+.clock-pay-out { margin-top: 1rem; }
+.clock-pay-out .notice ul { margin: 0; padding-left: 1.1rem; }
+.clock-pay-out thead tr:first-child th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--brand-strong); }

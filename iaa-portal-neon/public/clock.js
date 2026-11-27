@@ -525,6 +525,7 @@
       aBtn, aMsg);
 
     const kioskPanel = kr.error ? null : ipadPanel(ctx, kr.data || [], redraw);
+    const payPanel = payrollPanel(ctx, nameOf);
 
     // Month overview: one row per person, one column per day (hours worked that day).
     const nDays = daysIn(month);
@@ -584,7 +585,123 @@
       h("div", { class: "stat-grid" },
         stat(h, all.shifts, "Shifts"), stat(h, hm(all.worked), "Hours worked"),
         stat(h, hm(all.extra), "Additional hours", all.extra ? "is-warn" : ""), stat(h, all.lunches, "Lunches"), stat(h, review.length, "To review", review.length ? "is-warn" : "")),
-      summary, grid, h("div", { class: "row" }, exportBtn), addPanel, kioskPanel, status);
+      summary, grid, h("div", { class: "row" }, exportBtn), payPanel, addPanel, kioskPanel, status);
+  }
+
+  // ---------------- Payroll report (management) ----------------
+  // Shifts and shift hours: the calendar month. Additional hours (over 12 h on a
+  // shift) and lunches: the 26th of the previous month to the 25th of this month.
+  // A shift belongs to the day it started.
+  const PAY_CUTOFF = 25;
+  function payPeriods(m) {
+    const prev = shiftMonth(m, -1);
+    return {
+      shifts: { from: m + "-01T00:00:00Z", to: shiftMonth(m, 1) + "-01T00:00:00Z", label: `1–${daysIn(m)} ${monthName(m)}` },
+      extra: { from: `${prev}-${PAY_CUTOFF + 1}T00:00:00Z`, to: `${m}-${PAY_CUTOFF + 1}T00:00:00Z`, label: `${PAY_CUTOFF + 1} ${monthName(prev)} – ${PAY_CUTOFF} ${monthName(m)}` }
+    };
+  }
+  function monthName(m) { return new Date(m + "-15T12:00:00Z").toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" }); }
+  // The payroll month: from the 26th on, this month's report is the one to run.
+  function payMonth() { return thisMonth(); }
+
+  function payrollPanel(ctx, nameOf) {
+    const { h, db } = ctx;
+    let pm = payMonth();
+    const out = h("div");
+    const label = h("b");
+    const gen = h("button", { class: "btn", type: "button" });
+    const setLabel = () => { label.textContent = monthLabel(pm); gen.textContent = "Generate payroll report for " + monthLabel(pm); out.replaceChildren(); };
+    const prev = h("button", { class: "btn btn-quiet btn-small", type: "button", "aria-label": "Previous month" }, "‹");
+    const next = h("button", { class: "btn btn-quiet btn-small", type: "button", "aria-label": "Next month" }, "›");
+    prev.addEventListener("click", () => { pm = shiftMonth(pm, -1); setLabel(); });
+    next.addEventListener("click", () => { pm = shiftMonth(pm, 1); setLabel(); });
+    setLabel();
+
+    gen.addEventListener("click", async () => {
+      gen.disabled = true;
+      out.replaceChildren(h("p", { class: "empty" }, "Working it out…"));
+      const per = payPeriods(pm);
+      const from = per.extra.from < per.shifts.from ? per.extra.from : per.shifts.from;
+      const r = await db.from("time_shift_hours").select("*").gte("clock_in", from).lt("clock_in", per.shifts.to).order("clock_in", { ascending: true });
+      gen.disabled = false;
+      if (r.error) { out.replaceChildren(h("p", { class: "notice is-error" }, r.error.message)); return; }
+      const report = buildPayroll(r.data || [], per, nameOf);
+      out.replaceChildren(renderPayroll(h, report, pm, per));
+    });
+
+    return h("section", { class: "panel clock-pay", "aria-labelledby": "pay-h" },
+      h("h2", { id: "pay-h" }, "Payroll report"),
+      h("p", null, "Shifts count for the calendar month. Additional hours (over 12 h on a shift) and lunches count from the 26th of the previous month to the 25th. Run it on the 26th, or any time after."),
+      h("div", { class: "row clock-month" }, prev, label, next), gen, out);
+  }
+
+  function buildPayroll(rows, per, nameOf) {
+    const inP = (s, p) => s.clock_in >= p.from && s.clock_in < p.to;
+    const people = {};
+    const get = (id) => (people[id] = people[id] || { id, name: nameOf(id), shifts: 0, shiftMin: 0, workedMin: 0, extraMin: 0, longShifts: 0, lunches: 0 });
+    const issues = { open: [], review: [] };
+    const now = new Date().toISOString();
+    rows.forEach((s) => {
+      const inShifts = inP(s, per.shifts), inExtra = inP(s, per.extra);
+      if (!inShifts && !inExtra) return;
+      if (!s.clock_out) { issues.open.push(s); return; }
+      if (!s.reviewed) issues.review.push(s);
+      const p = get(s.profile_id);
+      if (inShifts) { p.shifts++; p.shiftMin += s.shift_minutes || 0; p.workedMin += s.worked_minutes || 0; }
+      if (inExtra) { p.extraMin += s.additional_minutes || 0; if (s.additional_minutes > 0) p.longShifts++; p.lunches += s.lunches || 0; }
+    });
+    const list = Object.values(people).sort((a, b) => a.name.localeCompare(b.name));
+    const total = list.reduce((t, p) => ({ shifts: t.shifts + p.shifts, shiftMin: t.shiftMin + p.shiftMin, workedMin: t.workedMin + p.workedMin, extraMin: t.extraMin + p.extraMin, longShifts: t.longShifts + p.longShifts, lunches: t.lunches + p.lunches }),
+      { shifts: 0, shiftMin: 0, workedMin: 0, extraMin: 0, longShifts: 0, lunches: 0 });
+    const complete = now >= per.shifts.to;
+    return { list, total, issues, complete, generated: now };
+  }
+
+  function renderPayroll(h, rep, pm, per) {
+    const warn = [];
+    if (!rep.complete) warn.push(`The month isn’t over yet – shifts after ${dayLabel(rep.generated)} aren’t included. Additional hours and lunches up to the 25th are ${rep.generated >= per.extra.to ? "complete" : "not complete yet either"}.`);
+    if (rep.issues.open.length) warn.push(`${rep.issues.open.length} ${rep.issues.open.length === 1 ? "shift is" : "shifts are"} still open (not clocked out) and not counted: ` + rep.issues.open.map((s) => `${s.person_name} ${dayLabel(s.clock_in)}`).join(", ") + ". Fix them first.");
+    if (rep.issues.review.length) warn.push(`${rep.issues.review.length} ${rep.issues.review.length === 1 ? "shift is" : "shifts are"} still to review: ` + rep.issues.review.map((s) => `${s.person_name} ${dayLabel(s.clock_in)}`).join(", ") + ".");
+    const dl = h("button", { class: "btn", type: "button" }, "Download as Excel");
+    dl.addEventListener("click", () => exportPayroll(rep, pm, per));
+    return h("div", { class: "clock-pay-out" },
+      h("p", { class: "fineprint" }, `Generated ${dayLabel(rep.generated)} ${clock(rep.generated)}. Shifts: ${per.shifts.label}. Additional hours and lunches: ${per.extra.label}.`),
+      warn.length ? h("div", { class: "notice" }, h("ul", null, warn.map((w) => h("li", null, w)))) : h("p", { class: "status is-ok" }, "✓ No open shifts and nothing left to review in these periods."),
+      rep.list.length ? h("div", { class: "table-wrap" }, h("table", { class: "mgmt-table clock-table" },
+        h("thead", null,
+          h("tr", null, h("th", null, ""), h("th", { colspan: "3" }, `Shifts · ${per.shifts.label}`), h("th", { colspan: "3" }, `${per.extra.label}`)),
+          h("tr", null, ["Name", "Shifts", "Shift hours (up to 12 h)", "Hours worked", "Additional hours", "Long shifts", "Lunches"].map((x) => h("th", null, x)))),
+        h("tbody", null, rep.list.map((p) => h("tr", null,
+            h("td", null, h("b", null, p.name)), h("td", null, String(p.shifts)), h("td", null, hm(p.shiftMin)), h("td", null, hm(p.workedMin)),
+            h("td", null, p.extraMin ? h("b", null, hm(p.extraMin)) : "–"), h("td", null, p.longShifts ? String(p.longShifts) : "–"), h("td", null, String(p.lunches)))),
+          h("tr", { class: "clock-total" }, h("td", null, h("b", null, "Total")), h("td", null, String(rep.total.shifts)), h("td", null, hm(rep.total.shiftMin)), h("td", null, hm(rep.total.workedMin)),
+            h("td", null, hm(rep.total.extraMin)), h("td", null, String(rep.total.longShifts)), h("td", null, String(rep.total.lunches))))))
+        : h("p", { class: "empty" }, "No shifts in these periods."),
+      rep.list.length ? h("div", { class: "row" }, dl) : null);
+  }
+
+  function exportPayroll(rep, pm, per) {
+    if (!window.XLSX) { alert("The Excel library didn’t load – reload the page."); return; }
+    const aoa = [
+      [`Iceland Aero Agents – payroll report – ${monthLabel(pm)}`],
+      [`Shifts and shift hours: ${per.shifts.label}`],
+      [`Additional hours and lunches: ${per.extra.label}`],
+      [`Generated ${new Date(rep.generated).toLocaleString("en-GB", { timeZone: TZ })}${rep.complete ? "" : " – the month isn’t over yet, later shifts aren’t included"}`],
+      [],
+      ["Name", "Shifts", "Shift hours (up to 12 h)", "Hours worked", "Additional hours", "Long shifts (over 12 h)", "Lunches"]
+    ];
+    rep.list.forEach((p) => aoa.push([p.name, p.shifts, dec(p.shiftMin), dec(p.workedMin), dec(p.extraMin), p.longShifts, p.lunches]));
+    aoa.push(["Total", rep.total.shifts, dec(rep.total.shiftMin), dec(rep.total.workedMin), dec(rep.total.extraMin), rep.total.longShifts, rep.total.lunches]);
+    if (rep.issues.open.length || rep.issues.review.length) {
+      aoa.push([]);
+      rep.issues.open.forEach((s) => aoa.push(["Not counted – still open", `${s.person_name}, ${new Date(s.clock_in).toLocaleDateString("en-CA", { timeZone: TZ })}`]));
+      rep.issues.review.forEach((s) => aoa.push(["Still to review", `${s.person_name}, ${new Date(s.clock_in).toLocaleDateString("en-CA", { timeZone: TZ })}`]));
+    }
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{ wch: 28 }, { wch: 8 }, { wch: 22 }, { wch: 13 }, { wch: 16 }, { wch: 22 }, { wch: 9 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Payroll " + pm);
+    XLSX.writeFile(wb, `IAA payroll ${pm}.xlsx`);
   }
 
   // ---------------- Time clock iPads (management) ----------------
