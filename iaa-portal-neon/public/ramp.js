@@ -106,12 +106,11 @@
   async function flightPage(main, ctx) {
     const { h, fill, db, state, setStatus } = ctx;
     fill(main, h("a", { class: "back-link", href: "#/ramp" }, "Ramp"), h("p", { class: "empty" }, "Loading…"));
-    const [fr, sr, lr, cr, crew] = await Promise.all([
+    const [fr, sr, lr, cr] = await Promise.all([
       db.from("flights").select("*").eq("id", openId).single(),
       db.from("service_types").select("*").eq("active", true).order("sort", { ascending: true }),
       db.from("service_logs").select("*, service_types(name, unit)").eq("flight_id", openId).order("id", { ascending: true }),
-      db.from("flight_completions").select("*").eq("flight_id", openId).order("id", { ascending: false }),
-      db.from("flight_crew").select("profile_id, source").eq("flight_id", openId)
+      db.from("flight_completions").select("*").eq("flight_id", openId).order("id", { ascending: false })
     ]);
     if (fr.error || !fr.data) { fill(main, h("a", { class: "back-link", href: "#/ramp" }, "Ramp"), h("p", { class: "notice is-error" }, "Flight not found.")); return; }
     const f = fr.data, me = state.profile.id, isMgmt = state.profile.role === "management";
@@ -119,7 +118,6 @@
     const types = (sr.data || []).filter((s) => (s.stations || []).indexOf(f.station) !== -1);
     const logs = lr.data || [];
     const requested = new Set((f.services_requested || []).map((x) => x.toLowerCase()));
-    const mine = (crew.data || []).find((c) => c.profile_id === me);
     const qty = {};
     const status = h("p", { class: "status", role: "status" });
     const reload = () => flightPage(main, ctx);
@@ -205,14 +203,7 @@
                 const { error } = await db.from("flight_completions").insert({ flight_id: f.id });
                 if (error) { notice = { text: error.message }; } else { await push(); notice = { text: "Services marked complete in Notion." }; }
                 reload(); } }, "Services complete"),
-              h("span", { class: "fineprint" }, "When everything for this flight is logged.")),
-        h("div", { class: "row" },
-          mine
-            ? h("span", { class: "fineprint" }, mine.source === "self" ? "This flight is in your Logbook. " : "This flight is in your Logbook. ",
-                mine.source === "self" ? h("button", { class: "linkish", type: "button", onclick: async function () { await db.from("flight_crew").delete().eq("flight_id", f.id).eq("profile_id", me); reload(); } }, "Remove it") : null)
-            : h("button", { class: "btn btn-quiet btn-small", type: "button", onclick: async function () {
-                const { error } = await db.from("flight_crew").insert({ flight_id: f.id, profile_id: me });
-                notice = { text: error ? error.message : "Added to your Logbook." }; reload(); } }, "✈ I worked this flight"))));
+              h("span", { class: "fineprint" }, "When everything for this flight is logged."))));
   }
 
   window.IAARamp = { render: render };

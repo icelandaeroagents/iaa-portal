@@ -33,7 +33,7 @@
     { label: "On shift", items: ["hours", "ramp", "roster", "requests", "maintenance"] },
     { label: "Safety", items: ["emergency", "reports"] },
     { label: "Information", items: ["news", "briefings", "manuals", "policies", "equipment"] },
-    { label: "My records", items: ["training", "passes", "logbook"] },
+    { label: "My records", items: ["training", "passes"] },
     { label: "Break", items: ["game"] },
     { label: "Management", items: ["management", "people", "stations", "team-hours"] }
   ];
@@ -144,13 +144,6 @@
       description: "Submit and follow up internal reports.",
       roles: ALL_ROLES,
       render: renderReports
-    },
-    {
-      id: "logbook",
-      title: "Logbook",
-      description: "The aircraft you’ve worked – collect every type.",
-      roles: ALL_ROLES,
-      render: renderLogbook
     },
     {
       id: "game",
@@ -824,11 +817,6 @@
   async function renderRamp(main) {
     if (!window.IAARamp) return sectionMissing(main, "Ramp");
     return window.IAARamp.render(main, sectionCtx());
-  }
-
-  async function renderLogbook(main) {
-    if (!window.IAALogbook) return sectionMissing(main, "Logbook");
-    return window.IAALogbook.render(main, sectionCtx());
   }
 
   async function renderGame(main) {
