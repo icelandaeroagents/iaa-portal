@@ -16,12 +16,12 @@
 
   // ------------------------------------------------------------------
   // Shift rotation 5-5-4, Green / Orange. Blocks of 5, 5 and 4 days with the
-  // colours alternating, repeating every 28 days:
-  //   Green 5 · Orange 5 · Green 4 · Orange 5 · Green 5 · Orange 4
-  // The cycle starts on 28 November 2026 (1 December is day 4 of Green 5).
+  // colours alternating, repeating every 28 days. From 28 November 2026:
+  //   Green 5 · Orange 4 · Green 5 · Orange 5 · Green 4 · Orange 5
+  // (Green 28 Nov–2 Dec, Orange 3–6 Dec, Green 7–11 Dec, Orange 12–16 Dec …)
   // ------------------------------------------------------------------
   const ROTATION_START = "2026-11-28";
-  const ROTATION = [["green", 5], ["orange", 5], ["green", 4], ["orange", 5], ["green", 5], ["orange", 4]];
+  const ROTATION = [["green", 5], ["orange", 4], ["green", 5], ["orange", 5], ["green", 4], ["orange", 5]];
   function rotation(isoDate) {
     const ms = Date.UTC(+isoDate.slice(0, 4), +isoDate.slice(5, 7) - 1, +isoDate.slice(8, 10)) - Date.UTC(2026, 10, 28);
     let day = Math.round(ms / 86400000) % 28; if (day < 0) day += 28;
