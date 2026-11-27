@@ -692,6 +692,17 @@
 
   // ---------- Home ----------
 
+  // A "Needs attention" row: "2 management actions are overdue" becomes
+  // "Management actions are overdue" with a count badge (red when overdue).
+  function attnItem(href, text) {
+    const m = /^(\d+)\s+(.+)$/.exec(String(text));
+    if (!m) return h("li", null, h("a", { href: href }, text, h("span", { class: "chip chip-none count", "aria-hidden": "true" }, "›")));
+    const label = m[2].charAt(0).toUpperCase() + m[2].slice(1);
+    const bad = /overdue|expired|now|failed|declined/i.test(m[2]);
+    return h("li", null, h("a", { href: href, "aria-label": text }, label,
+      h("span", { class: "chip count " + (bad ? "chip-sev-high" : "chip-status-new") }, m[1])));
+  }
+
   async function renderHome(main) {
     const p = state.profile;
     const myStations = (p.station_codes || []).map((code) => {
@@ -722,14 +733,20 @@
       (async function () { if (window.IAADocuments) { try { toRead = await window.IAADocuments.homePanel(sectionCtx()); } catch (e) { toRead = null; } } })()
     ]);
 
+    const hour = Number(new Date().toLocaleString("en-GB", { hour: "2-digit", hour12: false, timeZone: "Atlantic/Reykjavik" }));
+    const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+    const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: "Atlantic/Reykjavik" });
+    const rot = window.IAARotation ? window.IAARotation.colour(todayIso) : null;
+    const hero = h("section", { class: "panel home-hero", "aria-labelledby": "hero-h" },
+      h("div", { class: "hero-text" },
+        h("h1", { id: "hero-h" }, greet + ", " + firstName()),
+        h("p", { class: "hero-date" }, new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "Atlantic/Reykjavik" }),
+          rot ? h("span", { class: "rot-chip rot-" + rot }, window.IAARotation.label[rot] + " shift") : null)),
+      clockCard);
     fill(
       main,
-      pageHead("Hello, " + firstName(), "Here’s what you can do in the staff portal."),
-      clockCard,
-      attention,
-      toRead,
-      latest,
-      roster,
+      hero,
+      h("div", { class: "home-grid" }, roster, attention, toRead, latest),
 
       !myStations.length
         ? h("p", { class: "notice" }, "You haven’t been given a station yet. Management will add you to one.")
@@ -899,7 +916,7 @@
     if (!items.length) return null;
     return h("section", { class: "panel panel-attention", "aria-labelledby": "attn-h" },
       h("h2", { id: "attn-h" }, "Needs attention"),
-      h("ul", { class: "attention-list" }, items.map((i) => h("li", null, h("a", { href: i[0] }, i[1])))));
+      h("ul", { class: "attention-list" }, items.map((i) => attnItem(i[0], i[1]))));
   }
 
   // Management: one line per thing waiting for them.
@@ -911,7 +928,7 @@
       if (!swapItems.length) return null;
       return h("section", { class: "panel panel-attention", "aria-labelledby": "attn-h" },
         h("h2", { id: "attn-h" }, "Needs attention"),
-        h("ul", { class: "attention-list" }, swapItems.map((t) => h("li", null, h("a", { href: "#/requests/swaps" }, t)))));
+        h("ul", { class: "attention-list" }, swapItems.map((t) => attnItem("#/requests/swaps", t))));
     }
     const items = swapItems.map((t) => ["#/requests/swaps", t]);
     try {
@@ -955,7 +972,7 @@
     if (!items.length) return null;
     return h("section", { class: "panel panel-attention", "aria-labelledby": "attn-h" },
       h("h2", { id: "attn-h" }, "Needs attention"),
-      h("ul", { class: "attention-list" }, items.map((i) => h("li", null, h("a", { href: i[0] }, i[1])))));
+      h("ul", { class: "attention-list" }, items.map((i) => attnItem(i[0], i[1]))));
   }
 
   // ---------- Briefings (briefings.js) ----------

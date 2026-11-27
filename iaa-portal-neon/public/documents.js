@@ -144,9 +144,9 @@
         h("div", null, h("h1", null, "Policies"), h("p", null, "Company policies and what they mean for you. Please read each one and confirm.")),
         isManagement ? h("a", { class: "btn", href: "#/policies/new" }, "Add policy") : null),
       takeNotice(h),
-      h("section", { class: "panel" },
+      h("section", { class: "panel panel-plain" },
         docs.length
-          ? h("ul", { class: "module-list" }, docs.map(function (d) {
+          ? h("ul", { class: "module-list is-plain is-cards" }, docs.map(function (d) {
               const r = readOf(reads, d);
               return h("li", null, h("a", { href: "#/policies/" + d.slug },
                 h("span", { class: "module-text" }, h("span", { class: "section-title" }, d.title),

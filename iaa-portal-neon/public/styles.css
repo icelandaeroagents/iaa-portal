@@ -69,7 +69,7 @@
 
     --soft: rgba(60, 196, 176, 0.14);
     --soft-ink: #8be4d6;
-    --shadow: none;
+    --shadow: 0 0 0 transparent;
 
     --notice-bg: #2c2411;
     --notice-line: #a07a24;
@@ -99,7 +99,7 @@
 
     --soft: rgba(60, 196, 176, 0.14);
     --soft-ink: #8be4d6;
-    --shadow: none;
+    --shadow: 0 0 0 transparent;
 
     --notice-bg: #2c2411;
     --notice-line: #a07a24;
@@ -1709,3 +1709,91 @@ h2 { font-weight: 600; }
 @media (max-width: 760px) { .sidenav .nav-brand { display: none; } }
 @media (max-width: 760px) { .rcal-day.is-off { display: none; } }
 .tabs.airport-picker { align-self: flex-start; width: auto; }
+
+/* Lists without a module code (e.g. Policies): name on the left, status on the right */
+.module-list.is-plain a { grid-template-columns: minmax(0, 1fr) auto; }
+.module-list .chip { justify-self: end; white-space: nowrap; }
+@media (max-width: 760px) {
+  .module-list.is-plain a { grid-template-columns: minmax(0, 1fr); }
+  .module-list.is-plain .chip { grid-column: 1; justify-self: start; }
+}
+/* Manuals: document references (e.g. GH-SMS-001) need a wider first column */
+.module-list.is-ref a { grid-template-columns: 7.5rem minmax(0, 1fr) auto; }
+.module-list.is-ref .module-code { font-size: 0.85rem; letter-spacing: 0.02em; }
+@media (max-width: 760px) {
+  .module-list.is-ref a { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+  .module-list.is-ref .chip { grid-column: 1; justify-self: start; }
+}
+
+/* =====================================================================
+   New design, part 2: one set of status colours, Home layout, card grids
+   ===================================================================== */
+:root {
+  --ok-bg: #dcf2e4;   --ok-ink: #1d6b3c;    /* done, valid, read, approved */
+  --wait-bg: #fdebd9; --wait-ink: #8a3d05;  /* waiting, to read, due soon */
+  --bad-bg: #fde2e2;  --bad-ink: #9b1c1c;   /* overdue, expired, declined */
+  --info-bg: #e3f2f0; --info-ink: #04574f;  /* in progress, under review */
+  --none-bg: #eef1f3; --none-ink: #4b5b67;  /* cancelled, not started */
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ok-bg: rgba(134, 239, 172, 0.14); --ok-ink: #86efac;
+    --wait-bg: rgba(245, 183, 122, 0.16); --wait-ink: #f5b77a;
+    --bad-bg: rgba(252, 165, 165, 0.16); --bad-ink: #fca5a5;
+    --info-bg: rgba(60, 196, 176, 0.14); --info-ink: #8be4d6;
+    --none-bg: rgba(159, 176, 195, 0.14); --none-ink: #c9d5e2;
+  }
+}
+:root[data-theme="dark"] {
+  --ok-bg: rgba(134, 239, 172, 0.14); --ok-ink: #86efac;
+  --wait-bg: rgba(245, 183, 122, 0.16); --wait-ink: #f5b77a;
+  --bad-bg: rgba(252, 165, 165, 0.16); --bad-ink: #fca5a5;
+  --info-bg: rgba(60, 196, 176, 0.14); --info-ink: #8be4d6;
+  --none-bg: rgba(159, 176, 195, 0.14); --none-ink: #c9d5e2;
+}
+
+.chip { border: 1px solid transparent; border-radius: 999px; padding: 0.2rem 0.65rem; font-size: 0.78rem; font-weight: 600; background: var(--none-bg); color: var(--none-ink); white-space: nowrap; }
+.chip-pass, .chip-cert, .chip-leave-approved, .chip-service-done, .chip-status-closed { background: var(--ok-bg); border-color: transparent; color: var(--ok-ink); }
+.chip-status-new, .chip-leave-pending, .chip-service-open, .chip-fail, .chip-sev-medium { background: var(--wait-bg); border-color: transparent; color: var(--wait-ink); }
+.chip-sev-high, .chip-leave-declined { background: var(--bad-bg); border-color: transparent; color: var(--bad-ink); }
+.chip-status-under_review, .chip-status-actions_agreed, .chip-service-in_progress { background: var(--info-bg); border-color: transparent; color: var(--info-ink); }
+.chip-none, .chip-leave-cancelled, .chip-service-declined, .chip-sev-low { background: var(--none-bg); border-color: transparent; color: var(--none-ink); }
+
+/* Needs attention: one row per item with a count badge */
+.attention-list { list-style: none; padding: 0; gap: 0.4rem; font-weight: 500; }
+.attention-list a { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.6rem 0.8rem; border-radius: 10px; background: var(--field); color: var(--ink); text-decoration: none; }
+.attention-list a:hover { background: var(--chrome-raised); }
+.attention-list .count { min-width: 1.6rem; text-align: center; }
+.panel-attention { border-left: 1px solid var(--line); box-shadow: inset 4px 0 0 var(--notice-line), var(--shadow); }
+
+/* Home: welcome panel with the time clock, then a grid of cards */
+.home-hero { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 1rem 2rem; padding: 1.5rem 1.75rem; }
+.home-hero .hero-text { flex: 1 1 16rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.home-hero .hero-text h1 { font-size: 1.75rem; }
+.home-hero .hero-date { color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.home-hero .rot-chip { margin-left: 0; }
+.home-hero .clock-panel { flex: 2 1 24rem; border: 0; box-shadow: none; padding: 0; background: transparent; }
+.home-hero .clock-panel.is-on { box-shadow: none; border: 0; }
+.home-hero .clock-panel > h2 { font-size: 1rem; color: var(--muted); font-weight: 600; }
+.home-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: 1.25rem; align-items: start; }
+.home-grid > .panel { margin: 0; }
+
+/* Card grids (Policies, Manuals) */
+.panel-plain { background: none; border: 0; box-shadow: none; padding: 0; }
+.module-list.is-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 1rem; border-top: 0; }
+.module-list.is-cards li { border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface); box-shadow: var(--shadow); }
+.module-list.is-cards a { grid-template-columns: minmax(0, 1fr); align-content: start; gap: 0.6rem; padding: 1.1rem 1.2rem; height: 100%; }
+.module-list.is-cards .module-code { font-size: 0.78rem; letter-spacing: 0.06em; }
+.module-list.is-cards .chip { justify-self: start; }
+.module-list.is-cards .section-title { font-size: 1.02rem; }
+
+/* Tables: a light header band */
+table:not(.roster-grid):not(.re-grid):not(.clock-grid):not(.risk-heat):not(.doc-table) thead th { background: var(--field); font-size: 0.8rem; font-weight: 600; color: var(--muted); padding: 0.6rem 0.75rem; }
+table:not(.roster-grid):not(.re-grid):not(.clock-grid):not(.risk-heat):not(.doc-table) td { padding: 0.65rem 0.75rem; }
+
+/* Page heading controls: tidy row on the right, wrapping under the title on narrow screens */
+.page-head-row { flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 0.75rem 1.5rem; }
+.page-head-row > .row-tight { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.5rem; }
+.panel.home-hero { flex-direction: row; align-items: center; }
+.home-hero .clock-panel { gap: 0.6rem; }
+@media (max-width: 760px) { .panel.home-hero { flex-direction: column; align-items: stretch; } .home-hero .hero-text, .home-hero .clock-panel { flex-basis: auto; } }

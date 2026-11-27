@@ -100,6 +100,9 @@
   // ======================================================================
   // Home page card
   // ======================================================================
+  // Append children, skipping empty ones (the browser's own append would print "null").
+  function appendAll(el, ...kids) { kids.flat().forEach((k) => { if (k !== null && k !== undefined && k !== false) el.append(k); }); return el; }
+
   async function homePanel(ctx, rerender) {
     const { h, db, state } = ctx;
     const me = state.profile.id;
@@ -156,7 +159,7 @@
         if (id && lunchNow.checked) await db.from("time_lunches").insert({ shift_id: id, kind: "at clock-in" });
         rerender();
       });
-      panel.append(
+      appendAll(panel, 
         h("p", null, "You’re not clocked in."),
         h("div", { class: "row clock-row" }, btn, h("label", { class: "clock-check" }, lunchNow, " Add lunch now"), note.link),
         note.box,
@@ -221,7 +224,7 @@
       doClockOut(false);
     });
 
-    panel.append(
+    appendAll(panel, 
       h("p", { class: "clock-now" }, `Clocked in since ${clock(open.clock_in)}`, open.clock_in && new Date(open.clock_in).toDateString() !== new Date().toDateString() ? ` (${dayLabel(open.clock_in)})` : "",
         ` · ${open.in_confirmed ? open.in_station : "location not confirmed"} · on the clock `, worked),
       lunchLine,
