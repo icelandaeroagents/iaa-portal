@@ -1797,3 +1797,47 @@ table:not(.roster-grid):not(.re-grid):not(.clock-grid):not(.risk-heat):not(.doc-
 .panel.home-hero { flex-direction: row; align-items: center; }
 .home-hero .clock-panel { gap: 0.6rem; }
 @media (max-width: 760px) { .panel.home-hero { flex-direction: column; align-items: stretch; } .home-hero .hero-text, .home-hero .clock-panel { flex-basis: auto; } }
+
+/* Equipment, as in the mock-up: three cards per row */
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.equipment-grid { grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); }
+.eq-card { gap: 0.55rem; padding: 1.1rem 1.2rem; }
+.eq-head { align-items: center; }
+.eq-head h2 { font-size: 1.05rem; }
+.eq-meta { margin: 0; color: var(--muted); font-size: 0.88rem; }
+.eq-last { margin: 0; font-size: 0.9rem; }
+.eq-last.is-due { color: var(--wait-ink); }
+.eq-updated { font-size: 0.75rem; }
+.eq-search input { max-width: 22rem; width: 100%; }
+
+/* Ramp, as in the mock-up: one card with a row per flight */
+.ramp-panel { gap: 0.25rem; padding: 0.9rem 1.4rem 0.6rem; }
+.ramp-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-bottom: 0.4rem; }
+.ramp-panel-head h2 { font-size: 1rem; }
+.ramp-rows { display: flex; flex-direction: column; }
+.ramp-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.1fr) minmax(0, 1.3fr) auto; gap: 0.4rem 1rem; align-items: center; padding: 0.85rem 0.25rem; border-top: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+.ramp-row:hover { background: var(--field); }
+.ramp-who, .ramp-times { display: flex; flex-direction: column; gap: 0.1rem; }
+.ramp-reg { font-size: 1.02rem; }
+.ramp-row .ramp-req { font-size: 0.88rem; color: var(--muted); }
+.ramp-row .chip { justify-self: end; }
+.ramp-days { display: inline-flex; align-items: center; gap: 0.4rem; }
+@media (max-width: 760px) {
+  .ramp-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .ramp-row .ramp-times, .ramp-row .ramp-req { grid-column: 1 / -1; }
+  .ramp-row .chip { grid-row: 1; grid-column: 2; }
+}
+
+/* Two columns side by side (Requests: form left, your requests right) */
+.split-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr)); gap: 1.25rem; align-items: start; }
+.stack { display: flex; flex-direction: column; gap: 1.25rem; }
+.split-2 > .panel, .stack > .panel { margin: 0; }
+.stat { padding: 1rem 1.15rem; box-shadow: var(--shadow); }
+.stat.is-warn .stat-n { color: var(--wait-ink); }
+.stat.is-bad .stat-n { color: var(--bad-ink); }
+.eq-card .row-tight { flex-wrap: wrap; }
+.eq-card .row-tight .btn { white-space: nowrap; }
+.eq-updated { display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; align-items: center; }
+.eq-updated .linkish { font-size: 0.8rem; }
+/* An empty status line takes no space; messages still appear in place when set */
+.main > p.status:empty { display: none; }

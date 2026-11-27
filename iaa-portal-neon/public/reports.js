@@ -170,6 +170,16 @@
         h("a", { class: "btn", href: "#/reports/new" }, "New report")
       ),
       noticeBox(ctx),
+      (function () {
+        // Summary tiles, as in the new design.
+        const year = String(new Date().getFullYear());
+        const open = all.filter((r) => r.status !== "closed");
+        const tile = (n, label, tone) => h("div", { class: "stat" + (tone ? " is-" + tone : "") }, h("span", { class: "stat-n" }, String(n)), h("span", { class: "stat-label" }, label));
+        return h("div", { class: "stat-grid" },
+          tile(open.length, "Open", open.length ? "warn" : ""),
+          tile(open.filter((r) => r.severity === "high").length, "High severity, still open", open.some((r) => r.severity === "high") ? "bad" : ""),
+          tile(all.filter((r) => r.status === "closed" && String(r.occurred_at || "").slice(0, 4) === year).length, "Closed this year", ""));
+      })(),
       h(
         "div",
         { class: "row" },

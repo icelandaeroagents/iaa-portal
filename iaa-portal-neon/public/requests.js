@@ -178,9 +178,11 @@
 
     fill(main,
       pageHead("Requests", "Leave and availability go to management only. Stock, equipment and defect requests are shared with all staff."),
-      tabs(ctx, "leave"), noticeBox(ctx), pendingPanel, form,
-      h("section", { class: "panel" }, h("h2", null, "Your requests"), mineTable, mineStatus),
-      awayPanel);
+      tabs(ctx, "leave"), noticeBox(ctx), pendingPanel,
+      h("div", { class: "split-2" }, form,
+        h("div", { class: "stack" },
+          h("section", { class: "panel" }, h("h2", null, "Your requests"), mineTable, mineStatus),
+          awayPanel)));
   }
 
   // ------------------------------------------------------------------

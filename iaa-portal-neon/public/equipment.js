@@ -75,7 +75,7 @@
     const list = here.filter((e) => !q || [e.name, e.category, e.location, e.notes].concat(logsFor(e.id).map((l) => l.comment || "")).join(" ").toLowerCase().indexOf(q) !== -1);
     const editable = station && canEdit(state.profile, station);
 
-    const tabs = h("nav", { class: "tabs", "aria-label": "Stations" }, stations.map((s) =>
+    const tabs = h("nav", { class: "tabs airport-picker", "aria-label": "Airport" }, stations.map((s) =>
       h("a", {
         href: "#/equipment",
         "aria-current": s.code === station ? "page" : null,
@@ -107,12 +107,12 @@
     fill(
       main,
       h("div", { class: "page-head page-head-row" },
-        h("div", null, h("h1", null, "Equipment"), h("p", null, "Where equipment is kept at each station, its levels, and anything important to know about it.")),
-        editable && editing !== "new" ? h("button", { class: "btn", type: "button", onclick: function () { editing = "new"; render(main, ctx); } }, "Add equipment") : null),
-      tabs,
+        h("div", null, h("h1", null, "Equipment"), h("p", null, "Where equipment is kept at each station, daily checks and levels.")),
+        h("div", { class: "row row-tight" }, tabs,
+          editable && editing !== "new" ? h("button", { class: "btn", type: "button", onclick: function () { editing = "new"; render(main, ctx); } }, "Add equipment") : null)),
       n ? h("p", { class: n.isError ? "notice is-error" : "notice" }, n.text) : null,
       warnings.length ? h("div", { class: "notice is-error" }, warnings.map((w) => h("div", null, w))) : null,
-      h("div", { class: "row" }, h("div", { class: "field" }, h("label", { for: "eq-search" }, "Search"), searchBox)),
+      h("div", { class: "eq-search" }, h("label", { for: "eq-search", class: "visually-hidden" }, "Search equipment"), searchBox),
       editing === "new" ? h("section", { class: "panel" }, editorForm(ctx, main, null)) : null,
       list.length
         ? h("div", { class: "equipment-grid" }, list.map((e) => (editing === e.id
@@ -153,11 +153,25 @@
         }))
       : null;
 
+    // Status: out of service, a low level, not checked today, or ready.
+    const lastLog = itemLogs[0] || null;
+    const checkedToday = !!(lastLog && new Date(lastLog.created_at).toDateString() === new Date().toDateString());
+    const anyLow = (e.levels || []).some(function (lv) {
+      const latest = itemLogs.find((l) => l[lv + "_pct"] !== null && l[lv + "_pct"] !== undefined);
+      return isLow(lv, e.category, latest ? latest[lv + "_pct"] : null);
+    });
+    const pill = e.status === "out_of_service" ? h("span", { class: "chip chip-sev-high" }, "Out of service")
+      : anyLow ? h("span", { class: "chip chip-status-new" }, "Check levels")
+      : (e.levels || []).length && !checkedToday ? h("span", { class: "chip chip-status-new" }, "Check due")
+      : h("span", { class: "chip chip-pass" }, (e.levels || []).length ? "Ready" : "In service");
+    const lastLine = lastLog
+      ? "Last check " + when(lastLog.created_at) + (lastLog.author_name ? " · " + lastLog.author_name : "")
+      : ((e.levels || []).length ? "Not checked yet" : null);
+
     return h("article", { class: "panel eq-card" + (e.status === "out_of_service" ? " is-out" : "") },
-      h("div", { class: "eq-head" },
-        h("div", null, h("h2", null, e.name), h("span", { class: "sub" }, e.category || "")),
-        e.status === "out_of_service" ? h("span", { class: "chip chip-sev-high" }, "Out of service") : h("span", { class: "chip chip-pass" }, "In service")),
-      e.location ? h("p", { class: "eq-line" }, h("b", null, "Location: "), h("span", { class: "prewrap" }, e.location)) : null,
+      h("div", { class: "eq-head" }, h("h2", null, e.name), pill),
+      h("p", { class: "eq-meta" }, [e.category, e.location].filter(Boolean).join(" · ")),
+      lastLine ? h("p", { class: "eq-last" + (checkedToday ? "" : " is-due") }, lastLine) : null,
       e.notes ? h("p", { class: "eq-line" }, h("b", null, "Notes: "), h("span", { class: "prewrap" }, e.notes)) : null,
       levels.length ? h("div", { class: "levels" }, levels) : null,
       lastComment ? h("div", { class: "eq-comment" },
@@ -165,14 +179,16 @@
         h("p", { class: "prewrap" }, lastComment.comment)) : null,
       logging === e.id ? logForm(ctx, main, e) : null,
       h("div", { class: "row row-tight" },
-        logging !== e.id ? h("button", { class: "btn btn-small", type: "button", onclick: function () { logging = e.id; render(main, ctx); } }, (e.levels || []).length ? "Log check or comment" : "Add comment") : null,
-        itemLogs.length ? h("button", { class: "btn btn-quiet btn-small", type: "button", onclick: function () {
+        logging !== e.id ? h("button", { class: "btn btn-small", type: "button", onclick: function () { logging = e.id; render(main, ctx); } }, (e.levels || []).length ? "Log check" : "Add comment") : null,
+        h("a", { class: "btn btn-quiet btn-small", href: "#/requests/service" }, "Report a defect")),
+      history,
+      h("p", { class: "sub eq-updated" },
+        itemLogs.length ? h("button", { class: "linkish", type: "button", onclick: function () {
           if (openHistory.has(e.id)) openHistory.delete(e.id); else openHistory.add(e.id);
           render(main, ctx);
         } }, openHistory.has(e.id) ? "Hide history" : `History (${itemLogs.length})`) : null,
-        editable ? h("button", { class: "btn btn-quiet btn-small", type: "button", onclick: function () { editing = e.id; logging = null; render(main, ctx); } }, "Edit") : null),
-      history,
-      h("p", { class: "sub" }, "Details updated " + new Date(e.updated_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) + (e.updated_by_name ? " by " + e.updated_by_name : "")));
+        editable ? h("button", { class: "linkish", type: "button", onclick: function () { editing = e.id; logging = null; render(main, ctx); } }, "Edit") : null,
+        h("span", null, "Details updated " + new Date(e.updated_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) + (e.updated_by_name ? " by " + e.updated_by_name : ""))));
   }
 
   function logForm(ctx, main, e) {

@@ -159,13 +159,13 @@
       : h("p", { class: "empty" }, "Nothing added yet. Add your airport passes, permits and certificates so you’re reminded before they expire.");
 
     fill(main,
-      pageHead("Passes & certificates", "You’re emailed 30 days and 7 days before anything expires, and management is copied."),
+      h("div", { class: "page-head page-head-row" },
+        h("div", null, h("h1", null, "Passes & certificates"), h("p", null, "You’re emailed 30 days and 7 days before anything expires, and management is copied.")),
+        editing === undefined ? h("div", { class: "row row-tight" }, h("button", { class: "btn", type: "button", onclick: function () { showMine(main, ctx, null); } }, "Add a pass or certificate")) : null),
       tabs(ctx, main, "mine"),
       noticeBox(ctx),
       editing !== undefined ? editor(ctx, main, editing || null, null, function () { showMine(main, ctx); }) : null,
-      h("section", { class: "panel" },
-        h("div", { class: "row" }, editing === undefined ? h("button", { class: "btn", type: "button", onclick: function () { showMine(main, ctx, null); } }, "Add a pass or certificate") : null),
-        list, status));
+      h("section", { class: "panel panel-table" }, list, status));
   }
 
   async function showEveryone(main, ctx, editing) {
@@ -193,7 +193,9 @@
       h("tbody", null, rows.map(row))));
 
     fill(main,
-      pageHead("Passes & certificates", "Everyone’s passes and certificates, soonest expiry first."),
+      h("div", { class: "page-head page-head-row" },
+        h("div", null, h("h1", null, "Passes & certificates"), h("p", null, "Everyone’s passes and certificates, soonest expiry first.")),
+        editing === undefined ? h("div", { class: "row row-tight" }, h("button", { class: "btn", type: "button", onclick: function () { showEveryone(main, ctx, null); } }, "Add for someone")) : null),
       tabs(ctx, main, "everyone"),
       noticeBox(ctx),
       editing !== undefined ? editor(ctx, main, editing || null, people, function () { showEveryone(main, ctx); }) : null,
@@ -201,8 +203,7 @@
         h("h2", null, `Expired or expiring within 60 days: ${soon.length}`),
         soon.length ? table(soon) : h("p", { class: "empty" }, "Nothing expiring in the next 60 days.")),
       h("section", { class: "panel" },
-        h("div", { class: "row" }, h("h2", null, "Everything"),
-          editing === undefined ? h("button", { class: "btn btn-small", type: "button", onclick: function () { showEveryone(main, ctx, null); } }, "Add for someone") : null),
+        h("h2", null, "Everything"),
         items.length ? table(items) : h("p", { class: "empty" }, "Nobody has added anything yet."),
         noneYet.length ? h("p", { class: "fineprint" }, "Nothing recorded yet for: " + noneYet.map((p) => p.full_name || p.email).join(", ")) : null));
   }

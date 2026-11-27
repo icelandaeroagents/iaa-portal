@@ -1229,15 +1229,22 @@
       );
     });
 
+    const inviteBtn = h("button", { class: "btn", type: "button", onclick: function () {
+      const panel = document.getElementById("invite-h");
+      if (!panel) return;
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      const first = panel.parentNode.querySelector("input[type=email], input");
+      if (first) setTimeout(() => first.focus({ preventScroll: true }), 350);
+    } }, "Invite someone");
     fill(
       main,
-      pageHead("People", "Give staff access and set their role and station."),
+      h("div", { class: "page-head page-head-row" },
+        h("div", null, h("h1", null, "People"), h("p", null, "Who can sign in, their role and stations.")),
+        h("div", { class: "row row-tight" }, inviteBtn)),
       requests.length ? renderRequestsPanel(requests) : null,
-      renderInvitePanel(data, invites),
-      await renderAccessReviewPanel(data),
       h(
         "section",
-        { class: "panel", "aria-labelledby": "staff-h" },
+        { class: "panel panel-table", "aria-labelledby": "staff-h" },
         h("h2", { id: "staff-h" }, "Staff with access"),
         rows.length
           ? h(
@@ -1250,9 +1257,11 @@
                 h("tbody", null, rows)
               )
             )
-          : h("p", { class: "empty" }, "No one has signed in yet. Invite staff above, then share the portal address with them."),
+          : h("p", { class: "empty" }, "No one has signed in yet. Use Invite someone, then share the portal address with them."),
         status
-      )
+      ),
+      renderInvitePanel(data, invites),
+      await renderAccessReviewPanel(data)
     );
   }
 

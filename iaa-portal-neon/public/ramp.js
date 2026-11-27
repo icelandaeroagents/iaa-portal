@@ -77,27 +77,37 @@
       listPage(main, ctx);
     } }, "↻ Refresh");
     const n = notice; notice = null;
+    const dayNav = h("div", { class: "ramp-days" },
+      h("button", { class: "btn btn-quiet btn-small", type: "button", "aria-label": "Previous day", onclick: () => { day = shiftDay(day, -1); listPage(main, ctx); } }, "‹"),
+      h("b", null, niceDay(day)),
+      h("button", { class: "btn btn-quiet btn-small", type: "button", "aria-label": "Next day", onclick: () => { day = shiftDay(day, 1); listPage(main, ctx); } }, "›"),
+      day !== todayIso() ? h("button", { class: "btn btn-quiet btn-small", type: "button", onclick: () => { day = todayIso(); listPage(main, ctx); } }, "Today") : null);
+    const picker = h("nav", { class: "tabs airport-picker", "aria-label": "Airport" }, STATION_ORDER.slice(0, 3).map((s) =>
+      h("a", { href: "#/ramp", "aria-current": s === station ? "page" : null, onclick: (e) => { e.preventDefault(); station = s; listPage(main, ctx); } }, s)));
+    const longDay = new Date(day + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+    // Status of each flight's services: complete, some logged, or not started.
+    const pillFor = (f) => f.services_complete ? h("span", { class: "chip chip-pass" }, "Services complete")
+      : counts[f.id] ? h("span", { class: "chip chip-status-new" }, `${counts[f.id]} logged`)
+      : h("span", { class: "chip chip-status-under_review" }, "Not started");
     fill(main,
       h("div", { class: "page-head page-head-row" },
         h("div", null, h("h1", null, "Ramp"), h("p", null, "Log the services you deliver. They go straight to the Services Log in Notion, under your name.")),
-        h("div", { class: "row row-tight" }, refresh)),
+        h("div", { class: "row row-tight" }, picker, dayNav, refresh)),
       n ? h("p", { class: "notice" }, n.text) : null, status,
-      h("nav", { class: "tabs airport-picker", "aria-label": "Airport" }, STATION_ORDER.slice(0, 3).map((s) => h("a", { href: "#/ramp", "aria-current": s === station ? "page" : null, onclick: (e) => { e.preventDefault(); station = s; listPage(main, ctx); } }, s))),
-      h("div", { class: "ramp-days" },
-        h("button", { class: "btn btn-quiet btn-small", type: "button", "aria-label": "Previous day", onclick: () => { day = shiftDay(day, -1); listPage(main, ctx); } }, "‹"),
-        h("b", null, niceDay(day)),
-        h("button", { class: "btn btn-quiet btn-small", type: "button", "aria-label": "Next day", onclick: () => { day = shiftDay(day, 1); listPage(main, ctx); } }, "›"),
-        day !== todayIso() ? h("button", { class: "btn btn-quiet btn-small", type: "button", onclick: () => { day = todayIso(); listPage(main, ctx); } }, "Today") : null),
-      flights.length
-        ? h("div", { class: "ramp-list" }, flights.map((f) => h("a", { class: "panel ramp-flight" + (f.services_complete ? " is-done" : ""), href: "#/ramp/" + f.id },
-            h("div", { class: "ramp-flight-head" },
-              h("b", { class: "ramp-reg" }, f.registration || f.name),
-              h("span", { class: "ramp-type" }, f.aircraft_type || ""),
-              f.services_complete ? h("span", { class: "chip chip-pass" }, "✓ Complete") : counts[f.id] ? h("span", { class: "chip" }, `${counts[f.id]} logged`) : null),
-            h("span", { class: "sub" }, [op(f.operator), f.arrival ? `Arr ${hhmm(f.arrival)}${f.origin ? " from " + f.origin : ""}` : null, f.departure ? `Dep ${hhmm(f.departure)}${f.destination ? " to " + f.destination : ""}` : null].filter(Boolean).join(" · ")),
-            (f.services_requested || []).length ? h("span", { class: "ramp-req" }, f.services_requested.join(" · ")) : null)))
-        : h("p", { class: "empty" }, `No ${station} flights ${niceDay(day).toLowerCase() === "today" ? "today" : "on this day"}.`),
-      h("p", { class: "fineprint" }, latest ? `From Notion, last updated ${when(latest)}. Updates every 10 minutes for the next two weeks – tap Refresh for the latest.` : "Flights come from Notion every 10 minutes, for the next two weeks."));
+      h("section", { class: "panel ramp-panel", "aria-labelledby": "ramp-day-h" },
+        h("div", { class: "ramp-panel-head" }, h("h2", { id: "ramp-day-h" }, `${station} · ${longDay}`),
+          h("span", { class: "sub" }, flights.length ? `${flights.length} ${flights.length === 1 ? "flight" : "flights"}` : "")),
+        flights.length
+          ? h("div", { class: "ramp-rows" }, flights.map((f) => h("a", { class: "ramp-row" + (f.services_complete ? " is-done" : ""), href: "#/ramp/" + f.id },
+              h("span", { class: "ramp-who" }, h("b", { class: "ramp-reg" }, f.registration || f.name),
+                h("span", { class: "sub" }, [f.aircraft_type, op(f.operator)].filter(Boolean).join(" · "))),
+              h("span", { class: "ramp-times" },
+                f.arrival ? h("span", null, `Arr ${hhmm(f.arrival)}${f.origin ? " · from " + f.origin : ""}`) : null,
+                f.departure ? h("span", { class: "sub" }, `Dep ${hhmm(f.departure)}${f.destination ? " · to " + f.destination : ""}`) : null),
+              h("span", { class: "ramp-req" }, (f.services_requested || []).join(" · ")),
+              pillFor(f))))
+          : h("p", { class: "empty" }, `No ${station} flights ${niceDay(day).toLowerCase() === "today" ? "today" : "on this day"}.`)),
+      h("p", { class: "fineprint" }, latest ? `From Notion, last updated ${when(latest)}. Updates every 10 minutes for the next two weeks – tap Refresh for the latest. Tap a flight to log services.` : "Flights come from Notion every 10 minutes, for the next two weeks."));
   }
 
   // ------------------------------------------------------------------
