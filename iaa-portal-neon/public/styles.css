@@ -1436,3 +1436,18 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
 }
 .kt-note { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 .clock-list li.is-off { opacity: 0.6; }
+
+/* Month overview grid (Hours → Team) */
+.clock-grid { border-collapse: separate; border-spacing: 0; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.clock-grid th, .clock-grid td { padding: 0.25rem 0.2rem; text-align: center; border-bottom: 1px solid var(--line); min-width: 2.1rem; }
+.clock-grid thead th { font-weight: 600; color: var(--muted); line-height: 1.1; }
+.clock-grid thead th span { display: block; font-size: 0.72rem; font-weight: 500; }
+.clock-grid th[scope="row"], .clock-grid thead th:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); text-align: left; white-space: nowrap; padding-right: 0.6rem; min-width: 8rem; }
+.clock-grid .is-wkd { background: var(--field); }
+.clock-grid .tot { font-weight: 600; border-left: 1px solid var(--line); padding: 0.25rem 0.5rem; }
+.clock-grid .clock-total th, .clock-grid .clock-total td { border-top: 2px solid var(--line); font-weight: 600; }
+.clock-cell { font: inherit; border: 0; background: none; color: var(--ink); padding: 0.2rem 0.1rem; border-radius: var(--radius-s); cursor: pointer; width: 100%; }
+.clock-cell:hover { background: var(--line); }
+.clock-grid td.is-over .clock-cell { color: #b45309; font-weight: 700; }
+.clock-grid td.is-flag { box-shadow: inset 0 -3px 0 var(--notice-line); }
+@media (prefers-color-scheme: dark) { .clock-grid td.is-over .clock-cell { color: #f59e0b; } }

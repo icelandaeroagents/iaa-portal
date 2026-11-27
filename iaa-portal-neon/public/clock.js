@@ -39,6 +39,9 @@
   function thisMonth() { return new Date().toLocaleDateString("en-CA", { timeZone: TZ }).slice(0, 7); }
   function monthLabel(m) { return new Date(m + "-15T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }); }
   function shiftMonth(m, n) { const d = new Date(m + "-15T12:00:00Z"); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7); }
+  function daysIn(m) { return new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 0)).getUTCDate(); }
+  const dayOf = (ts) => +new Date(ts).toLocaleDateString("en-CA", { timeZone: TZ }).slice(8, 10);
+  const hrs = (min) => { const v = Math.round((min || 0) / 6) / 10; return Number.isInteger(v) ? String(v) : v.toFixed(1); };   // 12, 13.4
   function monthRange(m) { return [m + "-01T00:00:00Z", shiftMonth(m, 1) + "-01T00:00:00Z"]; }
   // Iceland is on UTC all year, so a datetime-local value is UTC.
   const toLocalInput = (ts) => (ts ? new Date(ts).toISOString().slice(0, 16) : "");
@@ -427,7 +430,7 @@
         h("div", { class: "row" }, save, del, cancel), msg,
         hist.childNodes.length ? h("div", null, h("b", null, "History"), hist) : null);
       const old = main.querySelector(".clock-edit"); if (old) old.remove();
-      anchor.closest("li, tr, section").after(holder);
+      (anchor.closest(".clock-grid-panel") || anchor.closest("li, tr, section")).after(holder);
       inI.focus();
     }
 
@@ -482,6 +485,42 @@
 
     const kioskPanel = kr.error ? null : ipadPanel(ctx, kr.data || [], redraw);
 
+    // Month overview: one row per person, one column per day (hours worked that day).
+    const nDays = daysIn(month);
+    const dayNames = Array.from({ length: nDays }, (_, i) => new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7) - 1, i + 1)));
+    const isWeekend = (d) => d.getUTCDay() === 0 || d.getUTCDay() === 6;
+    const dayTotals = new Array(nDays + 1).fill(0);
+    const gridRows = ids.map((id) => {
+      const list = byPerson[id], t = totals(list);
+      const cells = dayNames.map((d, i) => {
+        const day = i + 1;
+        const shifts = list.filter((s) => dayOf(s.clock_in) === day);
+        if (!shifts.length) return h("td", { class: isWeekend(d) ? "is-wkd" : "" }, "");
+        const worked = shifts.reduce((a, s) => a + (s.worked_minutes || 0), 0);
+        dayTotals[day] += worked;
+        const open = shifts.some((s) => !s.clock_out), over = shifts.some((s) => s.additional_minutes > 0), flag = shifts.some((s) => !s.reviewed);
+        const tip = shifts.map((s) => `${clock(s.clock_in)}–${s.clock_out ? clock(s.clock_out) : "on shift"}${s.lunches ? ", lunch" : ""}`).join("; ");
+        const b = h("button", { type: "button", class: "clock-cell", title: `${nameOf(id)}, ${dayLabel(shifts[0].clock_in)}: ${tip}` }, open ? "on" : hrs(worked));
+        b.addEventListener("click", () => openEditor(shifts[0], b));
+        return h("td", { class: [isWeekend(d) ? "is-wkd" : "", over ? "is-over" : "", flag ? "is-flag" : ""].join(" ").trim() }, b);
+      });
+      return h("tr", null, h("th", { scope: "row" }, nameOf(id)), cells,
+        h("td", { class: "tot" }, String(t.shifts)), h("td", { class: "tot" }, hrs(t.worked)), h("td", { class: "tot" }, t.extra ? hrs(t.extra) : "–"), h("td", { class: "tot" }, String(t.lunches)));
+    });
+    const grid = h("section", { class: "panel clock-grid-panel", "aria-labelledby": "grid-h" },
+      h("h2", { id: "grid-h" }, "Month overview"),
+      rows.length ? h("div", { class: "table-wrap" }, h("table", { class: "clock-grid" },
+        h("thead", null, h("tr", null, h("th", null, "Name"),
+          dayNames.map((d, i) => h("th", { class: isWeekend(d) ? "is-wkd" : "", title: d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }) },
+            String(i + 1), h("span", null, d.toLocaleDateString("en-GB", { weekday: "narrow", timeZone: "UTC" })))),
+          h("th", { class: "tot" }, "Shifts"), h("th", { class: "tot" }, "Hours"), h("th", { class: "tot" }, "Additional"), h("th", { class: "tot" }, "Lunches"))),
+        h("tbody", null, gridRows,
+          h("tr", { class: "clock-total" }, h("th", { scope: "row" }, "Total"),
+            dayNames.map((d, i) => h("td", { class: isWeekend(d) ? "is-wkd" : "" }, dayTotals[i + 1] ? hrs(dayTotals[i + 1]) : "")),
+            h("td", { class: "tot" }, String(all.shifts)), h("td", { class: "tot" }, hrs(all.worked)), h("td", { class: "tot" }, all.extra ? hrs(all.extra) : "–"), h("td", { class: "tot" }, String(all.lunches))))))
+        : h("p", { class: "empty" }, "No shifts this month."),
+      rows.length ? h("p", { class: "fineprint" }, "Hours worked each day (by clock-in date). Orange: over 12 hours. Yellow edge: to review. Tap a day to correct that shift.") : null);
+
     const exportBtn = h("button", { class: "btn", type: "button" }, "Download Excel for " + monthLabel(month));
     exportBtn.addEventListener("click", () => exportMonth(rows, ids, byPerson, nameOf));
 
@@ -491,7 +530,7 @@
       h("div", { class: "stat-grid" },
         stat(h, all.shifts, "Shifts"), stat(h, hm(all.worked), "Hours worked"),
         stat(h, hm(all.extra), "Additional hours", all.extra ? "is-warn" : ""), stat(h, all.lunches, "Lunches"), stat(h, review.length, "To review", review.length ? "is-warn" : "")),
-      summary, h("div", { class: "row" }, exportBtn), addPanel, kioskPanel, status);
+      summary, grid, h("div", { class: "row" }, exportBtn), addPanel, kioskPanel, status);
   }
 
   // ---------------- Time clock iPads (management) ----------------
@@ -555,6 +594,26 @@
     const ws2 = XLSX.utils.json_to_sheet(shifts); ws2["!cols"] = [{ wch: 26 }, { wch: 11 }, { wch: 9 }, { wch: 9 }, { wch: 13 }, { wch: 11 }, { wch: 12 }, { wch: 11 }, { wch: 15 }, { wch: 30 }, { wch: 30 }, { wch: 16 }, { wch: 40 }];
     XLSX.utils.book_append_sheet(wb, ws1, "Monthly totals");
     XLSX.utils.book_append_sheet(wb, ws2, "Shifts");
+
+    // Month overview: people down, days across, hours worked each day.
+    const n = daysIn(month);
+    const head = ["Name"].concat(Array.from({ length: n }, (_, i) => String(i + 1)), ["Shifts", "Hours worked", "Additional hours", "Lunches"]);
+    const dayTot = new Array(n).fill(0);
+    const grid = [head];
+    ids.filter((id) => totals(byPerson[id]).shifts).forEach((id) => {
+      const list = byPerson[id].filter((s) => s.clock_out), t = totals(list);
+      const days = Array.from({ length: n }, (_, i) => {
+        const m = list.filter((s) => dayOf(s.clock_in) === i + 1).reduce((a, s) => a + (s.worked_minutes || 0), 0);
+        dayTot[i] += m;
+        return m ? dec(m) : "";
+      });
+      grid.push([nameOf(id)].concat(days, [t.shifts, dec(t.worked), dec(t.extra), t.lunches]));
+    });
+    grid.push(["Total"].concat(dayTot.map((m) => (m ? dec(m) : "")), [all.shifts, dec(all.worked), dec(all.extra), all.lunches]));
+    const ws3 = XLSX.utils.aoa_to_sheet(grid);
+    ws3["!cols"] = [{ wch: 24 }].concat(Array.from({ length: n }, () => ({ wch: 5 })), [{ wch: 8 }, { wch: 13 }, { wch: 16 }, { wch: 9 }]);
+    ws3["!freeze"] = { xSplit: 1, ySplit: 1 };
+    XLSX.utils.book_append_sheet(wb, ws3, "Month overview");
     XLSX.writeFile(wb, `IAA hours ${month}.xlsx`);
   }
 
