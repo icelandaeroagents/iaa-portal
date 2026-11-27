@@ -91,6 +91,10 @@
     {
       "path": "/api/ramp-sync",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/notion-backup",
+      "schedule": "*/10 * * * *"
     }
   ],
   "regions": [
@@ -99,6 +103,9 @@
   "functions": {
     "api/staff-notify.js": {
       "includeFiles": "public/{training-content,outstanding}.js"
+    },
+    "api/notion-backup.js": {
+      "maxDuration": 300
     }
   }
 }
