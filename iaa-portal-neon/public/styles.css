@@ -1451,3 +1451,5 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
 .clock-grid td.is-over .clock-cell { color: #b45309; font-weight: 700; }
 .clock-grid td.is-flag { box-shadow: inset 0 -3px 0 var(--notice-line); }
 @media (prefers-color-scheme: dark) { .clock-grid td.is-over .clock-cell { color: #f59e0b; } }
+.clock-comment { width: 100%; max-width: 32rem; margin-top: 0.6rem; }
+.clock-comment[hidden], .clock-row [hidden] { display: none; }

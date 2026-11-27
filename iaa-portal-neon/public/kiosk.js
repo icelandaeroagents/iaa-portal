@@ -130,6 +130,13 @@
       doneScreen(r);
     }
     const cancel = h("button", { class: "btn btn-quiet", type: "button", onclick: () => padScreen() }, "Not me – back");
+    // Optional comment for management, e.g. "Forgot to clock in – started at 06:00"
+    const commentBox = h("textarea", { class: "kiosk-comment", rows: "2", maxlength: "300", hidden: true, "aria-label": "Comment for management",
+      placeholder: info.open ? "e.g. Forgot to clock out – finished at 19:00" : "e.g. Forgot to clock in – started at 06:00" });
+    const commentBtn = h("button", { class: "btn btn-quiet", type: "button" }, "Add a comment");
+    commentBtn.addEventListener("click", () => { commentBox.hidden = false; commentBtn.hidden = true; commentBox.focus(); idle(60000); });
+    commentBox.addEventListener("input", () => idle(60000));
+    const comment = () => commentBox.value.trim() || null;
     let card;
     if (!info.open) {
       const lunch = h("input", { type: "checkbox" });
@@ -137,9 +144,10 @@
         h("h1", null, `Hi ${info.name}`),
         h("p", null, "You’re not clocked in."),
         h("label", { class: "kiosk-check" }, lunch, "Add lunch now"),
+        commentBox,
         h("div", { class: "kiosk-actions" },
-          h("button", { class: "btn", type: "button", onclick: () => act("clock_in", { lunch: lunch.checked }) }, "Clock in"),
-          cancel),
+          h("button", { class: "btn", type: "button", onclick: () => act("clock_in", { lunch: lunch.checked, comment: comment() }) }, "Clock in"),
+          commentBtn, cancel),
         msg);
     } else {
       const on = (Date.now() - new Date(info.open.clock_in).getTime()) / 60000;
@@ -153,20 +161,21 @@
           askArea.replaceChildren(
             h("p", { class: "notice" }, "No lunch is recorded on this shift. Did you have lunch?"),
             h("div", { class: "kiosk-actions" },
-              h("button", { class: "btn", type: "button", onclick: () => act("clock_out", { lunch: true }) }, "Yes – add lunch and clock out"),
-              h("button", { class: "btn btn-quiet", type: "button", onclick: () => act("clock_out", { lunch: false }) }, "No lunch – clock out"),
+              h("button", { class: "btn", type: "button", onclick: () => act("clock_out", { lunch: true, comment: comment() }) }, "Yes – add lunch and clock out"),
+              h("button", { class: "btn btn-quiet", type: "button", onclick: () => act("clock_out", { lunch: false, comment: comment() }) }, "No lunch – clock out"),
               h("button", { class: "btn btn-quiet", type: "button", onclick: () => padScreen() }, "Cancel")));
           idle();
           return;
         }
-        act("clock_out", { lunch: false });
+        act("clock_out", { lunch: false, comment: comment() });
       });
       card = h("div", { class: "kiosk-card" },
         h("h1", null, `Hi ${info.name}`),
         h("p", null, `Clocked in since ${clock(info.open.clock_in)} · on the clock ${hm(on)} · ${lunches ? (lunches === 1 ? "1 lunch" : lunches + " lunches") : "no lunch yet"}`),
+        commentBox,
         actions = h("div", { class: "kiosk-actions" },
           h("button", { class: "btn btn-quiet", type: "button", onclick: () => act("add_lunch") }, lunches ? "Add another lunch" : "Add lunch"),
-          outBtn, cancel),
+          outBtn, commentBtn, cancel),
         askArea, msg);
     }
     frame(card, null);

@@ -89,6 +89,14 @@
     });
   }
 
+  // "Add a comment" link that opens a box (for example "Forgot to clock in – started at 06:00").
+  function commentControl(h, placeholder) {
+    const box = h("input", { type: "text", maxlength: "300", class: "clock-comment", placeholder: placeholder, hidden: true, "aria-label": "Comment for management" });
+    const link = h("button", { class: "btn btn-quiet btn-small", type: "button" }, "Add a comment");
+    link.addEventListener("click", () => { box.hidden = false; link.hidden = true; box.focus(); });
+    return { box, link, value: () => box.value.trim() || null };
+  }
+
   // ======================================================================
   // Home page card
   // ======================================================================
@@ -132,6 +140,7 @@
 
     if (!open) {
       const lunchNow = h("input", { type: "checkbox" });
+      const note = commentControl(h, "e.g. Forgot to clock in – started at 06:00");
       const btn = h("button", { class: "btn", type: "button" }, "Clock in");
       btn.addEventListener("click", async () => {
         btn.disabled = true;
@@ -139,7 +148,8 @@
         if (!got) { btn.disabled = false; return; }
         ctx.setStatus(status, "Clocking in…");
         const ins = await db.from("time_shifts").insert({
-          in_station: got.loc.station, in_distance_km: got.loc.km, in_confirmed: got.loc.confirmed, in_reason: got.reason
+          in_station: got.loc.station, in_distance_km: got.loc.km, in_confirmed: got.loc.confirmed, in_reason: got.reason,
+          staff_note: note.value()
         }).select("id");
         if (ins.error) { btn.disabled = false; ctx.setStatus(status, ins.error.message, true); return; }
         const id = ins.data && ins.data[0] && ins.data[0].id;
@@ -148,7 +158,8 @@
       });
       panel.append(
         h("p", null, "You’re not clocked in."),
-        h("div", { class: "row clock-row" }, btn, h("label", { class: "clock-check" }, lunchNow, " Add lunch now")),
+        h("div", { class: "row clock-row" }, btn, h("label", { class: "clock-check" }, lunchNow, " Add lunch now"), note.link),
+        note.box,
         area, status,
         h("p", { class: "fineprint" }, "Your location is checked once when you clock in and out, to confirm you’re at BIRK, BIKF or BIAR. Only the result is saved, never where you were."));
       return panel;
@@ -166,6 +177,7 @@
     const addLunch = h("button", { class: "btn btn-quiet", type: "button" }, lunches.length ? "Add another lunch" : "Add lunch");
     const undo = lunches.length ? h("button", { class: "btn btn-quiet btn-small", type: "button" }, "Remove last lunch") : null;
     const out = h("button", { class: "btn", type: "button" }, "Clock out");
+    const outNote = commentControl(h, "e.g. Forgot to clock out – finished at 19:00");
 
     addLunch.addEventListener("click", async () => {
       addLunch.disabled = true;
@@ -188,7 +200,8 @@
       if (withLunch) await db.from("time_lunches").insert({ shift_id: open.id, kind: "added" });
       const u = await db.from("time_shifts").update({
         clock_out: new Date().toISOString(), out_station: got.loc.station, out_distance_km: got.loc.km,
-        out_confirmed: got.loc.confirmed, out_reason: got.reason
+        out_confirmed: got.loc.confirmed, out_reason: got.reason,
+        staff_note: outNote.value()
       }).eq("id", open.id);
       if (u.error) { out.disabled = false; ctx.setStatus(status, u.error.message, true); return; }
       rerender();
@@ -212,7 +225,9 @@
       h("p", { class: "clock-now" }, `Clocked in since ${clock(open.clock_in)}`, open.clock_in && new Date(open.clock_in).toDateString() !== new Date().toDateString() ? ` (${dayLabel(open.clock_in)})` : "",
         ` · ${open.in_confirmed ? open.in_station : "location not confirmed"} · on the clock `, worked),
       lunchLine,
-      h("div", { class: "row clock-row" }, addLunch, undo, out),
+      open.staff_note ? h("p", { class: "fineprint" }, "Your comment: “" + open.staff_note + "”") : null,
+      h("div", { class: "row clock-row" }, addLunch, undo, out, outNote.link),
+      outNote.box,
       area, status);
     return panel;
   }
