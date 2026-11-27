@@ -18,6 +18,8 @@
     cancelled: ["Cancelled", "chip-leave-cancelled"]
   };
   let notice = null;
+  let histShow = "approved";   // management history: "approved" or "all"
+  let histSince = 3;           // months back, or 0 for all time
 
   const fmt = (d) => new Date(String(d).slice(0, 10) + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
   const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Atlantic/Reykjavik" });
@@ -34,7 +36,7 @@
     const redraw = () => render(main, ctx, tabsNode);
     fill(main, pageHead("Requests"), tabsNode, h("p", { class: "empty" }, "Loading…"));
     const [sr, cr] = await Promise.all([
-      db.from("shift_swaps").select("*").order("created_at", { ascending: false }).limit(200),
+      db.from("shift_swaps").select("*").order("created_at", { ascending: false }).limit(isMgmt ? 2000 : 200),
       db.rpc("colleagues")
     ]);
     if (sr.error) { fill(main, pageHead("Requests"), tabsNode, h("p", { class: "notice is-error" }, "Shift swaps aren’t set up yet (database update 47).")); return; }
@@ -117,8 +119,8 @@
     const shown = swaps.filter((s) => isMgmt || s.requester_id === me || s.colleague_id === me)
       .filter((s) => !(s.colleague_id === me && s.status === "waiting_colleague"))
       .filter((s) => !(isMgmt && (s.status === "waiting_management" || s.status === "waiting_colleague")));
-    const list = h("section", { class: "panel", "aria-labelledby": "sw-all" },
-      h("h2", { id: "sw-all" }, isMgmt ? "All swaps" : "Your swaps"),
+    const list = isMgmt ? historyPanel(ctx, swaps, redraw) : h("section", { class: "panel", "aria-labelledby": "sw-all" },
+      h("h2", { id: "sw-all" }, "Your swaps"),
       shown.length ? h("ul", { class: "clock-list" }, shown.map((s) => {
         const cancel = s.requester_id === me && (s.status === "waiting_colleague" || s.status === "waiting_management")
           ? h("button", { class: "btn btn-quiet btn-small", type: "button" }, "Cancel request") : null;
@@ -132,6 +134,57 @@
     fill(main, pageHead("Requests"), tabsNode,
       n ? h("p", { class: "notice" }, n.text, n.link && isMgmt ? [" ", h("a", { href: "#/roster/edit" }, "Open the roster editor")] : null) : null,
       forMePanel, mgmtPanel, askPanel, list, status);
+  }
+
+  // ---- management: history of every swap ----
+  const stamp = (ts) => ts ? new Date(ts).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Atlantic/Reykjavik" }) : "–";
+  function historyPanel(ctx, swaps, redraw) {
+    const { h } = ctx;
+    const since = histSince ? new Date(Date.now() - histSince * 31 * 86400000).toISOString() : "";
+    const rows = swaps
+      .filter((s) => histShow === "all" || s.status === "approved")
+      .filter((s) => !since || (s.decided_at || s.created_at) >= since);
+    const show = h("select", { "aria-label": "Which swaps" },
+      h("option", { value: "approved", selected: histShow === "approved" || null }, "Approved swaps"),
+      h("option", { value: "all", selected: histShow === "all" || null }, "All requests"));
+    const period = h("select", { "aria-label": "Period" },
+      [[3, "Last 3 months"], [12, "Last 12 months"], [0, "All time"]].map(([v, t]) => h("option", { value: String(v), selected: histSince === v || null }, t)));
+    show.addEventListener("change", () => { histShow = show.value; redraw(); });
+    period.addEventListener("change", () => { histSince = +period.value; redraw(); });
+    const dl = h("button", { class: "btn btn-quiet btn-small", type: "button" }, "Download as Excel");
+    dl.addEventListener("click", () => exportHistory(rows));
+    return h("section", { class: "panel", "aria-labelledby": "sw-hist" },
+      h("h2", { id: "sw-hist" }, `Swap history (${rows.length})`),
+      h("div", { class: "row" }, show, period, rows.length ? dl : null),
+      rows.length ? h("div", { class: "table-wrap" }, h("table", { class: "mgmt-table sw-history" },
+        h("thead", null, h("tr", null, ["Asked", "Swap", "What changed", "Status", "Colleague answered", "Decided", "Roster editor"].map((x) => h("th", null, x)))),
+        h("tbody", null, rows.map((s) => h("tr", null,
+          h("td", null, stamp(s.created_at)),
+          h("td", null, h("b", null, s.requester_name), " ↔ ", h("b", null, s.colleague_name), s.message ? h("div", { class: "fineprint" }, "“" + s.message + "”") : null),
+          h("td", null, what(s)),
+          h("td", null, h("span", { class: "chip " + (STATUS[s.status] || ["", ""])[1] }, (STATUS[s.status] || [s.status])[0])),
+          h("td", null, stamp(s.colleague_answered_at)),
+          h("td", null, s.decided_at ? `${s.decided_by_name || "?"}, ${stamp(s.decided_at)}` : "–", s.decision_note ? h("div", { class: "fineprint" }, "“" + s.decision_note + "”") : null),
+          h("td", null, s.status !== "approved" ? "–" : s.roster_changes ? `Updated (${s.roster_changes})` : "Not found – update by hand"))))))
+        : h("p", { class: "empty" }, histShow === "approved" ? "No approved swaps in this period." : "No swap requests in this period."));
+  }
+
+  function exportHistory(rows) {
+    if (!window.XLSX) { alert("The Excel library didn’t load – reload the page."); return; }
+    const day = (d) => (d ? String(d).slice(0, 10) : "");
+    const data = rows.map((s) => ({
+      "Asked": stamp(s.created_at), "Asked by": s.requester_name, "Their shift": day(s.requester_date),
+      "Colleague": s.colleague_name, "Colleague’s shift": s.colleague_date ? day(s.colleague_date) : "(cover)",
+      "Message": s.message || "", "Status": (STATUS[s.status] || [s.status])[0],
+      "Colleague answered": s.colleague_answered_at ? stamp(s.colleague_answered_at) : "",
+      "Decided by": s.decided_by_name || "", "Decided": s.decided_at ? stamp(s.decided_at) : "", "Note": s.decision_note || "",
+      "Roster editor": s.status !== "approved" ? "" : s.roster_changes ? `Updated (${s.roster_changes})` : "Not found – updated by hand"
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws["!cols"] = [{ wch: 20 }, { wch: 22 }, { wch: 12 }, { wch: 22 }, { wch: 16 }, { wch: 30 }, { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 24 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Shift swaps");
+    XLSX.writeFile(wb, `IAA shift swaps ${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   // For Home: swaps waiting for this person, and (management) waiting for approval.

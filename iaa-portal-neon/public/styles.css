@@ -1477,3 +1477,5 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
 .re-grid td.is-drop { background: rgba(8, 143, 131, 0.14); box-shadow: inset 0 0 0 2px var(--brand); }
 .re-undo { margin-left: 0.4rem; }
 .re-palette { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 3; background: var(--surface); padding: 0.5rem 0; border-bottom: 1px solid var(--line); }
+.sw-history td { vertical-align: top; }
+.sw-history td:first-child { white-space: nowrap; }
