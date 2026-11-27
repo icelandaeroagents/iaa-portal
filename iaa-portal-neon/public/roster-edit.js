@@ -596,6 +596,80 @@
 
     // --- grid
     const gStatus = h("p", { class: "status", role: "status" });
+
+    // Drag and drop: move a name to another cell (hold Alt/Option to copy),
+    // drop it on someone else's name to swap them, or drag a name from the
+    // row of people onto a cell to add them. Every drop can be undone.
+    const short = (d) => `${dayNum(d)} ${monthName(month).split(" ")[0].slice(0, 3)}`;
+    const place = (duty, d) => `${duty} on ${short(d)}`;
+    const byId = {};
+    entries.forEach((e) => { byId[e.id] = e; });
+    let dragging = null;
+    async function applyDrop(data, toDate, toDuty, ontoId, copy) {
+      const who = names[data.profile_id] || "?";
+      let res, text, undo;
+      if (data.kind === "person") {
+        res = await db.from("roster_entries").insert({ work_date: toDate, duty: toDuty, profile_id: data.profile_id }).select("id");
+        const id = res.data && res.data[0] && res.data[0].id;
+        text = `Added ${who} to ${place(toDuty, toDate)}.`;
+        undo = async () => db.from("roster_entries").delete().eq("id", id);
+      } else {
+        const e = byId[data.id]; if (!e) return;
+        if (e.work_date === toDate && e.duty === toDuty && !ontoId) return;   // dropped where it was
+        const other = ontoId && ontoId !== e.id ? byId[ontoId] : null;
+        if (other && !copy) {
+          // swap the two people
+          res = await db.from("roster_entries").update({ profile_id: other.profile_id }).eq("id", e.id);
+          if (!res.error) res = await db.from("roster_entries").update({ profile_id: e.profile_id }).eq("id", other.id);
+          text = `Swapped ${who} (${place(e.duty, e.work_date)}) and ${names[other.profile_id] || "?"} (${place(other.duty, other.work_date)}).`;
+          undo = async () => { await db.from("roster_entries").update({ profile_id: e.profile_id }).eq("id", e.id); return db.from("roster_entries").update({ profile_id: other.profile_id }).eq("id", other.id); };
+        } else if (copy) {
+          res = await db.from("roster_entries").insert({ work_date: toDate, duty: toDuty, profile_id: e.profile_id, note: e.note }).select("id");
+          const id = res.data && res.data[0] && res.data[0].id;
+          text = `Copied ${who} to ${place(toDuty, toDate)}.`;
+          undo = async () => db.from("roster_entries").delete().eq("id", id);
+        } else {
+          res = await db.from("roster_entries").update({ work_date: toDate, duty: toDuty }).eq("id", e.id);
+          text = `Moved ${who} from ${place(e.duty, e.work_date)} to ${place(toDuty, toDate)}.`;
+          undo = async () => db.from("roster_entries").update({ work_date: e.work_date, duty: e.duty }).eq("id", e.id);
+        }
+      }
+      if (res && res.error) {
+        const dup = /duplicate|unique/i.test(res.error.message);
+        notice = { local: true, grid: true, isError: true, text: dup ? `${who} is already on ${place(toDuty, toDate)}.` : res.error.message };
+      } else {
+        notice = { local: true, grid: true, text: text, undo: undo };
+      }
+      rerender();
+    }
+    function dropTarget(td, d, duty) {
+      td.dataset.date = d; td.dataset.duty = duty;
+      td.addEventListener("dragover", (ev) => { if (!dragging) return; ev.preventDefault(); ev.dataTransfer.dropEffect = dragging.kind === "person" || ev.altKey ? "copy" : "move"; td.classList.add("is-drop"); });
+      td.addEventListener("dragleave", (ev) => { if (!td.contains(ev.relatedTarget)) td.classList.remove("is-drop"); });
+      td.addEventListener("drop", (ev) => {
+        ev.preventDefault(); td.classList.remove("is-drop");
+        const data = dragging; dragging = null; if (!data) return;
+        const chip = ev.target.closest && ev.target.closest(".re-chip[data-id]");
+        applyDrop(data, d, duty, chip ? +chip.dataset.id : null, ev.altKey);
+      });
+    }
+    function draggable(node, data) {
+      node.setAttribute("draggable", "true");
+      node.addEventListener("dragstart", (ev) => {
+        dragging = data;
+        ev.dataTransfer.effectAllowed = "copyMove";
+        try { ev.dataTransfer.setData("text/plain", names[data.profile_id] || ""); } catch (e) { /* older browsers */ }
+        node.classList.add("is-dragging");
+        main.classList.add("re-dragging");
+      });
+      node.addEventListener("dragend", () => { node.classList.remove("is-dragging"); main.classList.remove("re-dragging"); dragging = null;
+        main.querySelectorAll(".is-drop").forEach((x) => x.classList.remove("is-drop")); });
+      return node;
+    }
+    const palette = h("div", { class: "re-palette", "aria-label": "Drag a name onto the roster" },
+      h("span", { class: "sub" }, "Drag onto the roster:"),
+      people.slice().sort((a, b) => String(names[a.id]).localeCompare(String(names[b.id])))
+        .map((p) => draggable(h("span", { class: "re-chip re-person", title: "Drag onto a cell to add " + names[p.id] }, names[p.id] || p.email), { kind: "person", profile_id: p.id })));
     const order = dutyOrder(entries);
     const grid = (dates) => h("div", { class: "table-wrap roster-wrap" }, h("table", { class: "roster-grid re-grid" },
       h("thead", null, h("tr", null, h("th", null, ""), dates.map((d) => h("th", { class: (d === iso(new Date()) ? "is-today " : "") + (window.IAARotation && window.IAARotation.colour(d) ? "rot-" + window.IAARotation.colour(d) : "") },
@@ -605,16 +679,18 @@
         return h("tr", null, h("th", { scope: "row" }, duty), dates.map(function (d) {
           const here = entries.filter((e) => e.work_date === d && e.duty === duty)
             .sort((a, b) => String(names[a.profile_id]).localeCompare(String(names[b.profile_id])));
-          return h("td", { class: !here.length && req ? "is-missing" : here.length > 1 ? "is-doubled" : null, title: here.length > 1 ? "More than one person – remove one" : null },
-            here.length ? here.map((e) => h("span", { class: "re-chip" }, (names[e.profile_id] || "?") + (e.note ? " (" + e.note + ")" : ""),
+          const td = h("td", { class: !here.length && req ? "is-missing" : here.length > 1 ? "is-doubled" : null, title: here.length > 1 ? "More than one person – remove one" : null },
+            here.length ? here.map((e) => draggable(h("span", { class: "re-chip", "data-id": String(e.id), title: "Drag to move · Alt/Option to copy · drop on a name to swap" }, (names[e.profile_id] || "?") + (e.note ? " (" + e.note + ")" : ""),
               h("button", { type: "button", class: "re-x", "aria-label": `Remove ${names[e.profile_id]} from ${duty} on ${d}`, onclick: async function () {
                 this.disabled = true;
                 const { error } = await db.from("roster_entries").delete().eq("id", e.id);
                 notice = error ? { text: error.message, isError: true, grid: true, local: true }
                   : { local: true, text: `Removed ${names[e.profile_id] || "?"} from ${duty} on ${dayNum(d)} ${monthName(month).split(" ")[0]}.`, grid: true };
                 rerender();
-              } }, "×")))
+              } }, "×")), { kind: "entry", id: e.id, profile_id: e.profile_id }))
               : req ? "–" : "");
+          dropTarget(td, d, duty);
+          return td;
         }));
       }))));
 
@@ -626,13 +702,23 @@
       n && !n.local ? h("p", { class: n.isError ? "notice is-error" : "notice" }, n.text) : null,
       statusPanel, copyPanel, pastePanel(ctx, allPeople, names, rerender), assign, coverage,
       h("section", { class: "panel" }, h("h2", null, monthName(month)),
-        gStatus,
+        palette, gStatus,
         grid(days.slice(0, 15)), grid(days.slice(15)),
-        h("p", { class: "fineprint" }, "Select × to remove someone. A red dash means nobody is assigned to a duty that is needed every day.")));
+        h("p", { class: "fineprint" }, "Drag a name to move it, hold Alt (Option on a Mac) while dropping to copy it, or drop it on another name to swap the two. Drag from the names above to add someone. Select × to remove someone. A red dash means nobody is assigned to a duty that is needed every day.")));
     if (n) {
       if (n.paste) { const ps = main.querySelector(".re-paste .status"); if (ps) setStatus(ps, n.text, !!n.isError); }
       else setStatus(aStatus, n.text, !!n.isError);
       if (n.grid) setStatus(gStatus, n.text, !!n.isError);
+      if (n.grid && n.undo) {
+        const u = h("button", { class: "btn btn-quiet btn-small re-undo", type: "button" }, "Undo");
+        u.addEventListener("click", async () => {
+          u.disabled = true;
+          const r = await n.undo();
+          notice = r && r.error ? { local: true, grid: true, isError: true, text: r.error.message } : { local: true, grid: true, text: "Undone." };
+          rerender();
+        });
+        gStatus.append(" ", u);
+      }
     }
     if (keepScroll) {
       const k = keepScroll; keepScroll = null;
