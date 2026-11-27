@@ -316,7 +316,7 @@ label, .field-label { font-weight: 500; font-size: 0.95rem; }
   align-items: flex-end;
 }
 
-input[type="text"], input[type="email"], input[type="number"], input[type="search"], input[type="date"], select {
+input[type="text"], input[type="email"], input[type="number"], input[type="search"], input[type="date"], input[type="time"], select {
   font: inherit;
   color: var(--ink);
   background: var(--field);
@@ -1463,3 +1463,6 @@ dialog.photo-view img { max-width: 96vw; max-height: 84vh; border-radius: var(--
 .clock-pay-out { margin-top: 1rem; }
 .clock-pay-out .notice ul { margin: 0; padding-left: 1.1rem; }
 .clock-pay-out thead tr:first-child th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--brand-strong); }
+
+/* A form field that spans the whole row of a form grid */
+.form-grid .field-wide { grid-column: 1 / -1; }

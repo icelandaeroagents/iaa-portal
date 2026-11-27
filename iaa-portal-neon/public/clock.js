@@ -319,6 +319,11 @@
           noteCell);
       })))) : h("p", { class: "empty" }, "No shifts this month.");
 
+    // Forgot to clock in and out altogether: ask management to add the shift.
+    const rq = await db.from("time_requests").select("*").eq("profile_id", state.profile.id).order("created_at", { ascending: false }).limit(20);
+    const myReqs = rq.error ? null : (rq.data || []);
+    const reqPanel = myReqs === null ? null : requestPanel(ctx, myReqs, redraw);
+
     const locBtn = h("button", { class: "btn btn-quiet btn-small", type: "button" }, "Check my location");
     const locOut = h("p", { class: "status", role: "status" });
     locBtn.addEventListener("click", async () => {
@@ -337,9 +342,67 @@
         stat(h, hm(t.worked), "Hours worked"),
         stat(h, hm(t.extra), "Additional hours (beyond 12 h)", t.extra ? "is-warn" : ""),
         stat(h, t.lunches, "Lunches")),
-      table, status,
+      table, status, reqPanel,
       h("div", { class: "row clock-row" }, locBtn), locOut,
       h("p", { class: "fineprint" }, "Worked = clock-out − clock-in. Up to 12 hours on a shift counts as the shift; anything beyond 12 hours is additional hours. Lunches are recorded, not deducted. If something is wrong, ask for a correction – management will fix it and the change is kept in a history."));
+  }
+
+  const REQ_STATUS = { pending: ["Waiting for management", "chip-leave-pending"], approved: ["Approved – shift added", "chip-leave-approved"], declined: ["Declined", "chip-leave-declined"], cancelled: ["Cancelled", "chip-leave-cancelled"] };
+  const reqChip = (h, r) => h("span", { class: "chip " + (REQ_STATUS[r.status] || ["", ""])[1] }, (REQ_STATUS[r.status] || [r.status])[0]);
+  const reqWhen = (r) => { const sameDay = new Date(r.clock_in).toDateString() === new Date(r.clock_out).toDateString();
+    return `${dayLabel(r.clock_in)} ${clock(r.clock_in)}–${sameDay ? "" : dayLabel(r.clock_out) + " "}${clock(r.clock_out)} · ${hm((new Date(r.clock_out) - new Date(r.clock_in)) / 60000)}${r.lunches ? " · " + (r.lunches === 1 ? "1 lunch" : r.lunches + " lunches") : ""}`; };
+
+  function requestPanel(ctx, reqs, redraw) {
+    const { h, db } = ctx;
+    const date = h("input", { type: "date", max: new Date().toLocaleDateString("en-CA", { timeZone: TZ }) });
+    const start = h("input", { type: "time", value: "07:00" });
+    const end = h("input", { type: "time", value: "19:00" });
+    const lunches = h("input", { type: "number", min: "0", max: "5", step: "1", value: "1" });
+    const reason = h("input", { type: "text", maxlength: "300", placeholder: "e.g. Phone was flat – forgot to clock in and out" });
+    const send = h("button", { class: "btn", type: "button" }, "Send request");
+    const msg = h("p", { class: "status", role: "status" });
+    const preview = h("p", { class: "clock-result" });
+    const times = () => {
+      if (!date.value || !start.value || !end.value) return null;
+      const ci = new Date(`${date.value}T${start.value}:00Z`);
+      let co = new Date(`${date.value}T${end.value}:00Z`);
+      if (co <= ci) co = new Date(co.getTime() + 86400000);   // finished after midnight
+      return { ci: ci.toISOString(), co: co.toISOString() };
+    };
+    const show = () => { const t = times(); preview.textContent = t ? reqWhen({ clock_in: t.ci, clock_out: t.co, lunches: Math.max(0, Math.round(+lunches.value || 0)) }) : ""; };
+    [date, start, end, lunches].forEach((x) => x.addEventListener("input", show));
+    send.addEventListener("click", async () => {
+      const t = times();
+      if (!t) { ctx.setStatus(msg, "Choose the date and the start and finish times.", true); return; }
+      if (reason.value.trim().length < 3) { ctx.setStatus(msg, "Please say briefly why the shift is missing.", true); return; }
+      if (new Date(t.co) > new Date()) { ctx.setStatus(msg, "The shift must have finished already.", true); return; }
+      send.disabled = true;
+      const r = await db.from("time_requests").insert({ clock_in: t.ci, clock_out: t.co, lunches: Math.min(5, Math.max(0, Math.round(+lunches.value || 0))), reason: reason.value.trim() });
+      send.disabled = false;
+      if (r.error) { ctx.setStatus(msg, r.error.message, true); return; }
+      redraw();
+    });
+    const list = reqs.length ? h("ul", { class: "clock-list" }, reqs.map((r) => {
+      const cancel = r.status === "pending" ? h("button", { class: "btn btn-quiet btn-small", type: "button" }, "Cancel") : null;
+      if (cancel) cancel.addEventListener("click", async () => { cancel.disabled = true; await db.from("time_requests").update({ status: "cancelled" }).eq("id", r.id); redraw(); });
+      return h("li", null, reqChip(h, r), " ", reqWhen(r), h("div", { class: "fineprint" }, `“${r.reason}”` + (r.decision_note ? ` – ${r.decided_by_name}: “${r.decision_note}”` : "")), cancel);
+    })) : null;
+    // Stay open while something is waiting, and for a week after a decision so the outcome is seen.
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+    const waiting = reqs.filter((r) => r.status === "pending").length;
+    const recent = reqs.filter((r) => (r.status === "approved" || r.status === "declined") && r.decided_at && r.decided_at > weekAgo);
+    const sumText = waiting ? ` (${waiting} waiting)` : recent.length ? ` (${recent.filter((r) => r.status === "approved").length ? "approved" : "declined"} – see below)` : "";
+    return h("details", { class: "panel", open: (waiting || recent.length) ? true : null },
+      h("summary", null, "Forgot to clock in at all? Request a shift" + sumText),
+      h("p", null, "For a day you worked but didn’t clock in or out at all. Management checks it and adds the shift. (If you clocked in but a time is wrong, use “Ask for a correction” on that shift instead.)"),
+      h("div", { class: "form-grid" },
+        h("label", { class: "field" }, h("span", null, "Date"), date),
+        h("label", { class: "field" }, h("span", null, "Started"), start),
+        h("label", { class: "field" }, h("span", null, "Finished"), end),
+        h("label", { class: "field" }, h("span", null, "Lunches"), lunches),
+        h("label", { class: "field field-wide" }, h("span", null, "Reason"), reason)),
+      preview, send, msg,
+      list ? h("div", null, h("h3", null, "Your requests"), list) : null);
   }
 
   // ---------------- Team (management) ----------------
@@ -348,11 +411,12 @@
     const redraw = () => teamPage(main, ctx);
     fill(main, pageHead("Hours"), tabs(ctx, "team"), h("p", { class: "empty" }, "Loading…"));
     const [from, to] = monthRange(month);
-    const [mr, or, pr, kr] = await Promise.all([
+    const [mr, or, pr, kr, tq] = await Promise.all([
       db.from("time_shift_hours").select("*").gte("clock_in", from).lt("clock_in", to).order("clock_in", { ascending: true }),
       db.from("time_shift_hours").select("*").is("clock_out", null).order("clock_in", { ascending: true }),
       db.from("profiles").select("id, full_name, email, active").eq("active", true).order("full_name", { ascending: true }),
-      db.from("time_kiosks").select("*").order("created_at", { ascending: true })
+      db.from("time_kiosks").select("*").order("created_at", { ascending: true }),
+      db.from("time_requests").select("*").eq("status", "pending").order("clock_in", { ascending: true })
     ]);
     if (mr.error) { fill(main, pageHead("Hours"), tabs(ctx, "team"), h("p", { class: "notice is-error" }, "The time clock isn’t set up yet (database update 44).")); return; }
     const rows = mr.data || [], openNow = or.data || [], people = pr.data || [];
@@ -386,6 +450,29 @@
           s.staff_note ? h("div", null, "Note: “", h("i", null, s.staff_note), "”") : null,
           h("div", { class: "row" }, ok, editButton(s)));
       }))) : null;
+
+    // Missed-shift requests from staff
+    const pendingReqs = tq.error ? [] : (tq.data || []);
+    const reqsPanel = pendingReqs.length ? h("section", { class: "panel panel-attention", "aria-labelledby": "rq-h" },
+      h("h2", { id: "rq-h" }, `Missed-shift requests (${pendingReqs.length})`),
+      h("ul", { class: "clock-list" }, pendingReqs.map((r) => {
+        const note = h("input", { type: "text", maxlength: "300", placeholder: "Note to them (optional)" });
+        const ok = h("button", { class: "btn btn-small", type: "button" }, "Approve – add the shift");
+        const no = h("button", { class: "btn btn-quiet btn-small", type: "button" }, "Decline");
+        const m = h("span", { class: "status", role: "status" });
+        const decide = async (to) => {
+          ok.disabled = no.disabled = true;
+          const u = await db.from("time_requests").update({ status: to, decision_note: note.value.trim() || null }).eq("id", r.id);
+          if (u.error) { ok.disabled = no.disabled = false; ctx.setStatus(m, u.error.message, true); return; }
+          redraw();
+        };
+        ok.addEventListener("click", () => decide("approved"));
+        no.addEventListener("click", () => decide("declined"));
+        return h("li", null, h("b", null, r.person_name), " · ", reqWhen(r), h("div", null, "Reason: “", h("i", null, r.reason), "”"),
+          h("div", { class: "row" }, note, ok, no), m);
+      })),
+      h("p", { class: "fineprint" }, "Check it against the roster. Approving adds the shift exactly as asked, marked as added by you."))
+      : null;
 
     // Month summary per person
     const byPerson = {};
@@ -572,7 +659,7 @@
         h("tbody", null,
           [["Forgot to clock out", "On the clock now – “Forgot to clock out?” after 13 hours", "Correct → set Clock out to when they finished → Save correction"],
            ["Clocked in late or out early by mistake (often with a comment)", "To review, or a day in the Month overview", "Correct → change the time → Save correction"],
-           ["Didn’t clock in or out at all", "A blank day in the Month overview (check the roster)", "Add a missed shift (below) → person, times, lunches, reason → Add shift"],
+           ["Didn’t clock in or out at all", "Missed-shift requests (staff can ask), or a blank day in the Month overview", "Approve the request – or Add a missed shift (below) → person, times, lunches, reason → Add shift"],
            ["Location not confirmed", "To review – shows the distance and their reason", "Reason fine? Mark reviewed. Times wrong? Correct"],
            ["Lunch missing or recorded by mistake", "The Lunches column, or the shift itself", "Correct → set Lunches → Save correction"],
            ["A shift that shouldn’t exist", "The Month overview or Show shifts", "Correct → Delete shift"]
@@ -580,7 +667,7 @@
       h("p", { class: "fineprint" }, "Month end: when On the clock now and To review are both empty, the month is clean – download the Excel."));
 
     fill(main, pageHead("Hours", "Who’s on the clock, shifts to review, and each person’s monthly totals."),
-      tabs(ctx, "team"), guide, nowPanel, reviewPanel,
+      tabs(ctx, "team"), guide, reqsPanel, nowPanel, reviewPanel,
       monthNav(ctx, redraw),
       h("div", { class: "stat-grid" },
         stat(h, all.shifts, "Shifts"), stat(h, hm(all.worked), "Hours worked"),
@@ -798,6 +885,9 @@
     const review = rows.filter((s) => !s.reviewed).length;
     if (forgot) out.push(`${forgot} ${forgot === 1 ? "person has" : "people have"} been clocked in for over 13 hours – forgot to clock out?`);
     if (review) out.push(`${review} ${review === 1 ? "shift" : "shifts"} to review (location not confirmed or a correction request)`);
+    const rq = await db.from("time_requests").select("id").eq("status", "pending");
+    const nReq = rq.error ? 0 : (rq.data || []).length;
+    if (nReq) out.push(`${nReq} missed-shift ${nReq === 1 ? "request" : "requests"} to approve`);
     return out;
   }
 

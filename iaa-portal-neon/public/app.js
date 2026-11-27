@@ -856,8 +856,8 @@
   }
 
   // Maintenance Manager: equipment due or overdue, and open defect and equipment requests.
-  async function maintenanceAttention() {
-    const items = [];
+  async function maintenanceAttention(first) {
+    const items = (first || []).slice();
     try {
       if (window.IAAFleet) (await window.IAAFleet.attention(db)).forEach((t) => items.push(["#/maintenance", t]));
       const r = await db.from("service_requests").select("id, kind, urgency").in("status", ["open", "in_progress"]).in("kind", ["vehicle_defect", "equipment"]);
@@ -874,8 +874,16 @@
 
   // Management: one line per thing waiting for them.
   async function attentionPanel() {
-    if (state.profile.role !== "management") return state.profile.maintenance_manager ? maintenanceAttention() : null;
-    const items = [];
+    let swapItems = [];
+    if (window.IAASwaps) { try { swapItems = await window.IAASwaps.attention(sectionCtx()); } catch (e) { swapItems = []; } }
+    if (state.profile.role !== "management") {
+      if (state.profile.maintenance_manager) return maintenanceAttention(swapItems.map((t) => ["#/requests/swaps", t]));
+      if (!swapItems.length) return null;
+      return h("section", { class: "panel panel-attention", "aria-labelledby": "attn-h" },
+        h("h2", { id: "attn-h" }, "Needs attention"),
+        h("ul", { class: "attention-list" }, swapItems.map((t) => h("li", null, h("a", { href: "#/requests/swaps" }, t)))));
+    }
+    const items = swapItems.map((t) => ["#/requests/swaps", t]);
     try {
       const [acc, req, exp, rev] = await Promise.all([
         db.from("access_requests").select("id").eq("status", "pending"),

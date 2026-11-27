@@ -50,6 +50,7 @@
   }
 
   async function render(main, ctx) {
+    if (/^#\/requests\/swaps/.test(location.hash) && window.IAASwaps) return window.IAASwaps.render(main, ctx, tabs(ctx, "swaps"));
     const tab = /^#\/requests\/service/.test(location.hash) ? "service" : "leave";
     return tab === "service" ? showService(main, ctx) : showLeave(main, ctx);
   }
@@ -58,7 +59,8 @@
     const { h } = ctx;
     return h("nav", { class: "tabs", "aria-label": "Request types" },
       h("a", { href: "#/requests/leave", "aria-current": active === "leave" ? "page" : null }, "Leave & availability"),
-      h("a", { href: "#/requests/service", "aria-current": active === "service" ? "page" : null }, "Stock, equipment & defects"));
+      h("a", { href: "#/requests/service", "aria-current": active === "service" ? "page" : null }, "Stock, equipment & defects"),
+      window.IAASwaps ? h("a", { href: "#/requests/swaps", "aria-current": active === "swaps" ? "page" : null }, "Shift swaps") : null);
   }
 
   // ------------------------------------------------------------------
