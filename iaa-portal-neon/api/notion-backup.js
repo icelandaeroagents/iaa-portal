@@ -328,10 +328,33 @@ async function discover() {
   const sources = all.filter((o) => o.object === "data_source" || o.object === "database");
   const pages = all.filter((o) => o.object === "page" && !(o.parent && (o.parent.type === "data_source_id" || o.parent.type === "database_id")));
   const pageIds = new Set(pages.map((p) => p.id.replace(/-/g, "")));
-  const top = pages.filter((p) => !(p.parent && p.parent.type === "page_id" && pageIds.has(String(p.parent.page_id).replace(/-/g, ""))));
+  let top = pages.filter((p) => !(p.parent && p.parent.type === "page_id" && pageIds.has(String(p.parent.page_id).replace(/-/g, ""))));
+  // A page inside a database row (e.g. a blank page inside a flight) is already backed up
+  // with that row's page contents, so it is left out. Others get their parent's name.
+  const parents = {};
+  const keep = [];
+  for (const p of top) {
+    if (p.parent && p.parent.type === "page_id") {
+      const pid = p.parent.page_id;
+      if (!(pid in parents)) {
+        try {
+          const parent = await notion(`/pages/${pid}`);
+          parents[pid] = { inDatabase: !!(parent.parent && (parent.parent.type === "data_source_id" || parent.parent.type === "database_id")), title: titleOf(parent) };
+        } catch (e) { parents[pid] = { inDatabase: false, title: "" }; }
+      }
+      if (parents[pid].inDatabase) continue;
+      p._parentTitle = parents[pid].title;
+    }
+    keep.push(p);
+  }
+  top = keep;
+  const pageTitle = (p) => {
+    const t = titleOf(p);
+    return t !== "Untitled" ? t : "Untitled" + (p._parentTitle ? " – inside " + p._parentTitle : "") + " (" + p.id.replace(/-/g, "").slice(0, 8) + ")";
+  };
   return {
     databases: sources.map((s) => ({ id: s.id, title: titleOf(s), url: s.url || null })).sort((a, b) => a.title.localeCompare(b.title)),
-    pages: top.map((p) => ({ id: p.id, title: titleOf(p), url: p.url || null })).sort((a, b) => a.title.localeCompare(b.title))
+    pages: top.map((p) => ({ id: p.id, title: pageTitle(p), url: p.url || null })).sort((a, b) => a.title.localeCompare(b.title))
   };
 }
 
