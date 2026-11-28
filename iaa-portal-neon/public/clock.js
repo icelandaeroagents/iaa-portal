@@ -121,6 +121,10 @@
     // Asks for a reason when the location isn't confirmed. Resolves to {loc, reason} or null.
     function withLocation(verb) {
       return new Promise(async (resolve) => {
+        // Management don't need a location check (database update 49).
+        if (ctx.state.profile.role === "management") {
+          return resolve({ loc: { confirmed: false, station: null, km: null }, reason: "Management – no location check" });
+        }
         ctx.setStatus(status, "Checking your location…");
         const loc = await locate();
         if (loc.confirmed) { ctx.setStatus(status, ""); return resolve({ loc, reason: null }); }
@@ -164,7 +168,9 @@
         h("div", { class: "row clock-row" }, btn, h("label", { class: "clock-check" }, lunchNow, " Add lunch now"), note.link),
         note.box,
         area, status,
-        h("p", { class: "fineprint" }, "Your location is checked once when you clock in and out, to confirm you’re at BIRK, BIKF or BIAR. Only the result is saved, never where you were."));
+        h("p", { class: "fineprint" }, ctx.state.profile.role === "management"
+          ? "As management, your location isn’t checked when you clock in and out."
+          : "Your location is checked once when you clock in and out, to confirm you’re at BIRK, BIKF or BIAR. Only the result is saved, never where you were."));
       return panel;
     }
 
@@ -226,7 +232,7 @@
 
     appendAll(panel, 
       h("p", { class: "clock-now" }, `Clocked in since ${clock(open.clock_in)}`, open.clock_in && new Date(open.clock_in).toDateString() !== new Date().toDateString() ? ` (${dayLabel(open.clock_in)})` : "",
-        ` · ${open.in_confirmed ? open.in_station : "location not confirmed"} · on the clock `, worked),
+        ` · ${open.in_confirmed ? open.in_station : /^Management/.test(open.in_reason || "") ? "no location check" : "location not confirmed"} · on the clock `, worked),
       lunchLine,
       open.staff_note ? h("p", { class: "fineprint" }, "Your comment: “" + open.staff_note + "”") : null,
       h("div", { class: "row clock-row" }, addLunch, undo, out, outNote.link),
